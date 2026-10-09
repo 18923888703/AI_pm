@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI PM 学院 · 从小白到独立交付</title>
+<link rel="stylesheet" href="assets/styles.css?v=6">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============ 左侧导航 ============ -->
+  <aside class="sidebar">
+    <div class="ws">
+      <div class="ws-logo">AI</div>
+      <div>
+        <div class="ws-name">AI PM 学院</div>
+        <div class="ws-sub">从小白到独立交付</div>
+      </div>
+    </div>
+
+    <div class="nav" id="nav">
+      <div class="nav-section">学习</div>
+      <div class="nav-item" data-route="home"><span class="nav-ico">🏠</span>今日学习</div>
+      <div class="nav-item" data-route="plan"><span class="nav-ico">📅</span>学习计划<span class="nav-count" id="planCount">1</span></div>
+      <div class="nav-item" data-route="practice"><span class="nav-ico">🧪</span>实战练习<span class="nav-count" id="practiceCount">0/12</span></div>
+      <div class="nav-item" data-route="interview"><span class="nav-ico">🎙️</span>面试测评<span class="nav-count" id="interviewScore">未测</span></div>
+      <div class="nav-item" data-route="path"><span class="nav-ico">🗺️</span>学习路径</div>
+      <div class="nav-item" data-route="dict"><span class="nav-ico">📖</span>术语词典</div>
+      <div class="nav-item" data-route="review"><span class="nav-ico">🔁</span>复习队列<span class="nav-count" id="reviewCount">0</span></div>
+      <div class="nav-item" data-route="mastery"><span class="nav-ico">📊</span>我的掌握度</div>
+
+      <div class="nav-section">学习路径 · 阶段</div>
+      <div id="stageTree"></div>
+
+      <div class="nav-section">其他</div>
+      <div class="nav-item" data-route="settings"><span class="nav-ico">⚙️</span>设置与记忆</div>
+    </div>
+
+    <div class="side-foot">
+      <div class="prog-wrap">
+        <div class="ring" id="ring"></div>
+        <div class="prog-txt">
+          <b id="progPct">0%</b> 已掌握<br>
+          <span id="progSub">共 0 / 0 个概念</span>
+        </div>
+      </div>
+      <div class="side-line" id="sideLevel">
+        <span class="tag" id="gradeTag">起步</span>
+        <span class="tiny" id="syncLine">本地存储</span>
+      </div>
+      <button class="mem-btn" id="memPeek">🧠 记忆档案：0 条学习记录</button>
+    </div>
+  </aside>
+
+  <!-- ============ 右侧内容 ============ -->
+  <main class="main">
+    <header class="topbar" id="topbar">
+      <div class="crumb" id="crumb"></div>
+      <div class="top-actions">
+        <div class="search-box">
+          <span class="ico">🔍</span>
+          <input id="globalSearch" placeholder="搜索术语…" autocomplete="off" aria-label="搜索术语">
+        </div>
+        <button class="btn sm" id="toggleChat" aria-controls="chat" aria-expanded="false">💬 AI 追问</button>
+      </div>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+
+  <!-- ============ AI 追问侧栏 ============ -->
+  <aside class="chat hidden" id="chat" aria-hidden="true">
+    <div class="chat-head">
+      <span>AI 追问</span>
+      <span class="sub" id="chatCtx">未选择概念</span>
+      <button class="btn ghost sm" style="margin-left:auto" id="chatClose">✕</button>
+    </div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-quick" id="chatQuick"></div>
+    <div class="chat-foot">
+      <textarea class="chat-input" id="chatInput" placeholder="哪里没懂？直接问，比如「用一个餐厅的例子讲一下」"></textarea>
+      <div class="row">
+        <span class="hint">Enter 发送 · Shift+Enter 换行</span>
+        <span class="mode-pill" id="modePill">离线讲解</span>
+        <button class="btn primary sm" id="chatSend">发送</button>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<nav class="mobile-nav" aria-label="移动端主导航">
+  <button data-route="home"><span>🏠</span>今日</button>
+  <button data-route="plan"><span>📅</span>计划</button>
+  <button data-route="practice"><span>🧪</span>练习</button>
+  <button data-route="interview"><span>🎙️</span>测评</button>
+  <button data-route="path"><span>🗺️</span>路径</button>
+  <button data-route="settings"><span>⚙️</span>设置</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/data-core.js?v=6"></script>
+<script src="assets/data-adv.js?v=6"></script>
+<script src="assets/data-pro.js?v=6"></script>
+<script src="assets/data-pm.js?v=6"></script>
+<script src="assets/curriculum.js?v=6"></script>
+<script src="assets/store.js?v=6"></script>
+<script src="assets/memory.js?v=6"></script>
+<script src="assets/practice.js?v=6"></script>
+<script src="assets/llm.js?v=6"></script>
+<script src="assets/app.js?v=6"></script>
+</body>
+</html>
