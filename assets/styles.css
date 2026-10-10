@@ -437,6 +437,9 @@ body.simple-mode .simple-only{display:block}
 .assessment-top > div:first-child b{color:var(--blue)}
 .assessment-progress{height:6px;background:var(--border);border-radius:8px;overflow:hidden}
 .assessment-progress i{display:block;height:100%;background:var(--blue);border-radius:8px}
+.assessment-question-meta{display:flex;gap:6px;margin-bottom:12px}
+.assessment-question-meta span{font-size:11px;line-height:22px;padding:0 8px;border-radius:999px;background:var(--bg-soft);color:var(--text-2);border:1px solid var(--border)}
+.assessment-question-meta span.review{background:rgba(105,64,165,.08);color:#6940a5;border-color:rgba(105,64,165,.2)}
 .assessment-card h1{font-size:28px;max-width:680px;margin-bottom:24px}
 .assessment-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .assessment-options button{

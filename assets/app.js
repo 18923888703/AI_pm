@@ -21,6 +21,15 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function shuffled(list) {
+    const out = list.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+    }
+    return out;
+  }
+
   /** 极简 Markdown：加粗 / 行内代码 / 引用 / 分割线 / 换行 */
   function md(s) {
     let h = esc(s);
@@ -705,10 +714,14 @@
 
   function viewInterviewResult(iv) {
     const result = iv.result;
-    const wrong = window.INTERVIEW_QUESTIONS.map(function (q, i) { return { q: q, answer: iv.answers[i] }; })
+    const questions = window.Lab.interviewQuestions();
+    const wrong = questions.map(function (q, i) { return { q: q, answer: iv.answers[i] }; })
       .filter(function (x) { return x.answer !== x.q.a; });
+    const reviewNote = result.reviewCount
+      ? ' 其中变式复测答对 ' + result.reviewCorrect + ' / ' + result.reviewCount + ' 题。'
+      : '';
     let html = '<div class="page"><div class="result-head"><div class="score-disc" style="--score:' + result.score + ';--score-color:' + scoreTone(result.score) + '"><b>' + result.score + '</b><span>/100</span></div>' +
-      '<div><h1>' + esc(result.label) + '</h1><p class="lead">答对 ' + result.correct + ' / ' + result.total + ' 题。分数只反映这套题覆盖的能力，不代表招聘结论。</p>' +
+      '<div><h1>' + esc(result.label) + '</h1><p class="lead">答对 ' + result.correct + ' / ' + result.total + ' 题。' + esc(reviewNote) + '分数只反映本次随机题覆盖的能力，不代表招聘结论。</p>' +
       '<button class="btn" data-assess-start="1">重新测评</button></div></div>' +
       '<h2>六维能力诊断</h2><div class="dimension-list">';
     Object.keys(window.INTERVIEW_DIMS).forEach(function (k) {
@@ -729,21 +742,25 @@
     const iv = window.Lab.interview();
     if (iv.completedAt && iv.result) return viewInterviewResult(iv);
     if (iv.startedAt) {
+      const questions = window.Lab.interviewQuestions();
       const idx = iv.answers.length;
-      const q = window.INTERVIEW_QUESTIONS[idx];
+      const q = questions[idx];
       if (!q) return '<div class="page"><div class="empty">测评状态异常，请重新开始。<br><br><button class="btn" data-assess-start="1">重新开始</button></div></div>';
       const dim = window.INTERVIEW_DIMS[q.dim];
-      return '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (idx + 1) + ' / ' + window.INTERVIEW_QUESTIONS.length + ' 题</span><b>' + esc(dim.name) + '</b></div>' +
-        '<div class="assessment-progress"><i style="width:' + Math.round(idx / window.INTERVIEW_QUESTIONS.length * 100) + '%"></i></div></div>' +
-        '<div class="assessment-card"><h1>' + esc(q.q) + '</h1><div class="assessment-options">' + q.options.map(function (o, i) {
+      return '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (idx + 1) + ' / ' + questions.length + ' 题</span><b>' + esc(dim.name) + '</b></div>' +
+        '<div class="assessment-progress"><i style="width:' + Math.round(idx / questions.length * 100) + '%"></i></div></div>' +
+        '<div class="assessment-card"><div class="assessment-question-meta"><span>随机题</span>' +
+        (q.review ? '<span class="review">变式复测</span>' : '<span>首次抽到</span>') + '</div><h1>' + esc(q.q) + '</h1><div class="assessment-options">' + q.options.map(function (o, i) {
           return '<button data-assess-answer="' + i + '"><span>' + 'ABCD'[i] + '</span>' + esc(o) + '</button>';
         }).join('') + '</div></div><p class="assessment-note">答题过程中不显示正误，避免后面的题被提示影响。</p></div>';
     }
 
     const last = (iv.history || []).slice(-1)[0];
+    const sessionSize = window.Lab.interviewSessionSize();
+    const bankSize = window.Lab.interviewBankSize();
     let html = '<div class="page interview-intro"><h1>AI PM 面试测评</h1>' +
-      '<p class="lead">' + window.INTERVIEW_QUESTIONS.length + ' 道情境题，覆盖 AI 基础、需求判断、方案架构、Prompt 与工作流、产品化验证、交付风险六个维度。完成后自动生成补弱学习计划。</p>' +
-      '<div class="assessment-facts"><div><b>' + window.INTERVIEW_QUESTIONS.length + '</b><span>道题</span></div><div><b>' + Object.keys(window.INTERVIEW_DIMS).length + '</b><span>能力维度</span></div><div><b>15</b><span>分钟左右</span></div></div>' +
+      '<p class="lead">每次从 ' + bankSize + ' 道情境题中分层随机抽取 ' + sessionSize + ' 道，覆盖六个能力维度。已答对的知识点仍会用不同问法复测，避免只记住原题答案。</p>' +
+      '<div class="assessment-facts"><div><b>' + sessionSize + '</b><span>每次抽题</span></div><div><b>' + bankSize + '</b><span>题库总量</span></div><div><b>12</b><span>分钟左右</span></div></div>' +
       '<div class="dimension-preview">';
     Object.keys(window.INTERVIEW_DIMS).forEach(function (k) {
       const d = window.INTERVIEW_DIMS[k];
@@ -751,7 +768,7 @@
     });
     html += '</div>' + (last ? '<div class="last-score">上次得分 <b>' + last.score + '</b> / 100</div>' : '') +
       '<button class="btn primary assessment-start" data-assess-start="1">开始测评</button>' +
-      '<p class="tiny">评分依据是固定题目和答案，不使用模型临场判断；结果保存在当前浏览器。</p></div>';
+      '<p class="tiny">题目、题序和选项顺序都会随机；评分仍依据预先校验的标准答案，不使用模型临场判断。结果保存在当前浏览器。</p></div>';
     return html;
   }
 
@@ -985,11 +1002,13 @@
 
     // 测验
     html += '<div class="divider"></div><h2>小测验</h2>' +
-      '<p class="tiny" style="margin-top:-4px">答错没关系，答错了我会记住这个概念，之后主动提醒你复习。</p>';
+      '<p class="tiny" style="margin-top:-4px">题目顺序和答案位置会随机。答错没关系，我会记住这个概念，之后主动提醒你复习。</p>';
     t.quiz.forEach(function (q, qi) {
-      html += '<div class="quiz" data-q="' + qi + '"><div class="quiz-q">' + (qi + 1) + '. ' + esc(q.q) + '</div>' +
-        q.options.map(function (o, oi) {
-          return '<button type="button" class="opt" data-opt="' + oi + '"><span class="k">' + 'ABCD'[oi] + '</span><span>' + esc(o) + '</span></button>';
+      const displayOptions = shuffled(q.options.map(function (text, original) { return { text: text, original: original }; }));
+      const correctDisplay = displayOptions.findIndex(function (x) { return x.original === q.a; });
+      html += '<div class="quiz" data-q="' + qi + '" data-correct-display="' + correctDisplay + '"><div class="quiz-q">' + (qi + 1) + '. ' + esc(q.q) + '</div>' +
+        displayOptions.map(function (o, oi) {
+          return '<button type="button" class="opt" data-opt="' + oi + '" data-original="' + o.original + '"><span class="k">' + 'ABCD'[oi] + '</span><span>' + esc(o.text) + '</span></button>';
         }).join('') +
         '<div class="explain" style="display:none"></div></div>';
     });
@@ -1365,12 +1384,14 @@
       if (quizEl.dataset.done) return;
       const qi = +quizEl.dataset.q;
       const oi = +el.dataset.opt;
+      const original = +el.dataset.original;
+      const correctDisplay = +quizEl.dataset.correctDisplay;
       const q = currentTerm.quiz[qi];
-      const ok = oi === q.a;
+      const ok = original === q.a;
       quizEl.dataset.done = '1';
       quizEl.querySelectorAll('.opt').forEach(function (o, i) {
         o.classList.add('disabled');
-        if (i === q.a) o.classList.add('correct');
+        if (i === correctDisplay) o.classList.add('correct');
         else if (i === oi) o.classList.add('wrong');
       });
       const ex = quizEl.querySelector('.explain');
