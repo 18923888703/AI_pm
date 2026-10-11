@@ -68,9 +68,9 @@ button:focus-visible,[role=button]:focus-visible,summary:focus-visible{
 .ws-sub{font-size:11px;color:var(--text-3);margin-top:-3px}
 
 .nav-section{margin:14px 0 4px;padding:0 16px;font-size:11px;font-weight:600;color:var(--text-3);letter-spacing:.04em}
-.nav{flex:1;overflow-y:auto;padding:0 8px 10px}
+.nav{flex:1;overflow-y:auto;padding:8px 8px 10px}
 .nav-item{
-  display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--radius);
+  display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--radius);
   cursor:pointer;font-size:14px;color:var(--text);position:relative;
 }
 .nav-item:hover{background:var(--bg-hover)}
@@ -288,6 +288,28 @@ body.simple-mode .simple-only{display:block}
 .side-line{display:flex;align-items:center;gap:6px;margin-top:8px;padding:0 2px}
 
 /* ---------- 今日计划 ---------- */
+.home-focus{padding-top:48px}
+.home-focus > h1{font-size:34px;margin-bottom:2px}
+.home-data-strip{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:26px 0 34px}
+.home-data-strip > div{padding:16px 18px;border-right:1px solid var(--border)}
+.home-data-strip > div:first-child{padding-left:0}
+.home-data-strip > div:last-child{border-right:0}
+.home-data-strip b,.home-data-strip span{display:block;font-variant-numeric:tabular-nums}
+.home-data-strip b{font-size:22px;line-height:1.2}
+.home-data-strip span{font-size:12px;color:var(--text-2);margin-top:4px}
+.home-next{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:4px 0 28px;border-bottom:1px solid var(--border)}
+.home-next h2{font-size:22px;margin:9px 0 3px}
+.home-next p{margin:0;color:var(--text-2);max-width:64ch}
+.home-next .btn{height:40px;padding:0 16px;flex:0 0 auto}
+.home-tag-section{margin-top:28px}
+.home-tag-section h2{font-size:14px;margin:0 0 10px;color:var(--text-2)}
+.knowledge-tags{display:flex;flex-wrap:wrap;gap:8px}
+.knowledge-tag{display:inline-flex;align-items:center;min-height:30px;padding:4px 10px;border-radius:999px;font-size:13px;border:1px solid var(--border)}
+.knowledge-tag.pending{background:#fff;color:var(--text)}
+.knowledge-tag.done{background:rgba(15,123,108,.07);border-color:rgba(15,123,108,.18);color:var(--green)}
+.home-tag-section.completed{opacity:.84}
+.home-carry{margin-top:24px;color:var(--orange)}
+
 .plan-card{
   border:1px solid var(--border-2);border-radius:12px;background:#fff;padding:18px 20px;margin:18px 0 22px;
   box-shadow:0 6px 24px rgba(15,15,15,.07);
@@ -448,7 +470,23 @@ body.simple-mode .simple-only{display:block}
 }
 .assessment-options button:hover{background:var(--bg-soft);border-color:var(--blue)}
 .assessment-options button span{width:22px;height:22px;border-radius:50%;border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;flex:0 0 22px;font-size:11px}
+.assessment-options button.correct{border-color:rgba(15,123,108,.45);background:rgba(15,123,108,.06)}
+.assessment-options button.correct span{background:var(--green);border-color:var(--green);color:#fff}
+.assessment-options button.wrong{border-color:rgba(224,62,62,.4);background:rgba(224,62,62,.05)}
+.assessment-options button:disabled{cursor:default;color:var(--text)}
 .assessment-note{font-size:12px;color:var(--text-3);margin-top:14px}
+.daily-score-line{display:flex;justify-content:space-between;align-items:baseline;margin:-22px 0 18px;color:var(--text-2);font-size:13px}
+.daily-score-line b{font-size:17px;color:var(--text);font-variant-numeric:tabular-nums}
+.assessment-open-answer{width:100%;min-height:210px;resize:vertical;border:1px solid var(--border-2);border-radius:12px;padding:16px;line-height:1.7;background:#fff}
+.assessment-open-answer:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(35,131,226,.12)}
+.assessment-open-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px}
+.assessment-your-answer{padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.assessment-your-answer p,.assessment-outline p{margin:5px 0 0;color:var(--text-2)}
+.assessment-rubric{margin-top:22px}
+.assessment-rubric h2{font-size:16px;margin-bottom:10px}
+.assessment-rubric label{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.assessment-rubric input{margin-top:5px;accent-color:var(--blue)}
+.assessment-outline{margin-top:18px;padding:13px 15px;background:var(--bg-soft);border-radius:10px}
 .result-head{display:flex;gap:24px;align-items:center;margin:12px 0 30px}
 .score-disc{flex:0 0 118px;padding:12px 16px;border-right:1px solid var(--border)}
 .score-disc b{font-size:48px;line-height:1;color:var(--score-color);letter-spacing:-.04em}
@@ -486,6 +524,11 @@ body.simple-mode .simple-only{display:block}
 .wrong-list details{border-bottom:1px solid var(--border)}
 .wrong-list summary{padding:11px 2px;cursor:pointer;font-size:13.5px;font-weight:550}
 .wrong-list p{font-size:13px;color:var(--text-2);margin:5px 0 10px;padding-left:16px}
+
+.my-tabs{display:flex;gap:4px;margin:10px 0 30px;border-bottom:1px solid var(--border)}
+.my-tabs button{border:0;background:transparent;padding:9px 12px;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.my-tabs button:hover{color:var(--text);background:var(--bg-soft)}
+.my-tabs button.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
 
 /* 术语页：今天这份计划里的位置 */
 .plan-strip{
@@ -745,7 +788,7 @@ body.simple-mode .simple-only{display:block}
   .chat.hidden{margin-right:0;transform:translateX(100%)}
   .mobile-nav{
     position:fixed;left:0;right:0;bottom:0;z-index:45;height:58px;
-    display:grid;grid-template-columns:repeat(6,1fr);background:var(--bg-side);
+    display:grid;grid-template-columns:repeat(5,1fr);background:var(--bg-side);
     border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom);
   }
   .mobile-nav button{
@@ -756,8 +799,17 @@ body.simple-mode .simple-only{display:block}
 .mobile-nav button.active{color:var(--blue);font-weight:600;background:rgba(35,131,226,.06)}
   .mobile-nav button:focus-visible{outline:2px solid var(--blue);outline-offset:-3px}
   .page{padding-bottom:90px}
-  .hero{padding-top:20px}
-  .hero h1{font-size:28px}
+  .home-focus{padding-top:24px}
+  .home-focus > h1{font-size:28px}
+  .home-data-strip{grid-template-columns:1fr 1fr;margin:20px 0 26px}
+  .home-data-strip > div{padding:12px 10px;border-bottom:1px solid var(--border)}
+  .home-data-strip > div:nth-child(2){border-right:0}
+  .home-data-strip > div:nth-child(4){border-right:0}
+  .home-data-strip > div:nth-child(3),.home-data-strip > div:nth-child(4){border-bottom:1px solid var(--border)}
+  .home-data-strip > div:nth-child(3){padding-left:0}
+  .home-data-strip > div:nth-child(5){grid-column:1/-1;border:0;padding-left:0}
+  .home-next{align-items:stretch;flex-direction:column;gap:16px}
+  .home-next .btn{width:100%;justify-content:center}
   .plan-card{padding:15px 14px;margin-left:-4px;margin-right:-4px}
   .plan-top{align-items:center}
   .plan-budget{padding:5px 9px}
@@ -781,6 +833,8 @@ body.simple-mode .simple-only{display:block}
   .check-list,.self-rating,.dimension-preview,.assessment-options{grid-template-columns:1fr}
   .assessment-facts > div{padding:12px 10px}
   .assessment-card h1{font-size:24px}
+  .assessment-open-actions{align-items:stretch;flex-direction:column}
+  .assessment-open-actions .btn{width:100%;justify-content:center;height:42px}
   .result-head{align-items:flex-start;gap:12px}
   .score-disc{flex-basis:86px;padding:8px 10px 8px 0}
   .score-disc b{font-size:38px}

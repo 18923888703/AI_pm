@@ -1,7 +1,7 @@
 /* ============================================================
    课程大纲（Curriculum）
    ------------------------------------------------------------
-   把散装的 60 个术语编成一份有顺序、有先修关系的固定课表。
+   把散装的 61 个术语编成一份有顺序、有先修关系的固定课表。
    这是「学习计划」的骨架 —— 计划不是每天临时算出来的推荐，
    而是「这份大纲排到第几课了，今天继续往下走」。
 
@@ -24,9 +24,9 @@
     { stage: 1, t: '调用一次到底发生了什么', g: '区分「训练」和「推理」，知道温度和每次回答不一样的关系', ids: ['inference', 'temperature'] },
     { stage: 1, t: '怎么让它稳定地听你的话', g: '系统提示词和示例分管不同的事，不再往用户提示里堆要求', ids: ['systemprompt', 'fewshot'] },
     { stage: 1, t: '要的不是一句话，是能用的数据', g: '什么时候必须上结构化输出，以及它挡掉的是哪一类事故', ids: ['structured'] },
-    { stage: 1, t: '给它外挂一本自己的资料', g: '搞懂 RAG 这条链路：先把文字变成向量，再按问题找回来', ids: ['embedding', 'rag'] },
+    { stage: 1, t: '给它外挂一本自己的资料', g: '搞懂 RAG 的召回与重排序：先广泛找回来，再把最相关资料排到前面', ids: ['embedding', 'rag', 'rerank'] },
     { stage: 1, t: '资料存哪儿，要不要亲自训练它', g: '能判断一个需求该用 RAG 还是微调，不再拍脑袋', ids: ['vectordb', 'finetune'] },
-    { stage: 1, kind: 'checkpoint', t: '阶段检查 · 稳定干活', g: '能独立说出「这个需求用提示词 / RAG / 微调」的选择依据', ids: ['inference', 'temperature', 'systemprompt', 'fewshot', 'structured', 'embedding', 'rag', 'vectordb', 'finetune'] },
+    { stage: 1, kind: 'checkpoint', t: '阶段检查 · 稳定干活', g: '能独立说出「这个需求用提示词 / RAG / 微调」的选择依据', ids: ['inference', 'temperature', 'systemprompt', 'fewshot', 'structured', 'embedding', 'rag', 'rerank', 'vectordb', 'finetune'] },
 
     /* ---------- 阶段 2：Agent 是怎么转起来的 ---------- */
     { stage: 2, t: 'Agent 就是模型 + 手', g: '明白 Agent 和聊天的本质差别：它能不能真的去做一件事', ids: ['agent', 'tool'] },

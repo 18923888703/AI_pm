@@ -213,6 +213,28 @@
       ).sort(function (x, y) { return x.t - y.t; }).slice(-200)
     };
 
+    const mergedQuiz = JSON.parse(JSON.stringify(a.quizVariants || {}));
+    Object.keys(b.quizVariants || {}).forEach(function (termId) {
+      const x = b.quizVariants[termId] || {};
+      const cur = mergedQuiz[termId] || { answered: {}, recentIds: [], correct: 0, wrong: 0 };
+      cur.answered = cur.answered || {};
+      Object.keys(x.answered || {}).forEach(function (qid) {
+        const qa = cur.answered[qid] || {};
+        const qb = x.answered[qid] || {};
+        cur.answered[qid] = {
+          attempts: Math.max(qa.attempts || 0, qb.attempts || 0),
+          correct: Math.max(qa.correct || 0, qb.correct || 0),
+          wrong: Math.max(qa.wrong || 0, qb.wrong || 0),
+          lastAt: Math.max(qa.lastAt || 0, qb.lastAt || 0)
+        };
+      });
+      cur.correct = Math.max(cur.correct || 0, x.correct || 0);
+      cur.wrong = Math.max(cur.wrong || 0, x.wrong || 0);
+      cur.recentIds = unionBy([].concat(cur.recentIds || [], x.recentIds || []), function (id) { return id; }).slice(-6);
+      mergedQuiz[termId] = cur;
+    });
+    out.quizVariants = mergedQuiz;
+
     out.prefs = newest.prefs || base.prefs;
     out.plan = newest.plan || base.plan;
     out.updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);

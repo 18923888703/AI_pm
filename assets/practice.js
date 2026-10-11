@@ -89,10 +89,10 @@
       source: '项目实践篇 · RAG、Function Calling 与 MCP',
       scenario: '客服既要回答商品保质期，又要查询用户订单状态，还要把处理结果写入 CRM。',
       task: '分别决定哪些问题走 RAG、结构化查询、函数调用和 MCP，并说明数据类型、权限和失败兜底。',
-      checkpoints: ['非结构化知识与结构化数据分流', '动作通过受控工具执行', '协议与业务工具没有混为一谈', '没有数据时不让模型编造'],
-      reference: ['商品政策和 FAQ：RAG，返回引用片段。', '订单状态：按订单号或手机号查询结构化数据库/API。', '创建工单或写 CRM：Function Calling，先校验权限和幂等键。', '多个 AI 应用需要统一接入工具时：可用 MCP 暴露能力；MCP 本身不替代业务权限。'],
+      checkpoints: ['非结构化知识与结构化数据分流', '召回与重排序的职责分开', '动作通过受控工具执行', '协议与业务工具没有混为一谈', '没有数据时不让模型编造'],
+      reference: ['商品政策和 FAQ：RAG，先混合召回候选，再按问题相关性 Rerank，最后返回少量引用片段。', '订单状态：按订单号或手机号查询结构化数据库/API。', '创建工单或写 CRM：Function Calling，先校验权限和幂等键。', '多个 AI 应用需要统一接入工具时：可用 MCP 暴露能力；MCP 本身不替代业务权限。'],
       rubric: ['数据类型判断正确', '查询与动作分开', '权限边界明确', '失败有兜底'],
-      related: ['rag', 'vectordb', 'tool', 'mcp'],
+      related: ['rag', 'rerank', 'vectordb', 'tool', 'mcp'],
       decision: { q: '查询“我的订单到哪了”最合适的主数据来源是？', options: ['让大模型凭训练知识回答', '订单数据库或物流 API', '商品 FAQ 的向量库', '把所有数据塞进系统提示词'], a: 1, why: '订单状态是实时结构化事实，应来自业务系统而不是生成或语义检索。' }
     },
     {
@@ -142,12 +142,14 @@
   ];
 
   const DIMS = {
-    foundation: { name: 'AI 基础认知', desc: '模型、上下文、不确定性与成本', terms: ['llm', 'token', 'context', 'hallucination', 'temperature'], practices: ['rag-tool-selection'] },
-    problem: { name: '需求判断', desc: '问题、证据、MVP 与成效', terms: ['problemframing', 'aisuitability', 'taskdecomp', 'outcomemetric'], practices: ['brief-to-task', 'assumption-evidence', 'mvp-slice'] },
-    architecture: { name: 'AI 方案架构', desc: 'RAG、数据、工具与系统连接', terms: ['rag', 'vectordb', 'tool', 'mcp', 'modelselection'], practices: ['rag-tool-selection', 'order-chatflow'] },
-    workflow: { name: 'Prompt 与工作流', desc: '结构化 Prompt、分支、Agent 状态', terms: ['systemprompt', 'structured', 'workflow', 'orchestration', 'agent'], practices: ['prompt-contract', 'workflow-breakdown', 'agent-four-layers'] },
-    product: { name: '产品化与验证', desc: '确认、恢复、评测与体验闭环', terms: ['autonomy', 'provenance', 'aiux', 'eval', 'goldenset'], practices: ['confirmation-gate', 'demo-product-loop'] },
-    delivery: { name: '交付与风险', desc: '成本、可观测、灰度与回滚', terms: ['riskgrading', 'observability', 'economics', 'idempotent', 'rollout'], practices: ['risk-workflow', 'enterprise-handoff'] }
+    project_experience: { name: '项目与产品经验', desc: '项目价值、个人贡献与复盘', terms: ['problemframing', 'outcomemetric', 'flywheel'], practices: ['assumption-evidence', 'enterprise-handoff'] },
+    product_value: { name: '产品方法与商业价值', desc: '需求、MVP、ROI 与产品判断', terms: ['problemframing', 'aisuitability', 'taskdecomp', 'outcomemetric'], practices: ['brief-to-task', 'mvp-slice'] },
+    ai_foundation: { name: 'AI 与模型基础', desc: '模型能力、边界与技术选型', terms: ['llm', 'context', 'hallucination', 'temperature', 'modelselection'], practices: ['brief-to-task', 'enterprise-handoff'] },
+    rag_retrieval: { name: 'RAG、检索与 Rerank', desc: '知识库、召回、重排序与生成', terms: ['rag', 'rerank', 'embedding', 'vectordb', 'provenance'], practices: ['rag-tool-selection', 'order-chatflow'] },
+    agent_workflow: { name: 'Agent、工作流与工具', desc: '状态、工具、MCP 与流程设计', terms: ['agent', 'workflow', 'tool', 'mcp', 'orchestration'], practices: ['workflow-breakdown', 'agent-four-layers', 'order-chatflow'] },
+    evaluation_data: { name: '评测、数据与指标', desc: '评测集、Badcase、指标与反馈', terms: ['eval', 'goldenset', 'llmjudge', 'observability', 'calibration'], practices: ['confirmation-gate', 'demo-product-loop'] },
+    delivery_collaboration: { name: '交付、项目管理与协作', desc: '排期、灰度、风险与跨团队推进', terms: ['riskgrading', 'economics', 'idempotent', 'rollout', 'recovery'], practices: ['risk-workflow', 'enterprise-handoff'] },
+    industry_soft: { name: '行业判断、表达与软素质', desc: '趋势判断、沟通、成长与影响力', terms: ['aiux', 'autonomy', 'buildbuy', 'flywheel', 'calibration'], practices: ['assumption-evidence', 'demo-product-loop'] }
   };
 
   const QUESTIONS = [
@@ -219,6 +221,8 @@
     { id: 'architecture-live-data-b', concept: 'architecture-live-data', variant: 2, dim: 'architecture', q: '要回答“我今天还有多少可用额度”，系统应优先读取什么？', options: ['向量库里的历史说明', '账户系统的实时结构化数据', '模型训练数据', '系统提示词中的示例'], a: 1, why: '额度是实时账户事实，应来自受权限控制的业务系统。' },
     { id: 'architecture-tools-b', concept: 'architecture-tools', variant: 2, dim: 'architecture', q: '多个智能体需要用统一方式发现并调用企业工具，哪项描述更准确？', options: ['MCP 可作为能力暴露与连接协议，具体调用仍需权限控制', 'MCP 会自动替代所有业务 API', 'Function Calling 是数据库', '只需把工具说明写进普通对话'], a: 0, why: 'MCP 负责标准化连接与能力暴露，不替代业务实现和权限。' },
     { id: 'architecture-secrets-b', concept: 'architecture-secrets', variant: 2, dim: 'architecture', q: '浏览器端原型需要调用付费模型，正式上线时密钥应如何处理？', options: ['打包进前端代码', '放进 URL', '由后端保管并按最小权限代理请求', '写在页面注释里'], a: 2, why: '前端内容可被查看，长期密钥必须在服务端保管并限制权限。' },
+    { id: 'architecture-rerank-a', concept: 'architecture-rerank', variant: 1, dim: 'architecture', q: '正确政策片段已在向量检索 Top 30 中，却排在第 14；系统只把前 5 段交给模型。最直接的优化是？', options: ['增加 Reranker 对候选片段重排序', '提高生成温度', '把所有文档塞进上下文', '取消引用'], a: 0, why: '正确资料已召回但排序靠后，应在召回后加入重排序，提高最终 Top K 的精度。' },
+    { id: 'architecture-rerank-b', concept: 'architecture-rerank', variant: 2, dim: 'architecture', q: 'Reranker 在典型 RAG 链路中的位置是？', options: ['扫描整个知识库后再召回', '候选召回之后、拼接生成上下文之前', '答案生成之后替代事实核验', '向量入库之前'], a: 1, why: '先用便宜检索得到候选，再用 Reranker 精排少量候选，最后选择高质量片段生成。' },
 
     { id: 'workflow-contract-b', concept: 'workflow-contract', variant: 2, dim: 'workflow', q: '一个节点既抽取字段、又判断风险、又发送通知，主要问题是什么？', options: ['职责混杂，难以测试和定位故障', '节点数量太少所以速度一定更快', '提示词不够长', '模型参数不够多'], a: 0, why: '单一职责和稳定输入输出契约才能让节点独立测试、替换和排障。' },
     { id: 'workflow-missing-input-b', concept: 'workflow-missing-input', variant: 2, dim: 'workflow', q: '退款查询缺少订单号，但用户已提供手机号。流程最合理的下一步是？', options: ['随机选择一个订单', '用手机号查候选订单并让用户确认', '直接承诺退款成功', '忽略缺失信息继续执行'], a: 1, why: '应利用已有结构化信息缩小范围，并在关键对象不唯一时确认。' },
@@ -237,8 +241,9 @@
   ];
 
   const QUESTION_BANK = QUESTIONS.concat(VARIANT_QUESTIONS);
-  const QUESTIONS_PER_DIM = 3;
-  const SESSION_SIZE = Object.keys(DIMS).length * QUESTIONS_PER_DIM;
+  const MCQ_COUNT = 12;
+  const OPEN_COUNT = 8;
+  const SESSION_SIZE = MCQ_COUNT + OPEN_COUNT;
 
   function shuffled(list) {
     const out = list.slice();
@@ -249,27 +254,46 @@
     return out;
   }
 
-  function shuffledQuestion(q, review) {
-    const opts = shuffled(q.options.map(function (text, original) {
-      return { text: text, correct: original === q.a };
-    }));
-    return {
-      id: q.id, concept: q.concept, variant: q.variant, dim: q.dim,
-      q: q.q, options: opts.map(function (x) { return x.text; }),
-      a: opts.findIndex(function (x) { return x.correct; }), why: q.why,
-      review: !!review
+  function currentBank() {
+    return window.INTERVIEW_BANK || QUESTION_BANK.map(function (q, index) {
+      const dimMap = { foundation: 'ai_foundation', problem: 'product_value', architecture: 'rag_retrieval', workflow: 'agent_workflow', product: 'evaluation_data', delivery: 'delivery_collaboration' };
+      const id = q.id || ('fallback-' + index);
+      const options = q.options.map(function (text, i) { return { id: id + '-o' + (i + 1), text: text }; });
+      return {
+        id: id, variantGroup: q.concept || id, dimension: dimMap[q.dim] || q.dim,
+        difficulty: q.variant === 2 ? 2 : 1, type: 'mcq', topics: [q.concept || id],
+        prompt: q.q, options: options, correctOptionId: options[q.a].id,
+        explanation: q.why, sourceRef: '原课程题库'
+      };
+    });
+  }
+
+  function sessionQuestion(q, review) {
+    const base = {
+      id: q.id, variantGroup: q.variantGroup, dimension: q.dimension, difficulty: q.difficulty,
+      type: q.type, subtype: q.subtype || '', topics: (q.topics || []).slice(), prompt: q.prompt,
+      review: !!review, sourceRef: q.sourceRef || ''
     };
+    if (q.type === 'open') {
+      base.rubric = (q.rubric || []).map(function (x) { return { id: x.id, label: x.label, weight: x.weight || 1 }; });
+      base.answerOutline = q.answerOutline || '';
+    } else {
+      base.options = shuffled((q.options || []).map(function (x) { return { id: x.id, text: x.text }; }));
+      base.correctOptionId = q.correctOptionId;
+      base.explanation = q.explanation || '';
+    }
+    return base;
   }
 
   let S = null;
 
   function empty() {
     return {
-      version: 2,
+      version: 3,
       practices: {},
       interview: {
         answers: [], startedAt: 0, completedAt: 0, result: null, history: [],
-        sessionQuestions: [], questionStats: {}, lastQuestionIds: []
+        sessionQuestions: [], questionStats: {}, lastQuestionIds: [], recentSessions: [], pendingOpen: null
       },
       plan: null
     };
@@ -278,18 +302,34 @@
     const mem = window.Mem.state;
     if (!mem.lab || typeof mem.lab !== 'object') mem.lab = empty();
     S = mem.lab;
-    S.version = 2;
+    const oldVersion = Number(S.version || 1);
+    S.version = 3;
     S.practices = S.practices || {};
     S.interview = Object.assign(empty().interview, S.interview || {});
     if (!Array.isArray(S.interview.answers)) S.interview.answers = [];
     if (!Array.isArray(S.interview.sessionQuestions)) S.interview.sessionQuestions = [];
     if (!S.interview.questionStats || typeof S.interview.questionStats !== 'object') S.interview.questionStats = {};
     if (!Array.isArray(S.interview.lastQuestionIds)) S.interview.lastQuestionIds = [];
+    if (!Array.isArray(S.interview.recentSessions)) S.interview.recentSessions = [];
+    if (S.interview.pendingOpen && typeof S.interview.pendingOpen !== 'object') S.interview.pendingOpen = null;
     // 旧版本进行到一半的固定题测评无法可靠映射到新版随机题，安全回到起始页。
-    if (S.interview.startedAt && !S.interview.completedAt && !S.interview.sessionQuestions.length) {
+    if (S.interview.startedAt && !S.interview.completedAt && (!S.interview.sessionQuestions.length || oldVersion < 3)) {
       S.interview.answers = [];
       S.interview.startedAt = 0;
       S.interview.result = null;
+      S.interview.pendingOpen = null;
+    }
+    if (oldVersion < 3 && S.interview.completedAt && S.interview.result) {
+      const legacy = S.interview.result;
+      if (!(S.interview.history || []).some(function (x) { return x.at === legacy.at; })) {
+        S.interview.history = (S.interview.history || []).concat([{ score: legacy.score, dims: legacy.dims, at: legacy.at || S.interview.completedAt }]).slice(-10);
+      }
+      S.interview.answers = [];
+      S.interview.sessionQuestions = [];
+      S.interview.startedAt = 0;
+      S.interview.completedAt = 0;
+      S.interview.result = null;
+      S.interview.pendingOpen = null;
     }
     return S;
   }
@@ -311,8 +351,7 @@
 
   function interviewQuestions() {
     load();
-    // 兼容旧版已完成的 24 题结果；新版测评始终使用本次冻结的题目快照。
-    return S.interview.sessionQuestions.length ? S.interview.sessionQuestions : QUESTIONS;
+    return S.interview.sessionQuestions.length ? S.interview.sessionQuestions : [];
   }
 
   function conceptStats(concept) {
@@ -321,65 +360,94 @@
     return all[concept];
   }
 
+  function recentQuestionIds() {
+    return new Set([].concat.apply([], (S.interview.recentSessions || []).slice(-2)));
+  }
+
+  function chooseFrom(pool, selected, dimCounts, preferReview) {
+    const recent = recentQuestionIds();
+    let candidates = pool.filter(function (q) {
+      return selected.every(function (x) { return x.id !== q.id; }) && (dimCounts[q.dimension] || 0) < 4;
+    });
+    if (!candidates.length) return null;
+    const noRecent = candidates.filter(function (q) { return !recent.has(q.id); });
+    if (noRecent.length) candidates = noRecent;
+    candidates = shuffled(candidates).sort(function (a, b) {
+      const sa = conceptStats(a.variantGroup), sb = conceptStats(b.variantGroup);
+      function value(q, s) {
+        let v = 0;
+        if (preferReview && s.correct > 0) v += 100;
+        if (!preferReview && (!s.attempts || s.wrong >= s.correct)) v += 45;
+        if ((dimCounts[q.dimension] || 0) === 0) v += 30;
+        if (q.id !== s.lastQuestionId) v += 15;
+        v += Math.max(0, (s.wrong || 0) * 3 - (s.correct || 0));
+        return v;
+      }
+      return value(b, sb) - value(a, sa);
+    });
+    return candidates[0];
+  }
+
   function buildInterviewSession() {
-    const lastIds = new Set(S.interview.lastQuestionIds || []);
+    const bank = currentBank();
     const selected = [];
+    const dimCounts = {};
+    const reviewTarget = 6;
+    let reviewPicked = 0;
 
-    Object.keys(DIMS).forEach(function (dim) {
-      const concepts = Array.from(new Set(QUESTION_BANK.filter(function (q) { return q.dim === dim; })
-        .map(function (q) { return q.concept; })));
-      const mastered = shuffled(concepts.filter(function (concept) { return conceptStats(concept).correct > 0; }));
-      const weakOrNew = shuffled(concepts.filter(function (concept) { return conceptStats(concept).correct === 0; }))
-        .sort(function (a, b) {
-          const sa = conceptStats(a), sb = conceptStats(b);
-          const aPriority = (sa.wrong || 0) * 3 - (sa.attempts || 0);
-          const bPriority = (sb.wrong || 0) * 3 - (sb.attempts || 0);
-          return bPriority - aPriority;
-        });
-      const chosen = [];
+    function addFor(filter) {
+      const pool = bank.filter(filter);
+      const preferReview = reviewPicked < reviewTarget && pool.some(function (q) { return conceptStats(q.variantGroup).correct > 0; });
+      const picked = chooseFrom(pool, selected, dimCounts, preferReview);
+      if (!picked) return;
+      const isReview = conceptStats(picked.variantGroup).correct > 0 && !recentQuestionIds().has(picked.id) && picked.id !== conceptStats(picked.variantGroup).lastQuestionId;
+      selected.push(sessionQuestion(picked, isReview));
+      dimCounts[picked.dimension] = (dimCounts[picked.dimension] || 0) + 1;
+      if (isReview) reviewPicked++;
+    }
 
-      // 只要存在已答对知识点，每个维度至少安排一道变式复测。
-      if (mastered.length) chosen.push(mastered[0]);
-      weakOrNew.concat(mastered).forEach(function (concept) {
-        if (chosen.length < QUESTIONS_PER_DIM && chosen.indexOf(concept) < 0) chosen.push(concept);
-      });
-
-      chosen.slice(0, QUESTIONS_PER_DIM).forEach(function (concept) {
-        const stat = conceptStats(concept);
-        let variants = QUESTION_BANK.filter(function (q) {
-          return q.dim === dim && q.concept === concept && q.id !== stat.lastQuestionId && !lastIds.has(q.id);
-        });
-        if (!variants.length) variants = QUESTION_BANK.filter(function (q) {
-          return q.dim === dim && q.concept === concept && q.id !== stat.lastQuestionId;
-        });
-        if (!variants.length) variants = QUESTION_BANK.filter(function (q) { return q.dim === dim && q.concept === concept; });
-        const picked = shuffled(variants)[0];
-        selected.push(shuffledQuestion(picked, stat.correct > 0));
-      });
+    [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3].forEach(function (difficulty) {
+      addFor(function (q) { return q.type === 'mcq' && q.difficulty === difficulty; });
+    });
+    ['scenario', 'scenario', 'scenario', 'scenario', 'project', 'project', 'strategy', 'strategy'].forEach(function (subtype) {
+      addFor(function (q) { return q.type === 'open' && q.subtype === subtype; });
     });
 
+    if (selected.length !== SESSION_SIZE) throw new Error('题库不足，无法生成完整的 20 题测评');
     return shuffled(selected);
+  }
+
+  function answerScore(answer) {
+    if (!answer) return 0;
+    if (answer.kind === 'mcq') return answer.correct ? 5 : 0;
+    return Math.max(0, Math.min(5, Number(answer.score) || 0));
   }
 
   function scoreInterview() {
     const answers = S.interview.answers;
     const sessionQuestions = interviewQuestions();
-    const dims = {};
-    Object.keys(DIMS).forEach(function (k) { dims[k] = { correct: 0, total: 0, score: 0 }; });
-    let correct = 0, reviewCount = 0, reviewCorrect = 0;
+    const dims = {}, difficulties = {}, types = { mcq: { points: 0, max: 0, score: 0 }, open: { points: 0, max: 0, score: 0 } };
+    Object.keys(DIMS).forEach(function (k) { dims[k] = { points: 0, max: 0, score: 0, total: 0 }; });
+    [1, 2, 3].forEach(function (k) { difficulties[k] = { points: 0, max: 0, score: 0 }; });
+    let points = 0, correct = 0, reviewCount = 0, reviewCorrect = 0;
     sessionQuestions.forEach(function (q, i) {
-      const hit = answers[i] === q.a;
-      dims[q.dim].total++;
-      if (hit) { correct++; dims[q.dim].correct++; }
-      if (q.review) { reviewCount++; if (hit) reviewCorrect++; }
+      const answer = answers[i];
+      const got = answerScore(answer);
+      points += got;
+      dims[q.dimension].points += got; dims[q.dimension].max += 5; dims[q.dimension].total++;
+      difficulties[q.difficulty].points += got; difficulties[q.difficulty].max += 5;
+      types[q.type].points += got; types[q.type].max += 5;
+      if (q.type === 'mcq' && answer && answer.correct) correct++;
+      if (q.review) { reviewCount++; if (got >= 4) reviewCorrect++; }
     });
-    Object.keys(dims).forEach(function (k) {
-      dims[k].score = dims[k].total ? Math.round(dims[k].correct / dims[k].total * 100) : 0;
-    });
-    const score = Math.round(correct / sessionQuestions.length * 100);
+    Object.keys(dims).forEach(function (k) { dims[k].score = dims[k].max ? Math.round(dims[k].points / dims[k].max * 100) : 0; });
+    Object.keys(difficulties).forEach(function (k) { const x = difficulties[k]; x.score = x.max ? Math.round(x.points / x.max * 100) : 0; });
+    Object.keys(types).forEach(function (k) { const x = types[k]; x.score = x.max ? Math.round(x.points / x.max * 100) : 0; });
+    const score = Math.round(points);
     const label = score >= 90 ? '面试准备充分' : score >= 75 ? '能独立做方案' : score >= 60 ? '能讲清核心逻辑' : score >= 40 ? '概念基础已建立' : '需要系统补基础';
     return {
-      score: score, correct: correct, total: sessionQuestions.length, dims: dims, label: label,
+      score: score, points: points, correct: correct, objectiveTotal: MCQ_COUNT, total: sessionQuestions.length,
+      dims: dims, difficulties: difficulties, types: types, label: label,
       reviewCount: reviewCount, reviewCorrect: reviewCorrect, at: Date.now()
     };
   }
@@ -391,11 +459,11 @@
       const sprint = ['enterprise-handoff', 'order-chatflow', 'risk-workflow', 'confirmation-gate'];
       const days = sprint.map(function (pid, i) {
         const p = exercise(pid);
-        const dim = i === 0 || i === 2 ? 'delivery' : (i === 1 ? 'architecture' : 'product');
+        const dim = i === 0 || i === 2 ? 'delivery_collaboration' : (i === 1 ? 'rag_retrieval' : 'evaluation_data');
         return { day: i + 1, dim: dim, title: '面试冲刺实战：' + p.title, kind: 'practice', practiceId: pid, min: p.min, done: false };
       });
-      days.push({ day: 5, dim: 'delivery', title: '复盘表达结构并重新测评', kind: 'retest', min: 20, done: false });
-      return { createdAt: Date.now(), score: result.score, focus: ['delivery', 'architecture', 'product'], strategy: '基础判断已过关，计划转向复杂案例、方案表达和交付取舍。', days: days };
+      days.push({ day: 5, dim: 'delivery_collaboration', title: '复盘表达结构并重新测评', kind: 'retest', min: 20, done: false });
+      return { createdAt: Date.now(), score: result.score, focus: ['delivery_collaboration', 'rag_retrieval', 'evaluation_data'], strategy: '基础判断已过关，计划转向复杂案例、方案表达和交付取舍。', days: days };
     }
     const length = result.score < 50 ? 14 : result.score < 75 ? 10 : 7;
     const termPos = {}, practicePos = {};
@@ -418,6 +486,31 @@
     return { createdAt: Date.now(), score: result.score, focus: focus, strategy: '优先补最低分的三个维度，完成后重新测评。', days: days };
   }
 
+  function updateQuestionStat(question, passed) {
+    const stat = conceptStats(question.variantGroup);
+    stat.attempts++;
+    if (passed) stat.correct++; else stat.wrong++;
+    stat.lastAt = Date.now();
+    stat.lastQuestionId = question.id;
+  }
+
+  function finishInterviewIfReady() {
+    const questions = interviewQuestions();
+    if (S.interview.answers.length !== questions.length) return null;
+    const result = scoreInterview();
+    S.interview.result = result;
+    S.interview.completedAt = Date.now();
+    S.interview.lastQuestionIds = questions.map(function (q) { return q.id; });
+    S.interview.recentSessions = (S.interview.recentSessions || []).concat([S.interview.lastQuestionIds.slice()]).slice(-2);
+    S.interview.history = (S.interview.history || []).concat([{
+      score: result.score, dims: result.dims, difficulties: result.difficulties, types: result.types,
+      reviewCount: result.reviewCount, reviewCorrect: result.reviewCorrect,
+      questionIds: S.interview.lastQuestionIds.slice(), at: result.at
+    }]).slice(-10);
+    S.plan = buildPlan(result);
+    return result;
+  }
+
   window.PRACTICES = PRACTICES;
   window.INTERVIEW_DIMS = DIMS;
   window.INTERVIEW_QUESTIONS = QUESTION_BANK;
@@ -435,42 +528,60 @@
       S = load();
       S.interview.answers = [];
       S.interview.sessionQuestions = buildInterviewSession();
+      S.interview.pendingOpen = null;
       S.interview.startedAt = Date.now();
       S.interview.completedAt = 0;
       S.interview.result = null;
       save();
       return S.interview.sessionQuestions;
     },
-    answerInterview(option) {
+    answerInterview(optionId) {
       S = load();
       if (!S.interview.startedAt || S.interview.completedAt) return null;
       const sessionQuestions = interviewQuestions();
       if (S.interview.answers.length >= sessionQuestions.length) return null;
       const question = sessionQuestions[S.interview.answers.length];
-      const answer = Number(option);
-      const hit = answer === question.a;
-      const stat = conceptStats(question.concept);
-      stat.attempts++;
-      if (hit) stat.correct++; else stat.wrong++;
-      stat.lastAt = Date.now();
-      stat.lastQuestionId = question.id;
-      S.interview.answers.push(answer);
-      if (S.interview.answers.length === sessionQuestions.length) {
-        const result = scoreInterview();
-        S.interview.result = result; S.interview.completedAt = Date.now();
-        S.interview.lastQuestionIds = sessionQuestions.map(function (q) { return q.id; });
-        S.interview.history = (S.interview.history || []).concat([{
-          score: result.score, dims: result.dims, reviewCount: result.reviewCount,
-          reviewCorrect: result.reviewCorrect, questionIds: S.interview.lastQuestionIds.slice(), at: result.at
-        }]).slice(-10);
-        S.plan = buildPlan(result);
-      }
+      if (!question || question.type !== 'mcq') return null;
+      const hit = String(optionId) === question.correctOptionId;
+      updateQuestionStat(question, hit);
+      S.interview.answers.push({ kind: 'mcq', questionId: question.id, value: String(optionId), correct: hit, score: hit ? 5 : 0 });
+      finishInterviewIfReady();
       save();
       return S.interview.result;
     },
+    submitOpenAnswer(text) {
+      S = load();
+      const questions = interviewQuestions();
+      const question = questions[S.interview.answers.length];
+      if (!question || question.type !== 'open') return null;
+      const value = String(text || '').trim();
+      if (value.length < 20) return { error: '请先写下至少 20 个字的回答，再查看评分要点。' };
+      S.interview.pendingOpen = { questionId: question.id, text: value };
+      save(); return S.interview.pendingOpen;
+    },
+    scoreOpenAnswer(rubricIds) {
+      S = load();
+      const questions = interviewQuestions();
+      const question = questions[S.interview.answers.length];
+      const pending = S.interview.pendingOpen;
+      if (!question || question.type !== 'open' || !pending || pending.questionId !== question.id) return null;
+      const chosen = new Set((rubricIds || []).map(String));
+      const rubric = question.rubric || [];
+      const totalWeight = rubric.reduce(function (n, x) { return n + (x.weight || 1); }, 0) || 1;
+      const gotWeight = rubric.reduce(function (n, x) { return n + (chosen.has(x.id) ? (x.weight || 1) : 0); }, 0);
+      const points = +(gotWeight / totalWeight * 5).toFixed(2);
+      updateQuestionStat(question, points >= 4);
+      S.interview.answers.push({
+        kind: 'open', questionId: question.id, text: pending.text,
+        rubricIds: Array.from(chosen), score: points, correct: points >= 4
+      });
+      S.interview.pendingOpen = null;
+      finishInterviewIfReady();
+      save(); return S.interview.result;
+    },
     interview() { return load().interview; },
     interviewQuestions: interviewQuestions,
-    interviewBankSize() { return QUESTION_BANK.length; },
+    interviewBankSize() { return currentBank().length; },
     interviewSessionSize() { return SESSION_SIZE; },
     plan() { return load().plan; },
     togglePlanDay(day) {

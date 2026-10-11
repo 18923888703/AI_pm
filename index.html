@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI PM 学院 · 从小白到独立交付</title>
-<link rel="stylesheet" href="assets/styles.css?v=7">
+<link rel="stylesheet" href="assets/styles.css?v=11">
 </head>
 <body>
 
@@ -21,36 +21,11 @@
     </div>
 
     <div class="nav" id="nav">
-      <div class="nav-section">学习</div>
       <div class="nav-item" data-route="home"><span class="nav-ico">🏠</span>今日学习</div>
-      <div class="nav-item" data-route="plan"><span class="nav-ico">📅</span>学习计划<span class="nav-count" id="planCount">1</span></div>
+      <div class="nav-item" data-route="path"><span class="nav-ico">🗺️</span>学习路径</div>
       <div class="nav-item" data-route="practice"><span class="nav-ico">🧪</span>实战练习<span class="nav-count" id="practiceCount">0/12</span></div>
       <div class="nav-item" data-route="interview"><span class="nav-ico">🎙️</span>面试测评<span class="nav-count" id="interviewScore">未测</span></div>
-      <div class="nav-item" data-route="path"><span class="nav-ico">🗺️</span>学习路径</div>
-      <div class="nav-item" data-route="dict"><span class="nav-ico">📖</span>术语词典</div>
-      <div class="nav-item" data-route="review"><span class="nav-ico">🔁</span>复习队列<span class="nav-count" id="reviewCount">0</span></div>
-      <div class="nav-item" data-route="mastery"><span class="nav-ico">📊</span>我的掌握度</div>
-
-      <div class="nav-section">学习路径 · 阶段</div>
-      <div id="stageTree"></div>
-
-      <div class="nav-section">其他</div>
-      <div class="nav-item" data-route="settings"><span class="nav-ico">⚙️</span>设置与记忆</div>
-    </div>
-
-    <div class="side-foot">
-      <div class="prog-wrap">
-        <div class="ring" id="ring"></div>
-        <div class="prog-txt">
-          <b id="progPct">0%</b> 已掌握<br>
-          <span id="progSub">共 0 / 0 个概念</span>
-        </div>
-      </div>
-      <div class="side-line" id="sideLevel">
-        <span class="tag" id="gradeTag">起步</span>
-        <span class="tiny" id="syncLine">本地存储</span>
-      </div>
-      <button class="mem-btn" id="memPeek">🧠 记忆档案：0 条学习记录</button>
+      <div class="nav-item" data-route="my"><span class="nav-ico">📊</span>我的学习<span class="nav-count" id="reviewCount">0</span></div>
     </div>
   </aside>
 
@@ -92,24 +67,25 @@
 
 <nav class="mobile-nav" aria-label="移动端主导航">
   <button data-route="home"><span>🏠</span>今日</button>
-  <button data-route="plan"><span>📅</span>计划</button>
+  <button data-route="path"><span>🗺️</span>路径</button>
   <button data-route="practice"><span>🧪</span>练习</button>
   <button data-route="interview"><span>🎙️</span>测评</button>
-  <button data-route="path"><span>🗺️</span>路径</button>
-  <button data-route="settings"><span>⚙️</span>设置</button>
+  <button data-route="my"><span>📊</span>我的</button>
 </nav>
 
 <div class="toast" id="toast"></div>
 
-<script src="assets/data-core.js?v=6"></script>
+<script src="assets/data-core.js?v=8"></script>
 <script src="assets/data-adv.js?v=6"></script>
 <script src="assets/data-pro.js?v=6"></script>
 <script src="assets/data-pm.js?v=6"></script>
-<script src="assets/curriculum.js?v=6"></script>
-<script src="assets/store.js?v=6"></script>
-<script src="assets/memory.js?v=6"></script>
-<script src="assets/practice.js?v=7"></script>
+<script src="assets/curriculum.js?v=8"></script>
+<script src="assets/store.js?v=11"></script>
+<script src="assets/memory.js?v=11"></script>
+<script src="assets/learning-quiz.js?v=11"></script>
+<script src="assets/practice.js?v=11"></script>
+<script src="assets/interview-bank.js?v=11"></script>
 <script src="assets/llm.js?v=6"></script>
-<script src="assets/app.js?v=7"></script>
+<script src="assets/app.js?v=11"></script>
 </body>
 </html>

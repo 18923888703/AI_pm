@@ -1,0 +1,34 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const context = { window: {}, console };
+vm.createContext(context);
+[
+  'assets/data-core.js',
+  'assets/data-adv.js',
+  'assets/data-pro.js',
+  'assets/data-pm.js',
+  'assets/curriculum.js'
+].forEach((file) => {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
+});
+
+const terms = context.window.TERMS;
+assert.equal(terms.length, 61, '课程应包含 61 个知识点');
+assert.equal(new Set(terms.map((t) => t.id)).size, terms.length, '知识点 ID 不应重复');
+
+const rerank = terms.find((t) => t.id === 'rerank');
+assert.ok(rerank, '应存在 Rerank 知识点');
+assert.equal(rerank.quiz.length, 2, 'Rerank 应包含两道小测');
+assert.ok(rerank.steps.length >= 4 && rerank.pitfalls.length >= 4, 'Rerank 内容应覆盖链路与常见误区');
+
+const ids = new Set(terms.map((t) => t.id));
+context.window.Curriculum.lessons.forEach((lesson) => {
+  lesson.ids.forEach((id) => assert.ok(ids.has(id), `课程引用了不存在的知识点：${id}`));
+});
+assert.ok(context.window.Curriculum.lessons.some((lesson) => lesson.kind === 'lesson' && lesson.ids.includes('rerank')));
+assert.ok(context.window.Curriculum.lessons.some((lesson) => lesson.kind === 'checkpoint' && lesson.ids.includes('rerank')));
+
+console.log('course integrity tests passed');

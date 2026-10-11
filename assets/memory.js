@@ -44,7 +44,9 @@
       /* --- 学习计划（持久化的大纲进度 + 当天冻结的清单） --- */
       syllabus: { startedAt: Date.now(), learned: [], doneAt: {} },  // learned: 已完成的概念 id
       plan: null,       // 今天这份清单：{date, items:[...]}
-      planLog: {}       // date -> {total, done, min, lessonNo}
+      planLog: {},      // date -> {total, done, min, lessonNo}
+      quizVariants: {}, // termId -> 变式题历史
+      dailyLearning: null
     };
   };
 
@@ -66,6 +68,8 @@
     if (!filled.syllabus.doneAt || typeof filled.syllabus.doneAt !== 'object') filled.syllabus.doneAt = {};
     filled.planLog = (o && o.planLog && typeof o.planLog === 'object') ? o.planLog : {};
     filled.plan = (o && o.plan && Array.isArray(o.plan.items)) ? o.plan : null;
+    filled.quizVariants = (o && o.quizVariants && typeof o.quizVariants === 'object') ? o.quizVariants : {};
+    filled.dailyLearning = (o && o.dailyLearning && typeof o.dailyLearning === 'object') ? o.dailyLearning : null;
     return filled;
   }
 
@@ -800,6 +804,25 @@
       recompute(id);
       noteAction(id, 'quiz');
       save();
+    },
+
+    /** 今日学习采用“一题一屏”时，答完即完成当天这个知识点；答错会进入复习队列。 */
+    completeDailyQuiz(id, cat, ok) {
+      const r = termRec(id);
+      if (!r.seen) { r.seen = 1; r.views = Math.max(1, r.views || 0); r.lastAt = Date.now(); }
+      api.quiz(id, cat, ok);
+      const p = ensurePlan();
+      p.items.forEach(function (it) {
+        const hit = it.termId === id || (it.termIds && it.termIds.indexOf(id) >= 0);
+        if (!hit || it.done) return;
+        it.prog = it.prog || {};
+        it.prog.read = true; it.prog.act = true; it.prog.quiz = true; it.prog.ms = Math.max(READ_MS, it.prog.ms || 0);
+        it.done = true; it.doneAt = Date.now();
+        if (it.type === 'new' && S.syllabus.learned.indexOf(id) < 0) {
+          S.syllabus.learned.push(id); S.syllabus.doneAt[id] = Date.now();
+        }
+      });
+      save(); return planState();
     },
 
     confused(id, cat, source) {

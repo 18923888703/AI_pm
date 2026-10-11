@@ -207,61 +207,18 @@
      侧栏
      ============================================================ */
   function renderSidebar() {
-    const lv = window.Mem.level();
-    // 阶段树
-    const tree = $('#stageTree');
-    tree.innerHTML = window.STAGES.map(function (s) {
-      const items = window.TERMS.filter(function (t) { return t.stage === s.id; });
-      return '<div class="nav-item" data-stage="' + s.id + '">' +
-        '<span class="nav-ico">' + stageIcon(s.id) + '</span>' +
-        s.name +
-        '<span class="nav-count">' + items.filter(function (t) {
-          const r = window.Mem.state.terms[t.id]; return r && r.mastery >= 3.5;
-        }).length + '/' + items.length + '</span></div>';
-    }).join('');
-
-    // 复习数
     const rq = window.Mem.reviewQueue(99);
     const rc = $('#reviewCount');
-    rc.textContent = rq.length;
-    rc.className = 'nav-count' + (rq.length ? ' hot' : '');
-
-    // 今日待办数
-    const pd = window.Mem.plan();
-    const pc = $('#planCount');
-    if (pc) {
-      pc.textContent = pd.remainCount ? String(pd.remainCount) : '✓';
-      pc.className = 'nav-count' + (pd.remainCount ? ' hot' : '');
-    }
+    if (rc) { rc.textContent = rq.length ? String(rq.length) : ''; rc.className = 'nav-count' + (rq.length ? ' hot' : ''); }
 
     const practice = window.Lab.practiceProgress();
     const practiceCount = $('#practiceCount');
     if (practiceCount) practiceCount.textContent = practice.done + '/' + practice.total;
     const interviewScore = $('#interviewScore');
     const interview = window.Lab.interview();
+    const lastInterview = (interview.history || []).slice(-1)[0];
     if (interviewScore) interviewScore.textContent = interview.result ? interview.result.score :
-      (interview.startedAt && !interview.completedAt ? '测评中' : '未测');
-
-    // 进度环
-    const p = window.Mem.progress();
-    const C = 2 * Math.PI * 15;
-    $('#ring').innerHTML =
-      '<svg width="34" height="34" viewBox="0 0 34 34">' +
-      '<circle cx="17" cy="17" r="15" fill="none" stroke="#e9e9e7" stroke-width="3"/>' +
-      '<circle cx="17" cy="17" r="15" fill="none" stroke="' + lv.grade.color + '" stroke-width="3" stroke-linecap="round" ' +
-      'stroke-dasharray="' + C + '" stroke-dashoffset="' + (C * (1 - p.pct / 100)) + '"/></svg>';
-    $('#progPct').textContent = p.pct + '%';
-    $('#progSub').textContent = '共 ' + p.mastered + ' / ' + p.total + ' 个概念';
-
-    // 等级 + 同步状态
-    const g = $('#gradeTag');
-    g.textContent = lv.grade.name + ' · ' + lv.score;
-    g.style.background = lv.grade.color + '14';
-    g.style.color = lv.grade.color;
-    $('#syncLine').innerHTML = syncLabel();
-
-    const pp = window.Mem.habits();
-    $('#memPeek').textContent = '🧠 ' + pp.totalMin + ' 分钟 · 连续 ' + pp.streak + ' 天 · ' + (window.Mem.state.events || []).length + ' 条记录';
+      (interview.startedAt && !interview.completedAt ? '测评中' : (lastInterview ? lastInterview.score : '未测'));
   }
 
   function syncLabel() {
@@ -373,137 +330,92 @@
      视图：今日学习
      ============================================================ */
   function viewHome() {
-    const lv = window.Mem.level();
     const hp = window.Mem.habits();
     const pd = window.Mem.plan();
     const sy = window.Mem.syllabus();
-    const weak = window.Mem.weakCats();
-    const strug = window.Mem.struggleTerms().slice(0, 3);
+    const grouped = {};
+    pd.items.filter(function (i) { return i.termId; }).forEach(function (it) {
+      if (!grouped[it.termId] || (!it.done && grouped[it.termId].done)) grouped[it.termId] = it;
+    });
+    const todayItems = Object.keys(grouped).map(function (id) { return grouped[id]; });
+    const pending = todayItems.filter(function (i) { return !i.done; });
+    const completed = todayItems.filter(function (i) { return i.done; });
+    const firstUndone = pending[0] || null;
+    const displayRemainMin = pending.reduce(function (sum, it) { return sum + (it.min || 0); }, 0);
+    const overall = Math.round(sy.learnedCount / sy.totalTerms * 100);
+    const dailySession = window.LearningQuiz.daily();
+    const dailyResult = window.LearningQuiz.dailyResult();
 
-    let html = '<div class="page hero">' +
-      '<h1>' + (pd.allDone ? '今天学完了' : '今天学 ' + pd.remainMin + ' 分钟') + '</h1>' +
-      '<p class="lead">第 <b>' + sy.realNo + ' / ' + sy.realTotal + '</b> 课 · ' + esc(pd.lessonTitle) +
-      '。按顺序完成下面 ' + pd.total + ' 项，进度会自动记录。</p>';
+    let html = '<div class="page home-focus"><h1>' + (pd.allDone ? '今天完成了' : '今天继续向前') + '</h1>' +
+      '<p class="lead">' + esc(pd.lessonTitle) + '</p>' +
+      '<div class="home-data-strip">' +
+      '<div><b>' + completed.length + '/' + todayItems.length + '</b><span>今日完成</span></div>' +
+      '<div><b>' + displayRemainMin + '</b><span>剩余分钟</span></div>' +
+      '<div><b>' + Math.max(1, hp.streak) + '</b><span>连续天数</span></div>' +
+      '<div><b>' + overall + '%</b><span>课程进度</span></div>' +
+      '<div><b>' + (dailyResult ? dailyResult.score + '%' : '—') + '</b><span>今日掌握度</span></div></div>' +
+      '<section class="home-next"><div><span class="tag">' + (pd.lessonKind === 'checkpoint' ? '阶段检查' : '第 ' + sy.realNo + ' 课') + '</span>' +
+      '<h2>' + esc(pd.lessonTitle) + '</h2><p>' + esc(pd.lessonGoal) + '</p></div>' +
+      (dailySession && !dailySession.completedAt ? '<button class="btn primary" data-route="learn">继续答题 →</button>' :
+        firstUndone ? '<button class="btn primary" data-learn-start="1">' + (completed.length ? '继续学习' : '开始学习') + ' →</button>' :
+        '<button class="btn" data-route="path">查看学习路径</button>') + '</section>';
 
-    /* ---------- 今日计划（持久化：今天生成后固定，做完就是做完） ---------- */
-    html += '<div class="plan-card">';
-    if (pd.allDone) {
-      html += '<div class="plan-done-banner">🎉 今天的计划全部完成了 —— 还剩 ' + sy.remainTerms + ' 个概念没学，明天继续。</div>';
+    if (pending.length) {
+      html += '<div class="home-tag-section"><h2>待学习</h2><div class="knowledge-tags">' + pending.map(function (it) {
+        return '<span class="knowledge-tag pending">' + esc(planItemName(it)) + '</span>';
+      }).join('') + '</div></div>';
     }
-
-    html += '<div class="plan-top">' +
-      '<div style="min-width:0">' +
-      '<div class="plan-title"><span class="tag">' + (pd.lessonKind === 'checkpoint' ? '阶段检查' : '第 ' + sy.realNo + ' 课') + '</span>' +
-      ' <span class="tag">连续 ' + Math.max(1, hp.streak) + ' 天</span></div>' +
-      '<div class="plan-lesson">' + esc(pd.lessonTitle) + '</div>' +
-      '<div class="tiny">' + esc(pd.lessonGoal) + '</div>' +
-      '</div>' +
-      '<div class="plan-budget"><b>' + (pd.allDone ? '✓' : pd.remainMin) + '</b><span>' + (pd.allDone ? '已完成' : '分钟剩余') + '</span></div>' +
-      '</div>';
-
-    // 进度条
-    html += '<div class="plan-bar"><i style="width:' + pd.pct + '%"></i></div>' +
-      '<div class="plan-prog"><span>' + pd.doneCount + ' / ' + pd.total + ' 项已完成</span>' +
-      '<span>按你的学习节奏安排</span></div>';
-
-    if (pd.carriedCount) {
-      html += '<div class="plan-carry">↩️ 昨天有 ' + pd.carriedCount + ' 项没做完，已经排到今天最前面</div>';
+    if (completed.length) {
+      html += '<div class="home-tag-section completed"><h2>今天已完成</h2><div class="knowledge-tags">' + completed.map(function (it) {
+        return '<span class="knowledge-tag done">✓ ' + esc(planItemName(it)) + '</span>';
+      }).join('') + '</div></div>';
     }
-
-    html += '<div class="plan-list">';
-    pd.items.forEach(function (it) {
-      html += planItemRow(it, { nav: true });
-    });
-    html += '</div>';
-
-    const firstUndone = pd.items.find(function (i) { return !i.done && i.termId; });
-    const noPlan = pd.items.length === 0;
-    html += '<div class="plan-foot">' +
-      (noPlan
-        ? '<span class="tiny">' + (sy.finished ? '整份课表都学完了，接下来靠复习队列维持。' : '暂时没有可排的内容。') + '</span>'
-        : '<span class="tiny">完成方式：阅读 25 秒，再做一道题或选择「懂了 / 还没懂」。</span>') +
-      '<div style="display:flex;gap:8px;flex:0 0 auto">' +
-      (firstUndone ? '<button class="btn primary sm" data-goto="term:' + firstUndone.termId + '">' +
-        (pd.doneCount ? '继续：' + esc(planItemName(firstUndone)) : '开始今天的学习') + ' →</button>' : '') +
-      '</div></div></div>';
-
-    html += interviewPlanHTML(true);
-
-    html += '<details class="home-progress"><summary><span>查看学习进展</span>' +
-      '<span class="home-progress-meta">' + esc(lv.grade.name) + ' · 已掌握 ' + sy.learnedCount + '/' + sy.totalTerms +
-      ' · 累计 ' + hp.totalMin + ' 分钟</span></summary><div class="home-progress-body">';
-
-    /* ---------- 水平画像 ---------- */
-    html += '<h2>我的水平</h2><div class="prof">' +
-      '<div class="prof-main">' +
-      '<div class="prof-grade" style="color:' + lv.grade.color + '">' + lv.grade.name + '</div>' +
-      '<div class="prof-score"><b>' + lv.score + '</b><span>/100</span></div>' +
-      '<div class="prof-trend ' + lv.trend.dir + '">' +
-      (lv.trend.dir === 'up' ? '↗' : lv.trend.dir === 'down' ? '↘' : '→') + ' ' + esc(lv.trend.label) + '</div>' +
-      (lv.next
-        ? '<div class="tiny" style="margin-top:6px">距离「' + lv.next.name + '」还差 ' + lv.toNext + ' 分</div>'
-        : '<div class="tiny" style="margin-top:6px">已达最高等级</div>') +
-      '</div><div class="prof-parts">';
-    lv.parts.forEach(function (x) {
-      html += '<div class="pp"><div class="pp-top"><span>' + x.label + '</span><b>' + x.v + '</b></div>' +
-        '<div class="bar"><i style="width:' + x.v + '%;background:' + lv.grade.color + '"></i></div>' +
-        '<div class="tiny">' + esc(x.note) + '</div></div>';
-    });
-    html += '</div></div>';
-
-    /* ---------- 习惯 ---------- */
-    html += '<div class="habit-row">' +
-      statBox(hp.totalMin, '分钟', '累计学习') +
-      statBox(hp.avgSessionMin, '分钟', '单次平均') +
-      statBox(hp.sessions, '次', '学习会话') +
-      statBox(hp.completion + '%', '', '有效完成度') +
-      (hp.askPref ? statBox(hp.askPref.pct + '%', '', hp.askPref.label) : '') +
-      statBox(hp.peaks.length ? hp.peaks.map(function (x) { return x.h + '点'; }).join(' ') : '—', '', '常学时段') +
-      '</div>';
-
-    /* ---------- 自适应说明 ---------- */
-    const adaptLines = [];
-    if (weak.length) adaptLines.push('· 「' + weak.map(function (w) { return w.name; }).join('」「') + '」类内容已自动切到<b>小白模式</b>（更多类比、更少术语、先补先修知识）');
-    if (lv.gi === 0) adaptLines.push('· 你还在起步阶段，术语页默认<b>收起难的部分</b>，先把故事听懂');
-    if (lv.gi >= 2) adaptLines.push('· 你已进入「' + lv.grade.name + '」术语页会额外展开<b>容易踩的坑</b>');
-    if (pd.budgetMin <= 8) adaptLines.push('· 当前时段不适合啃新东西，今天只排了 <b>' + pd.totalMin + ' 分钟</b> 的轻量任务');
-    if (hp.askPref) adaptLines.push('· 你' + hp.askPref.label + '，AI 回答时会<b>优先用这种讲法</b>开场');
-    adaptLines.push('· 以上都已写进 AI 的记忆摘要，追问时它知道你卡在哪、习惯怎么听');
-    html += '<div class="callout yellow" style="margin-top:18px"><span class="emo">🧭</span><div class="ct">' +
-      '<b>我已经据此做了这些调整</b><br>' + adaptLines.join('<br>') + '</div></div>';
-
-    html += '<div class="divider"></div><h2>为你定制</h2><div class="rec-grid">';
-    window.Mem.recommend().forEach(function (r) {
-      html += '<div class="rec" data-goto="term:' + r.term.id + '">' +
-        '<div class="t">' + esc(r.term.name) + ' <span class="tag">' + r.tag + '</span></div>' +
-        '<div class="w">' + esc(r.why) + '</div></div>';
-    });
-    html += '</div>';
-
-    if (strug.length) {
-      html += '<h2>你反复卡住的地方</h2><div class="term-list">';
-      strug.forEach(function (s) {
-        const t = T(s.id); if (!t) return;
-        html += '<div class="term-row" data-goto="term:' + t.id + '">' + masteryDot(t.id) +
-          '<div style="flex:0 0 150px"><div class="nm">' + esc(t.name) + '</div><div class="en">' + esc(t.en) + '</div></div>' +
-          '<div class="one">标记不懂 ' + s.rec.confused + ' 次 · 答错 ' + s.rec.wrong + ' 次</div></div>';
-      });
-      html += '</div>';
-    }
-
-    html += '<div class="divider"></div><h2>学习路径总览</h2>';
-    window.Mem.progress().stageStat.forEach(function (s) {
-      html += '<div class="term-row" data-route="path" style="margin-bottom:8px">' +
-        '<span class="nav-ico">' + stageIcon(s.stage.id) + '</span>' +
-        '<div style="flex:0 0 210px"><div class="nm">阶段 ' + (s.stage.id + 1) + ' · ' + esc(s.stage.name) + '</div>' +
-        '<div class="en">' + esc(s.stage.sub) + '</div></div>' +
-        '<div class="one">已掌握 ' + s.done + ' / ' + s.total + '</div>' +
-        '<div style="flex:0 0 80px"><div class="bar"><i style="width:' + s.pct + '%;background:#0f7b6c"></i></div></div></div>';
-    });
-
-    html += '</div></details>';
-
+    if (pd.carriedCount) html += '<p class="tiny home-carry">昨天未完成的 ' + pd.carriedCount + ' 项已自动顺延到今天。</p>';
     return html + '</div>';
+  }
+
+  function viewLearn() {
+    let session = window.LearningQuiz.daily();
+    if (!session) {
+      const ids = window.Mem.plan().items.filter(function (it) { return !it.done && it.termId; }).map(function (it) { return it.termId; });
+      session = window.LearningQuiz.startDaily(ids);
+    }
+    if (!session || !session.questions.length) {
+      return '<div class="page assessment-page"><div class="empty">今天没有待完成的知识点。<br><br><button class="btn" data-route="home">返回今日学习</button></div></div>';
+    }
+    if (session.completedAt && session.result) {
+      return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
+        '<div><h1>今日学习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。答错的知识点已进入后续变式复测。</p>' +
+        '<button class="btn primary" data-route="home">查看今日数据</button></div></div><h2>今日知识点</h2><div class="knowledge-tags">' +
+        session.responses.map(function (r) {
+          const term = T(r.termId); return '<span class="knowledge-tag ' + (r.correct ? 'done' : 'pending') + '">' + (r.correct ? '✓ ' : '需复习 · ') + esc(term ? term.name : r.termId) + '</span>';
+        }).join('') + '</div></div>';
+    }
+    const q = window.LearningQuiz.dailyQuestion();
+    if (!q) return '<div class="page"><div class="empty">学习状态异常，请返回首页重新开始。</div></div>';
+    const term = T(q.termId);
+    const answered = session.responses.length;
+    const currentScore = answered ? Math.round(session.responses.filter(function (x) { return x.correct; }).length / answered * 100) : 0;
+    let html = '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (session.index + 1) + ' / ' + session.questions.length + ' 题</span><b>' + esc(term.name) + '</b></div>' +
+      '<div class="assessment-progress"><i style="width:' + Math.round(session.index / session.questions.length * 100) + '%"></i></div></div>' +
+      '<div class="daily-score-line"><span>今日掌握度</span><b>' + (answered ? currentScore + '%' : '答题后生成') + '</b></div>' +
+      '<div class="assessment-card"><div class="assessment-question-meta"><span>今日学习</span>' + (q.review ? '<span class="review">变式复测</span>' : '<span>新知识</span>') + '</div>' +
+      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
+    q.options.forEach(function (o, i) {
+      let cls = '', disabled = '';
+      if (session.feedback) {
+        disabled = ' disabled';
+        if (o.id === session.feedback.correctOptionId) cls = ' correct';
+        else if (o.id === session.feedback.selectedOptionId) cls = ' wrong';
+      }
+      html += '<button class="' + cls + '" data-learn-answer="' + esc(o.id) + '"' + disabled + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
+    });
+    html += '</div>';
+    if (session.feedback) {
+      html += '<div class="practice-explain">' + (session.feedback.correct ? '✅ 判断正确。' : '❌ 这题需要继续复习。') + esc(session.feedback.explanation) + '</div>' +
+        '<div class="assessment-open-actions"><button class="btn primary" data-learn-next="1">' + (session.index + 1 >= session.questions.length ? '查看今日掌握度' : '下一题 →') + '</button></div>';
+    }
+    return html + '</div></div>';
   }
 
   function statBox(n, unit, label) {
@@ -716,23 +628,32 @@
     const result = iv.result;
     const questions = window.Lab.interviewQuestions();
     const wrong = questions.map(function (q, i) { return { q: q, answer: iv.answers[i] }; })
-      .filter(function (x) { return x.answer !== x.q.a; });
-    const reviewNote = result.reviewCount
-      ? ' 其中变式复测答对 ' + result.reviewCorrect + ' / ' + result.reviewCount + ' 题。'
-      : '';
+      .filter(function (x) { return x.q.type === 'mcq' && (!x.answer || !x.answer.correct); });
+    const openAnswers = questions.map(function (q, i) { return { q: q, answer: iv.answers[i] }; })
+      .filter(function (x) { return x.q.type === 'open' && x.answer; });
+    const reviewNote = result.reviewCount ? '变式复测通过 ' + result.reviewCorrect + '/' + result.reviewCount + '。' : '';
     let html = '<div class="page"><div class="result-head"><div class="score-disc" style="--score:' + result.score + ';--score-color:' + scoreTone(result.score) + '"><b>' + result.score + '</b><span>/100</span></div>' +
-      '<div><h1>' + esc(result.label) + '</h1><p class="lead">答对 ' + result.correct + ' / ' + result.total + ' 题。' + esc(reviewNote) + '分数只反映本次随机题覆盖的能力，不代表招聘结论。</p>' +
+      '<div><h1>' + esc(result.label) + '</h1><p class="lead">客观题答对 ' + result.correct + '/' + (result.objectiveTotal || 12) + '，开放题量表 ' +
+      Math.round((result.types && result.types.open ? result.types.open.points : 0) * 10) / 10 + '/40。' + esc(reviewNote) + '</p>' +
       '<button class="btn" data-assess-start="1">重新测评</button></div></div>' +
-      '<h2>六维能力诊断</h2><div class="dimension-list">';
+      '<h2>八维能力诊断</h2><div class="dimension-list">';
     Object.keys(window.INTERVIEW_DIMS).forEach(function (k) {
-      const d = window.INTERVIEW_DIMS[k], s = result.dims[k].score;
+      const d = window.INTERVIEW_DIMS[k], s = result.dims[k] ? result.dims[k].score : 0;
       html += '<div class="dimension-row"><div class="dimension-copy"><b>' + esc(d.name) + '</b><span>' + esc(d.desc) + '</span></div>' +
         '<div class="dimension-bar"><i style="width:' + s + '%;background:' + scoreTone(s) + '"></i></div><strong>' + s + '</strong></div>';
     });
     html += '</div>' + interviewPlanHTML(false);
     if (wrong.length) {
-      html += '<h2>本次错题</h2><div class="wrong-list">' + wrong.map(function (x) {
-        return '<details><summary>' + esc(x.q.q) + '</summary><p><b>正确答案：</b>' + esc(x.q.options[x.q.a]) + '</p><p>' + esc(x.q.why) + '</p></details>';
+      html += '<h2>客观题错题</h2><div class="wrong-list">' + wrong.map(function (x) {
+        const correct = (x.q.options || []).find(function (o) { return o.id === x.q.correctOptionId; });
+        return '<details><summary>' + esc(x.q.prompt) + '</summary><p><b>正确答案：</b>' + esc(correct ? correct.text : '—') + '</p><p>' + esc(x.q.explanation) + '</p></details>';
+      }).join('') + '</div>';
+    }
+    if (openAnswers.length) {
+      html += '<h2>开放题复盘</h2><div class="wrong-list">' + openAnswers.map(function (x) {
+        return '<details><summary>' + esc(x.q.prompt) + ' <span class="tag">' + Math.round((x.answer.score || 0) * 10) / 10 + '/5</span></summary>' +
+          '<p><b>你的回答：</b>' + esc(x.answer.text) + '</p><p><b>参考结构：</b>' + esc(x.q.answerOutline) + '</p>' +
+          '<p><button class="btn sm ghost" data-assess-ai="' + esc(x.q.id) + '">让 AI 补充点评</button></p></details>';
       }).join('') + '</div>';
     }
     return html + '</div>';
@@ -746,21 +667,38 @@
       const idx = iv.answers.length;
       const q = questions[idx];
       if (!q) return '<div class="page"><div class="empty">测评状态异常，请重新开始。<br><br><button class="btn" data-assess-start="1">重新开始</button></div></div>';
-      const dim = window.INTERVIEW_DIMS[q.dim];
-      return '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (idx + 1) + ' / ' + questions.length + ' 题</span><b>' + esc(dim.name) + '</b></div>' +
+      const dim = window.INTERVIEW_DIMS[q.dimension];
+      let html = '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (idx + 1) + ' / ' + questions.length + ' 题</span><b>' + esc(dim.name) + '</b></div>' +
         '<div class="assessment-progress"><i style="width:' + Math.round(idx / questions.length * 100) + '%"></i></div></div>' +
         '<div class="assessment-card"><div class="assessment-question-meta"><span>随机题</span>' +
-        (q.review ? '<span class="review">变式复测</span>' : '<span>首次抽到</span>') + '</div><h1>' + esc(q.q) + '</h1><div class="assessment-options">' + q.options.map(function (o, i) {
-          return '<button data-assess-answer="' + i + '"><span>' + 'ABCD'[i] + '</span>' + esc(o) + '</button>';
-        }).join('') + '</div></div><p class="assessment-note">答题过程中不显示正误，避免后面的题被提示影响。</p></div>';
+        (q.review ? '<span class="review">变式复测</span>' : '<span>首次抽到</span>') +
+        '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>';
+      if (q.type === 'mcq') {
+        html += '<div class="assessment-options">' + q.options.map(function (o, i) {
+          return '<button data-assess-answer="' + esc(o.id) + '"><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
+        }).join('') + '</div></div><p class="assessment-note">答题过程中不显示正误，避免影响后续判断。</p></div>';
+        return html;
+      }
+      const pending = iv.pendingOpen;
+      if (!pending || pending.questionId !== q.id) {
+        html += '<textarea id="assessmentOpenAnswer" class="assessment-open-answer" placeholder="先写结论，再写判断依据、关键动作和验证方式。至少 20 个字。"></textarea>' +
+          '<div class="assessment-open-actions"><span class="tiny">回答只保存在当前浏览器。</span><button class="btn primary" data-assess-open-submit="1">查看评分要点</button></div></div></div>';
+        return html;
+      }
+      html += '<div class="assessment-your-answer"><b>你的回答</b><p>' + esc(pending.text) + '</p></div>' +
+        '<div class="assessment-rubric"><h2>根据自己的回答勾选已覆盖要点</h2>' + (q.rubric || []).map(function (r) {
+          return '<label><input type="checkbox" value="' + esc(r.id) + '"> <span>' + esc(r.label) + '</span></label>';
+        }).join('') + '</div><div class="assessment-outline"><b>参考结构</b><p>' + esc(q.answerOutline) + '</p></div>' +
+        '<div class="assessment-open-actions"><span class="tiny">AI 点评不会改变量表得分。</span><button class="btn primary" data-assess-open-score="1">确认评分并继续</button></div></div></div>';
+      return html;
     }
 
     const last = (iv.history || []).slice(-1)[0];
     const sessionSize = window.Lab.interviewSessionSize();
     const bankSize = window.Lab.interviewBankSize();
     let html = '<div class="page interview-intro"><h1>AI PM 面试测评</h1>' +
-      '<p class="lead">每次从 ' + bankSize + ' 道情境题中分层随机抽取 ' + sessionSize + ' 道，覆盖六个能力维度。已答对的知识点仍会用不同问法复测，避免只记住原题答案。</p>' +
-      '<div class="assessment-facts"><div><b>' + sessionSize + '</b><span>每次抽题</span></div><div><b>' + bankSize + '</b><span>题库总量</span></div><div><b>12</b><span>分钟左右</span></div></div>' +
+      '<p class="lead">每次从 ' + bankSize + ' 道精选题中分层抽取 12 道客观题与 8 道开放题，覆盖八个能力维度。答对过的知识点仍会换一种问法复测。</p>' +
+      '<div class="assessment-facts"><div><b>' + sessionSize + '</b><span>每次抽题</span></div><div><b>' + bankSize + '</b><span>精选题库</span></div><div><b>25</b><span>分钟左右</span></div></div>' +
       '<div class="dimension-preview">';
     Object.keys(window.INTERVIEW_DIMS).forEach(function (k) {
       const d = window.INTERVIEW_DIMS[k];
@@ -768,16 +706,23 @@
     });
     html += '</div>' + (last ? '<div class="last-score">上次得分 <b>' + last.score + '</b> / 100</div>' : '') +
       '<button class="btn primary assessment-start" data-assess-start="1">开始测评</button>' +
-      '<p class="tiny">题目、题序和选项顺序都会随机；评分仍依据预先校验的标准答案，不使用模型临场判断。结果保存在当前浏览器。</p></div>';
+      '<p class="tiny">题目、题序和 3–5 个选项顺序都会随机；开放题按稳定量表自评，AI 仅提供可选点评。</p></div>';
     return html;
   }
 
   /* ============================================================
      视图：复习队列
      ============================================================ */
+  function myTabs(active) {
+    return '<div class="my-tabs" aria-label="我的学习分区">' +
+      '<button class="' + (active === 'progress' ? 'active' : '') + '" data-route="my">学习进度</button>' +
+      '<button class="' + (active === 'review' ? 'active' : '') + '" data-route="review">复习队列</button>' +
+      '<button class="' + (active === 'settings' ? 'active' : '') + '" data-route="settings">设置与记忆</button></div>';
+  }
+
   function viewReview() {
     const q = window.Mem.reviewQueue(99);
-    let html = '<div class="page"><h1>复习队列</h1>' +
+    let html = '<div class="page"><h1>我的学习</h1>' + myTabs('review') + '<h2>复习队列</h2>' +
       '<p class="lead">掌握度不到「已掌握」、且越久没看的排在越前面。这是你的记忆在替你排优先级。</p>';
 
     if (!q.length) {
@@ -805,7 +750,7 @@
     const prof = window.Mem.catProfile();
     const hp = window.Mem.habits();
     const lv = window.Mem.level();
-    let html = '<div class="page"><h1>我的掌握度</h1>' +
+    let html = '<div class="page"><h1>我的学习</h1>' + myTabs('progress') + '<h2>学习进度</h2>' +
       '<p class="lead">这里是我对你的长期记忆。它会跨会话保留，并决定我怎么给你讲新东西。</p>';
 
     /* 学习习惯 */
@@ -1002,16 +947,15 @@
 
     // 测验
     html += '<div class="divider"></div><h2>小测验</h2>' +
-      '<p class="tiny" style="margin-top:-4px">题目顺序和答案位置会随机。答错没关系，我会记住这个概念，之后主动提醒你复习。</p>';
-    t.quiz.forEach(function (q, qi) {
-      const displayOptions = shuffled(q.options.map(function (text, original) { return { text: text, original: original }; }));
-      const correctDisplay = displayOptions.findIndex(function (x) { return x.original === q.a; });
-      html += '<div class="quiz" data-q="' + qi + '" data-correct-display="' + correctDisplay + '"><div class="quiz-q">' + (qi + 1) + '. ' + esc(q.q) + '</div>' +
-        displayOptions.map(function (o, oi) {
-          return '<button type="button" class="opt" data-opt="' + oi + '" data-original="' + o.original + '"><span class="k">' + 'ABCD'[oi] + '</span><span>' + esc(o.text) + '</span></button>';
-        }).join('') +
-        '<div class="explain" style="display:none"></div></div>';
-    });
+      '<p class="tiny" style="margin-top:-4px">每次只抽一道；答对后下次会换一种问法复测，选项数量和顺序不固定。</p>';
+    const quiz = window.LearningQuiz.pick(t.id);
+    if (quiz) {
+      html += '<div class="quiz" data-question-id="' + esc(quiz.id) + '"><div class="quiz-q">' +
+        (quiz.review ? '<span class="tag purple">变式复测</span> ' : '') + esc(quiz.prompt) + '</div>' +
+        quiz.options.map(function (o, oi) {
+          return '<button type="button" class="opt" data-opt="' + oi + '" data-answer-id="' + esc(o.id) + '"><span class="k">' + 'ABCDE'[oi] + '</span><span>' + esc(o.text) + '</span></button>';
+        }).join('') + '<div class="explain" style="display:none"></div></div>';
+    }
 
     // 反馈
     html += '<div class="feedback"><span class="lbl">这个概念现在懂了吗？</span>' +
@@ -1042,7 +986,7 @@
     const pr = window.Mem.state.prefs;
     const ev = (window.Mem.state.events || []).length;
 
-    let html = '<div class="page"><h1>设置与记忆</h1>' +
+    let html = '<div class="page"><h1>我的学习</h1>' + myTabs('settings') + '<h2>设置与记忆</h2>' +
       '<p class="lead">你的学习记忆会自动保存在本机，并可以按你的设置同步到自己的网盘。</p>';
 
     /* ---------- 记忆存储与同步（新增） ---------- */
@@ -1218,12 +1162,13 @@
 
     let html = '';
     const titles = {
-      home: '今日学习', plan: '学习计划', path: '学习路径', dict: '术语词典',
+      home: '今日学习', learn: '今日学习', plan: '学习计划', path: '学习路径', dict: '术语词典',
       practice: '实战练习', 'practice-detail': '实战练习', interview: '面试测评',
-      review: '复习队列', mastery: '我的掌握度', settings: '设置与记忆'
+      my: '我的学习', review: '我的学习', mastery: '我的学习', settings: '我的学习'
     };
     try {
       if (r.route === 'term') html = viewTerm(r.id);
+      else if (r.route === 'learn') html = viewLearn();
       else if (r.route === 'plan') html = viewPlan();
       else if (r.route === 'path') html = viewPath();
       else if (r.route === 'dict') { searchQuery = r.q || ''; html = viewDict(); }
@@ -1231,7 +1176,7 @@
       else if (r.route === 'practice-detail') html = viewPracticeDetail(r.id);
       else if (r.route === 'interview') html = viewInterview();
       else if (r.route === 'review') html = viewReview();
-      else if (r.route === 'mastery') html = viewMastery();
+      else if (r.route === 'mastery' || r.route === 'my') html = viewMastery();
       else if (r.route === 'settings') html = viewSettings();
       else html = viewHome();
     } catch (err) {
@@ -1258,11 +1203,15 @@
     // 侧栏高亮
     document.querySelectorAll('.nav-item').forEach(function (el) {
       el.classList.toggle('active', el.dataset.route === r.route ||
-        (r.route === 'term' && el.dataset.route === 'dict') ||
+        (r.route === 'learn' && el.dataset.route === 'home') ||
+        (r.route === 'term' && el.dataset.route === 'path') ||
+        (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.mobile-nav [data-route]').forEach(function (el) {
       el.classList.toggle('active', el.dataset.route === r.route ||
+        (r.route === 'learn' && el.dataset.route === 'home') ||
+        (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.tree-item').forEach(function (el) {
@@ -1318,7 +1267,8 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],[data-plan-day]');
+      '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
+      '[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day]');
     if (!el) return;
 
     if (el.dataset.practiceSave) {
@@ -1345,9 +1295,44 @@
       return;
     }
     if (el.dataset.assessAnswer !== undefined) {
-      window.Lab.answerInterview(Number(el.dataset.assessAnswer));
+      window.Lab.answerInterview(el.dataset.assessAnswer);
       render();
       return;
+    }
+    if (el.dataset.assessOpenSubmit) {
+      const input = $('#assessmentOpenAnswer');
+      const res = window.Lab.submitOpenAnswer(input ? input.value : '');
+      if (res && res.error) { toast(res.error); return; }
+      render(); return;
+    }
+    if (el.dataset.assessOpenScore) {
+      const selected = Array.from(document.querySelectorAll('.assessment-rubric input:checked')).map(function (x) { return x.value; });
+      window.Lab.scoreOpenAnswer(selected);
+      render(); return;
+    }
+    if (el.dataset.assessAi) {
+      const q = window.Lab.interviewQuestions().find(function (x) { return x.id === el.dataset.assessAi; });
+      const idx = window.Lab.interviewQuestions().findIndex(function (x) { return x.id === el.dataset.assessAi; });
+      const answer = window.Lab.interview().answers[idx];
+      openChat();
+      if (q && answer) askQuick('请以 AI PM 面试官身份点评这道题。题目：' + q.prompt + '\n我的回答：' + answer.text + '\n请按参考结构指出做得好的地方、缺失判断和更清晰的表达方式。不要修改系统量表得分。');
+      return;
+    }
+    if (el.dataset.learnStart) {
+      const ids = [];
+      window.Mem.plan().items.filter(function (it) { return !it.done && it.termId; }).forEach(function (it) {
+        if (ids.indexOf(it.termId) < 0) ids.push(it.termId);
+      });
+      window.LearningQuiz.startDaily(ids);
+      go('learn'); return;
+    }
+    if (el.dataset.learnAnswer !== undefined) {
+      window.LearningQuiz.answerDaily(el.dataset.learnAnswer);
+      render(); return;
+    }
+    if (el.dataset.learnNext) {
+      window.LearningQuiz.nextDaily();
+      render(); return;
     }
     if (el.dataset.planDay) {
       window.Lab.togglePlanDay(Number(el.dataset.planDay));
@@ -1382,21 +1367,18 @@
     if (el.dataset.opt !== undefined && currentTerm) {
       const quizEl = el.closest('.quiz');
       if (quizEl.dataset.done) return;
-      const qi = +quizEl.dataset.q;
-      const oi = +el.dataset.opt;
-      const original = +el.dataset.original;
-      const correctDisplay = +quizEl.dataset.correctDisplay;
-      const q = currentTerm.quiz[qi];
-      const ok = original === q.a;
+      const result = window.LearningQuiz.answer(currentTerm.id, quizEl.dataset.questionId, el.dataset.answerId);
+      if (!result) return;
+      const ok = result.correct;
       quizEl.dataset.done = '1';
-      quizEl.querySelectorAll('.opt').forEach(function (o, i) {
+      quizEl.querySelectorAll('.opt').forEach(function (o) {
         o.classList.add('disabled');
-        if (i === correctDisplay) o.classList.add('correct');
-        else if (i === oi) o.classList.add('wrong');
+        if (o.dataset.answerId === result.correctOptionId) o.classList.add('correct');
+        else if (o === el) o.classList.add('wrong');
       });
       const ex = quizEl.querySelector('.explain');
       ex.style.display = 'block';
-      ex.innerHTML = (ok ? '✅ 对了。' : '❌ 再想想。') + esc(q.why);
+      ex.innerHTML = (ok ? '✅ 对了。' : '❌ 再想想。') + esc(result.explanation);
       window.Mem.quiz(currentTerm.id, currentTerm.cat, ok);
       checkPlanDone(currentTerm.id);
       updatePlanUI();
@@ -1641,7 +1623,8 @@
   $('#chatClose').onclick = closeChat;
 
   /* ---------- 其他 ---------- */
-  $('#memPeek').onclick = function () { go('mastery'); };
+  const memPeek = $('#memPeek');
+  if (memPeek) memPeek.onclick = function () { go('my'); };
   /* ---------- 阅读深度：读到末尾算「完成」，中途离开算「离开」 ---------- */
   let deepRead = false;
   $('#content').addEventListener('scroll', function () {
