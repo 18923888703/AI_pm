@@ -457,10 +457,7 @@
     let html = '<div class="page"><h1>学习路径</h1>' +
       '<p class="lead"><b>' + window.TERMS.length + ' 个概念，' + window.STAGES.length + ' 个阶段</b>，' +
       '从「AI 到底是什么」一路走到「独立交付一份能上线、可评测、可回滚的 AI 产品方案」。' +
-      '建议按顺序学；已经有基础，也可以直接挑工作里卡住的概念。</p>' +
-      '<section class="kb-entry"><div><span class="eyebrow">NEW · 专题知识库</span><h2>把课程概念连到产品方法与商业判断</h2>' +
-      '<p>已从导入资料中清理出 <b>' + window.KNOWLEDGE_BASE.length + '</b> 个专题，覆盖数据、RAG、产品方法、商业、增长与表达。</p></div>' +
-      '<button type="button" class="btn primary" data-goto="kb">打开知识库 →</button></section>';
+      '建议按顺序学；已经有基础，也可以直接挑工作里卡住的概念。</p>';
 
     window.STAGES.forEach(function (s) {
       const items = window.TERMS.filter(function (t) { return t.stage === s.id; });

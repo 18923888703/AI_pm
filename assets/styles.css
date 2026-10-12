@@ -334,10 +334,6 @@ h3{font-size:16px;font-weight:600;margin:22px 0 6px}
 /* ---------- 专题知识库 ---------- */
 .kb-page{max-width:1180px}
 .eyebrow{font-size:10.5px;letter-spacing:.12em;font-weight:750;color:var(--green);text-transform:uppercase}
-.kb-entry{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:24px 0 34px;padding:20px 22px;border:1px solid rgba(15,123,108,.24);border-radius:14px;background:linear-gradient(135deg,rgba(15,123,108,.07),rgba(35,131,226,.035))}
-.kb-entry h2{font-size:19px;margin:5px 0 5px}
-.kb-entry p{margin:0;font-size:13px;line-height:1.6;color:var(--text-2)}
-.kb-entry .btn{flex:0 0 auto}
 .kb-hero{padding:32px 0 28px;border-bottom:1px solid var(--border);margin-bottom:30px}
 .kb-hero h1{font-size:38px;letter-spacing:-.035em;margin:5px 0 10px}
 .kb-hero > p{font-size:16px;line-height:1.75;color:var(--text-2);max-width:720px;margin:0}
@@ -997,8 +993,6 @@ body.simple-mode .simple-only{display:block}
   .knowledge-current{display:inline-block;margin-top:12px}
   .relation-group{grid-template-columns:1fr;gap:9px}
   .relation-list{grid-template-columns:1fr}
-  .kb-entry{align-items:stretch;flex-direction:column;padding:17px 16px}
-  .kb-entry .btn{width:100%;justify-content:center}
   .kb-hero{padding-top:18px}
   .kb-hero h1,.kb-topic header h1{font-size:29px}
   .kb-overview-map{margin-bottom:36px}
