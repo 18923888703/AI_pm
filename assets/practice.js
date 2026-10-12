@@ -293,7 +293,7 @@
       practices: {},
       interview: {
         answers: [], startedAt: 0, completedAt: 0, result: null, history: [],
-        sessionQuestions: [], questionStats: {}, lastQuestionIds: [], recentSessions: [], pendingOpen: null
+        sessionQuestions: [], questionStats: {}, lastQuestionIds: [], recentSessions: [], pendingOpen: null, feedback: null
       },
       plan: null
     };
@@ -312,12 +312,14 @@
     if (!Array.isArray(S.interview.lastQuestionIds)) S.interview.lastQuestionIds = [];
     if (!Array.isArray(S.interview.recentSessions)) S.interview.recentSessions = [];
     if (S.interview.pendingOpen && typeof S.interview.pendingOpen !== 'object') S.interview.pendingOpen = null;
+    if (S.interview.feedback && typeof S.interview.feedback !== 'object') S.interview.feedback = null;
     // 旧版本进行到一半的固定题测评无法可靠映射到新版随机题，安全回到起始页。
     if (S.interview.startedAt && !S.interview.completedAt && (!S.interview.sessionQuestions.length || oldVersion < 3)) {
       S.interview.answers = [];
       S.interview.startedAt = 0;
       S.interview.result = null;
       S.interview.pendingOpen = null;
+      S.interview.feedback = null;
     }
     if (oldVersion < 3 && S.interview.completedAt && S.interview.result) {
       const legacy = S.interview.result;
@@ -330,6 +332,7 @@
       S.interview.completedAt = 0;
       S.interview.result = null;
       S.interview.pendingOpen = null;
+      S.interview.feedback = null;
     }
     return S;
   }
@@ -367,7 +370,7 @@
   function chooseFrom(pool, selected, dimCounts, preferReview) {
     const recent = recentQuestionIds();
     let candidates = pool.filter(function (q) {
-      return selected.every(function (x) { return x.id !== q.id; }) && (dimCounts[q.dimension] || 0) < 4;
+      return selected.every(function (x) { return x.id !== q.id && x.variantGroup !== q.variantGroup; }) && (dimCounts[q.dimension] || 0) < 4;
     });
     if (!candidates.length) return null;
     const noRecent = candidates.filter(function (q) { return !recent.has(q.id); });
@@ -529,6 +532,7 @@
       S.interview.answers = [];
       S.interview.sessionQuestions = buildInterviewSession();
       S.interview.pendingOpen = null;
+      S.interview.feedback = null;
       S.interview.startedAt = Date.now();
       S.interview.completedAt = 0;
       S.interview.result = null;
@@ -538,6 +542,7 @@
     answerInterview(optionId) {
       S = load();
       if (!S.interview.startedAt || S.interview.completedAt) return null;
+      if (S.interview.feedback) return null;
       const sessionQuestions = interviewQuestions();
       if (S.interview.answers.length >= sessionQuestions.length) return null;
       const question = sessionQuestions[S.interview.answers.length];
@@ -545,9 +550,22 @@
       const hit = String(optionId) === question.correctOptionId;
       updateQuestionStat(question, hit);
       S.interview.answers.push({ kind: 'mcq', questionId: question.id, value: String(optionId), correct: hit, score: hit ? 5 : 0 });
-      finishInterviewIfReady();
+      const selected = (question.options || []).find(function (o) { return o.id === String(optionId); });
+      const correct = (question.options || []).find(function (o) { return o.id === question.correctOptionId; });
+      S.interview.feedback = {
+        questionId: question.id, correct: hit, selectedOptionId: String(optionId), correctOptionId: question.correctOptionId,
+        selectedOptionText: selected ? selected.text : '', correctOptionText: correct ? correct.text : '',
+        explanation: question.explanation || '', conceptName: (window.INTERVIEW_DIMS[question.dimension] || {}).name || '判断原则'
+      };
       save();
       return S.interview.result;
+    },
+    nextInterview() {
+      S = load();
+      if (!S.interview.feedback) return null;
+      S.interview.feedback = null;
+      const result = finishInterviewIfReady();
+      save(); return result;
     },
     submitOpenAnswer(text) {
       S = load();

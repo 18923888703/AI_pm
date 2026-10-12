@@ -27,7 +27,10 @@ context.window.TERMS.forEach((term) => {
 
 const first = context.window.LearningQuiz.pick('rerank');
 assert.ok(first);
-assert.equal(context.window.LearningQuiz.answer('rerank', first.id, first.correctOptionId).correct, true);
+const firstFeedback = context.window.LearningQuiz.answer('rerank', first.id, first.correctOptionId);
+assert.equal(firstFeedback.correct, true);
+assert.ok(firstFeedback.selectedOptionText && firstFeedback.correctOptionText && firstFeedback.explanation);
+assert.ok(firstFeedback.conceptSummary && firstFeedback.pmView, '学习题解析应包含概念总结与产品应用');
 const second = context.window.LearningQuiz.pick('rerank');
 assert.notEqual(second.id, first.id, '答对后应切换到另一道变式题');
 assert.equal(second.review, true);

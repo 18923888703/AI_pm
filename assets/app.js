@@ -374,6 +374,19 @@
     return html + '</div>';
   }
 
+  function answerExplanationHTML(f) {
+    let html = '<div class="answer-explanation ' + (f.correct ? 'is-correct' : 'is-wrong') + '">' +
+      '<div class="answer-verdict"><b>' + (f.correct ? '判断正确' : '这道题答错了') + '</b><span>' +
+      (f.correct ? '你抓住了这个概念的关键判断。' : '先对照差异，再记住判断原则。') + '</span></div>' +
+      '<div class="answer-compare"><div><span>你的选择</span><p>' + esc(f.selectedOptionText || '—') + '</p></div>' +
+      '<div><span>正确答案</span><p>' + esc(f.correctOptionText || '—') + '</p></div></div>' +
+      '<div class="answer-reason"><b>为什么</b><p>' + esc(f.explanation || '') + '</p></div>';
+    if (f.conceptSummary) html += '<div class="answer-memory"><b>一句话记住「' + esc(f.conceptName) + '」</b><p>' + esc(f.conceptSummary) + '</p></div>';
+    if (f.pmView) html += '<details><summary>放到产品工作里怎么用</summary><p>' + esc(f.pmView) + '</p></details>';
+    if (!f.correct && f.pitfall) html += '<details><summary>最容易踩的坑</summary><p>' + esc(f.pitfall) + '</p></details>';
+    return html + '</div>';
+  }
+
   function viewLearn() {
     let session = window.LearningQuiz.daily();
     if (!session) {
@@ -412,7 +425,7 @@
     });
     html += '</div>';
     if (session.feedback) {
-      html += '<div class="practice-explain">' + (session.feedback.correct ? '✅ 判断正确。' : '❌ 这题需要继续复习。') + esc(session.feedback.explanation) + '</div>' +
+      html += answerExplanationHTML(session.feedback) +
         '<div class="assessment-open-actions"><button class="btn primary" data-learn-next="1">' + (session.index + 1 >= session.questions.length ? '查看今日掌握度' : '下一题 →') + '</button></div>';
     }
     return html + '</div></div>';
@@ -664,7 +677,8 @@
     if (iv.completedAt && iv.result) return viewInterviewResult(iv);
     if (iv.startedAt) {
       const questions = window.Lab.interviewQuestions();
-      const idx = iv.answers.length;
+      const feedback = iv.feedback;
+      const idx = feedback ? iv.answers.length - 1 : iv.answers.length;
       const q = questions[idx];
       if (!q) return '<div class="page"><div class="empty">测评状态异常，请重新开始。<br><br><button class="btn" data-assess-start="1">重新开始</button></div></div>';
       const dim = window.INTERVIEW_DIMS[q.dimension];
@@ -675,9 +689,21 @@
         '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>';
       if (q.type === 'mcq') {
         html += '<div class="assessment-options">' + q.options.map(function (o, i) {
-          return '<button data-assess-answer="' + esc(o.id) + '"><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
-        }).join('') + '</div></div><p class="assessment-note">答题过程中不显示正误，避免影响后续判断。</p></div>';
-        return html;
+          let cls = '', disabled = '';
+          if (feedback) {
+            disabled = ' disabled';
+            if (o.id === feedback.correctOptionId) cls = ' correct';
+            else if (o.id === feedback.selectedOptionId) cls = ' wrong';
+          }
+          return '<button class="' + cls + '" data-assess-answer="' + esc(o.id) + '"' + disabled + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
+        }).join('') + '</div>';
+        if (feedback) {
+          html += answerExplanationHTML(feedback) + '<div class="assessment-open-actions"><button class="btn primary" data-assess-next="1">' +
+            (iv.answers.length >= questions.length ? '查看测评结果' : '下一题 →') + '</button></div>';
+        } else {
+          html += '<p class="assessment-note">选择后先查看解析，再进入下一题。</p>';
+        }
+        return html + '</div></div>';
       }
       const pending = iv.pendingOpen;
       if (!pending || pending.questionId !== q.id) {
@@ -1268,7 +1294,7 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day]');
     if (!el) return;
 
     if (el.dataset.practiceSave) {
@@ -1298,6 +1324,10 @@
       window.Lab.answerInterview(el.dataset.assessAnswer);
       render();
       return;
+    }
+    if (el.dataset.assessNext) {
+      window.Lab.nextInterview();
+      render(); return;
     }
     if (el.dataset.assessOpenSubmit) {
       const input = $('#assessmentOpenAnswer');
@@ -1378,7 +1408,7 @@
       });
       const ex = quizEl.querySelector('.explain');
       ex.style.display = 'block';
-      ex.innerHTML = (ok ? '✅ 对了。' : '❌ 再想想。') + esc(result.explanation);
+      ex.innerHTML = answerExplanationHTML(result);
       window.Mem.quiz(currentTerm.id, currentTerm.cat, ok);
       checkPlanDone(currentTerm.id);
       updatePlanUI();

@@ -48,6 +48,9 @@ function finishPerfectSession() {
     const q = questions[Lab.interview().answers.length];
     if (q.type === 'mcq') {
       Lab.answerInterview(q.correctOptionId);
+      const feedback = Lab.interview().feedback;
+      assert.ok(feedback && feedback.correct && feedback.correctOptionText && feedback.explanation, '客观题答题后必须有完整解析');
+      Lab.nextInterview();
     } else {
       const submitted = Lab.submitOpenAnswer('我会先给出结论，再说明判断依据、执行步骤、指标和风险处理。');
       assert.ok(!submitted.error);

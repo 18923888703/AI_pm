@@ -124,6 +124,9 @@
   function answer(termId, questionId, optionId) {
     const q = (BANK[termId] || []).find(function (x) { return x.id === questionId; });
     if (!q) return null;
+    const term = window.TERMS.find(function (x) { return x.id === termId; });
+    const selectedOption = (q.options || []).find(function (x) { return x.id === optionId; });
+    const correctOption = (q.options || []).find(function (x) { return x.id === q.correctOptionId; });
     const rec = record(termId);
     const ok = optionId === q.correctOptionId;
     const qr = rec.answered[q.id] || { attempts: 0, correct: 0, wrong: 0, lastAt: 0 };
@@ -133,7 +136,16 @@
     rec.recentIds = (rec.recentIds || []).concat(q.id).slice(-6);
     delete active[termId];
     window.Mem.save();
-    return { correct: ok, correctOptionId: q.correctOptionId, explanation: q.explanation };
+    return {
+      correct: ok, correctOptionId: q.correctOptionId,
+      selectedOptionText: selectedOption ? selectedOption.text : '',
+      correctOptionText: correctOption ? correctOption.text : '',
+      explanation: q.explanation,
+      conceptName: term ? term.name : termId,
+      conceptSummary: term ? term.one : '',
+      pmView: term ? term.pm : '',
+      pitfall: term && term.pitfalls && term.pitfalls.length ? term.pitfalls[0] : ''
+    };
   }
 
   function dayKey() {
@@ -186,7 +198,9 @@
     window.Mem.completeDailyQuiz(q.termId, term.cat, result.correct);
     const response = { termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() };
     s.responses.push(response);
-    s.feedback = { termId: q.termId, correct: result.correct, selectedOptionId: String(optionId), correctOptionId: result.correctOptionId, explanation: result.explanation };
+    s.feedback = Object.assign({
+      termId: q.termId, selectedOptionId: String(optionId)
+    }, result);
     window.Mem.save(); return s.feedback;
   }
 

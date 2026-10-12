@@ -487,6 +487,23 @@ body.simple-mode .simple-only{display:block}
 .assessment-rubric label{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}
 .assessment-rubric input{margin-top:5px;accent-color:var(--blue)}
 .assessment-outline{margin-top:18px;padding:13px 15px;background:var(--bg-soft);border-radius:10px}
+.answer-explanation{margin-top:18px;border-top:1px solid var(--border);padding-top:18px}
+.answer-verdict{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.answer-verdict b{font-size:17px}
+.answer-verdict span{font-size:13px;color:var(--text-2)}
+.answer-explanation.is-correct .answer-verdict b{color:var(--green)}
+.answer-explanation.is-wrong .answer-verdict b{color:var(--red)}
+.answer-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.answer-compare > div{padding:11px 13px;background:var(--bg-soft);border-radius:10px}
+.answer-compare span{font-size:11px;color:var(--text-3);font-weight:600}
+.answer-compare p{margin:3px 0 0;line-height:1.55;font-size:13.5px}
+.answer-reason,.answer-memory{padding:12px 0;border-top:1px solid var(--border)}
+.answer-reason b,.answer-memory b{font-size:13px}
+.answer-reason p,.answer-memory p{margin:4px 0 0;color:var(--text-2);font-size:13.5px;line-height:1.7}
+.answer-memory b{color:var(--blue)}
+.answer-explanation details{border-top:1px solid var(--border);padding:9px 0}
+.answer-explanation details summary{cursor:pointer;font-size:13px;font-weight:600}
+.answer-explanation details p{margin:6px 0 0;color:var(--text-2);font-size:13px;line-height:1.7}
 .result-head{display:flex;gap:24px;align-items:center;margin:12px 0 30px}
 .score-disc{flex:0 0 118px;padding:12px 16px;border-right:1px solid var(--border)}
 .score-disc b{font-size:48px;line-height:1;color:var(--score-color);letter-spacing:-.04em}
@@ -835,6 +852,8 @@ body.simple-mode .simple-only{display:block}
   .assessment-card h1{font-size:24px}
   .assessment-open-actions{align-items:stretch;flex-direction:column}
   .assessment-open-actions .btn{width:100%;justify-content:center;height:42px}
+  .answer-verdict{align-items:flex-start;flex-direction:column;gap:2px}
+  .answer-compare{grid-template-columns:1fr}
   .result-head{align-items:flex-start;gap:12px}
   .score-disc{flex-basis:86px;padding:8px 10px 8px 0}
   .score-disc b{font-size:38px}
