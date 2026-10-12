@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI PM 学院 · 从小白到独立交付</title>
+<link rel="stylesheet" href="assets/styles.css?v=15">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============ 左侧导航 ============ -->
+  <aside class="sidebar">
+    <div class="ws">
+      <div class="ws-logo">AI</div>
+      <div>
+        <div class="ws-name">AI PM 学院</div>
+        <div class="ws-sub">从小白到独立交付</div>
+      </div>
+    </div>
+
+    <div class="nav" id="nav">
+      <div class="nav-item" data-route="home"><span class="nav-ico">🏠</span>今日学习</div>
+      <div class="nav-item" data-route="path"><span class="nav-ico">🗺️</span>学习路径</div>
+      <div class="nav-item" data-route="practice"><span class="nav-ico">🧪</span>实战练习<span class="nav-count" id="practiceCount">0/12</span></div>
+      <div class="nav-item" data-route="interview"><span class="nav-ico">🎙️</span>面试测评<span class="nav-count" id="interviewScore">未测</span></div>
+      <div class="nav-item" data-route="my"><span class="nav-ico">📊</span>我的学习<span class="nav-count" id="reviewCount">0</span></div>
+    </div>
+  </aside>
+
+  <!-- ============ 右侧内容 ============ -->
+  <main class="main">
+    <header class="topbar" id="topbar">
+      <div class="crumb" id="crumb"></div>
+      <div class="top-actions">
+        <div class="search-box">
+          <span class="ico">🔍</span>
+          <input id="globalSearch" placeholder="搜索课程与知识库…" autocomplete="off" aria-label="搜索课程与知识库">
+        </div>
+        <button class="btn sm" id="toggleChat" aria-controls="chat" aria-expanded="false">💬 AI 追问</button>
+      </div>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+
+  <!-- ============ AI 追问侧栏 ============ -->
+  <aside class="chat hidden" id="chat" aria-hidden="true">
+    <div class="chat-head">
+      <span>AI 追问</span>
+      <span class="sub" id="chatCtx">未选择概念</span>
+      <button class="btn ghost sm" style="margin-left:auto" id="chatClose">✕</button>
+    </div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-quick" id="chatQuick"></div>
+    <div class="chat-foot">
+      <textarea class="chat-input" id="chatInput" placeholder="哪里没懂？直接问，比如「用一个餐厅的例子讲一下」"></textarea>
+      <div class="row">
+        <span class="hint">Enter 发送 · Shift+Enter 换行</span>
+        <span class="mode-pill" id="modePill">离线讲解</span>
+        <button class="btn primary sm" id="chatSend">发送</button>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<nav class="mobile-nav" aria-label="移动端主导航">
+  <button data-route="home"><span>🏠</span>今日</button>
+  <button data-route="path"><span>🗺️</span>路径</button>
+  <button data-route="practice"><span>🧪</span>练习</button>
+  <button data-route="interview"><span>🎙️</span>测评</button>
+  <button data-route="my"><span>📊</span>我的</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/data-core.js?v=8"></script>
+<script src="assets/data-adv.js?v=6"></script>
+<script src="assets/data-pro.js?v=6"></script>
+<script src="assets/data-pm.js?v=6"></script>
+<script src="assets/curriculum.js?v=8"></script>
+<script src="assets/knowledge-base.js?v=15"></script>
+<script src="assets/knowledge-relations.js?v=15"></script>
+<script src="assets/store.js?v=11"></script>
+<script src="assets/memory.js?v=11"></script>
+<script src="assets/learning-quiz.js?v=12"></script>
+<script src="assets/practice.js?v=12"></script>
+<script src="assets/interview-bank.js?v=11"></script>
+<script src="assets/llm.js?v=6"></script>
+<script src="assets/app.js?v=15"></script>
+</body>
+</html>
