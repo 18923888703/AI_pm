@@ -1405,7 +1405,7 @@
       el.classList.toggle('active', el.dataset.route === r.route ||
         (r.route === 'learn' && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
-        (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
+        (r.route === 'kb-topic' && el.dataset.route === 'kb') ||
         (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
