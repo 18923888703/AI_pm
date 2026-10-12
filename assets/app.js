@@ -21,6 +21,8 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
   function shuffled(list) {
     const out = list.slice();
     for (let i = out.length - 1; i > 0; i--) {
@@ -454,7 +456,10 @@
     let html = '<div class="page"><h1>学习路径</h1>' +
       '<p class="lead"><b>' + window.TERMS.length + ' 个概念，' + window.STAGES.length + ' 个阶段</b>，' +
       '从「AI 到底是什么」一路走到「独立交付一份能上线、可评测、可回滚的 AI 产品方案」。' +
-      '建议按顺序学；已经有基础，也可以直接挑工作里卡住的概念。</p>';
+      '建议按顺序学；已经有基础，也可以直接挑工作里卡住的概念。</p>' +
+      '<section class="kb-entry"><div><span class="eyebrow">NEW · 专题知识库</span><h2>把课程概念连到产品方法与商业判断</h2>' +
+      '<p>已从导入资料中清理出 <b>' + window.KNOWLEDGE_BASE.length + '</b> 个专题，覆盖数据、RAG、产品方法、商业、增长与表达。</p></div>' +
+      '<button type="button" class="btn primary" data-goto="kb">打开知识库 →</button></section>';
 
     window.STAGES.forEach(function (s) {
       const items = window.TERMS.filter(function (t) { return t.stage === s.id; });
@@ -478,6 +483,83 @@
   }
 
   /* ============================================================
+     视图：专题知识库（导入资料的结构化延伸）
+     ============================================================ */
+  function knowledgeCardHTML(x) {
+    return '<article class="kb-card" data-goto="kb/' + escAttr(x.id) + '">' +
+      '<span class="kb-category">' + esc(x.category) + '</span><h3>' + esc(x.title) + '</h3>' +
+      '<p>' + esc(x.summary) + '</p><span class="kb-more">阅读专题 <span aria-hidden="true">→</span></span></article>';
+  }
+
+  function viewKnowledgeBase() {
+    const categories = window.KnowledgeBase.categories();
+    let html = '<div class="page kb-page"><div class="kb-hero"><span class="eyebrow">AI PM KNOWLEDGE BASE</span>' +
+      '<h1>专题知识库</h1><p>从导入资料中去重、校正并结构化的延伸内容。它不替代 61 个核心概念，而是帮助你把技术、产品方法和商业判断连起来。</p>' +
+      '<div class="kb-stats"><span><b>' + window.KNOWLEDGE_BASE.length + '</b> 个专题</span><span><b>' + categories.length + '</b> 类能力</span><span>已关联课程脑图</span></div></div>';
+    categories.forEach(function (category) {
+      const items = window.KNOWLEDGE_BASE.filter(function (x) { return x.category === category; });
+      html += '<section class="kb-section"><div class="kb-section-head"><h2>' + esc(category) + '</h2><span>' + items.length + ' 个专题</span></div>' +
+        '<div class="kb-grid">' + items.map(knowledgeCardHTML).join('') + '</div></section>';
+    });
+    return html + '<div class="kb-source">内容来源：用户导入的《AI产品经理--知识库》。已做去重、事实性降噪与课程结构化改写；原始文档未直接公开。</div></div>';
+  }
+
+  function shuffled(items) {
+    const out = items.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+    }
+    return out;
+  }
+
+  function knowledgeCheckHTML(x) {
+    const peers = window.KNOWLEDGE_BASE.filter(function (p) { return p.id !== x.id; });
+    const same = peers.filter(function (p) { return p.category === x.category; });
+    const pool = shuffled(same.concat(peers.filter(function (p) { return p.category !== x.category; }))).slice(0, 3);
+    const type = Math.floor(Math.random() * 3);
+    let prompt, correct, choices;
+    if (type === 0) {
+      prompt = '下面哪项最准确地概括了「' + x.title + '」？';
+      correct = { id: 'correct', text: x.summary };
+      choices = [correct].concat(pool.map(function (p, i) { return { id: 'd' + i, text: p.summary }; }));
+    } else if (type === 1) {
+      prompt = '在实际产品工作中，哪种做法最符合「' + x.title + '」？';
+      correct = { id: 'correct', text: x.application };
+      choices = [correct].concat(pool.map(function (p, i) { return { id: 'd' + i, text: p.application }; }));
+    } else {
+      const foreign = pool[0];
+      prompt = '下面哪一项不属于「' + x.title + '」的核心判断？';
+      correct = { id: 'correct', text: foreign.keyPoints[0] };
+      choices = x.keyPoints.map(function (p, i) { return { id: 'p' + i, text: p }; }).concat([correct]);
+    }
+    return '<section class="kb-check" data-correct="correct"><div class="sec-h"><span class="ico">✅</span>快速自测 · 每次随机换一种问法</div>' +
+      '<h2>' + esc(prompt) + '</h2><div class="kb-check-options">' + shuffled(choices).map(function (o, i) {
+        return '<button type="button" data-kb-answer="' + escAttr(o.id) + '"><span>' + 'ABCD'[i] + '</span>' + esc(o.text) + '</button>';
+      }).join('') + '</div><div class="kb-check-explain" hidden></div></section>';
+  }
+
+  function viewKnowledgeTopic(id) {
+    const x = window.KnowledgeBase.get(id);
+    if (!x) return '<div class="page"><div class="empty">找不到这个知识专题</div></div>';
+    const related = x.relatedTerms.map(T).filter(Boolean);
+    let html = '<div class="page kb-topic"><button type="button" class="kb-back" data-goto="kb">← 返回专题知识库</button>' +
+      '<header><span class="kb-category">' + esc(x.category) + '</span><h1>' + esc(x.title) + '</h1><p class="lead">' + esc(x.summary) + '</p></header>' +
+      '<section class="kb-takeaway"><span>一句话应用</span><p>' + esc(x.application) + '</p></section>' +
+      '<section class="sec"><div class="sec-h"><span class="ico">🧭</span>理解这个专题的三个抓手</div><div class="kb-points">' +
+      x.keyPoints.map(function (p, i) { return '<div><b>0' + (i + 1) + '</b><p>' + esc(p) + '</p></div>'; }).join('') + '</div></section>';
+    if (related.length) {
+      html += '<section class="sec"><div class="sec-h"><span class="ico">🕸️</span>回到核心课程</div><p class="tiny">点击相关概念，继续查看快速理解、随机小测和知识关联脑图。</p>' +
+        '<div class="kb-related">' + related.map(function (t) {
+          return '<button type="button" data-goto="term:' + escAttr(t.id) + '"><span>' + esc(t.name) + '</span><small>' + esc(t.one) + '</small></button>';
+        }).join('') + '</div></section>';
+    }
+    html += knowledgeCheckHTML(x);
+    html += '<div class="kb-source">来源：《AI产品经理--知识库》；页面内容为结构化改写，不代表原文逐字转载。</div></div>';
+    return html;
+  }
+
+  /* ============================================================
      视图：术语词典
      ============================================================ */
   function viewDict() {
@@ -487,16 +569,22 @@
       return (t.name + t.en + t.one + t.analogy + t.cat).toLowerCase().indexOf(q) >= 0;
     }).sort(function (a, b) { return a.stage - b.stage || a.level - b.level; });
 
-    let html = '<div class="page"><h1>术语词典</h1>' +
-      '<p class="lead">开会听到听不懂的词，直接在这里搜。<b>' + window.TERMS.length + '</b> 个词条' +
-      (q ? '，匹配到 <b>' + list.length + '</b> 个' : '') + '。</p>';
+    const kbList = (window.KNOWLEDGE_BASE || []).filter(function (x) {
+      if (!q) return false;
+      return (x.title + x.summary + x.category + (x.keywords || []).join(' ')).toLowerCase().indexOf(q) >= 0;
+    });
+
+    let html = '<div class="page"><h1>知识搜索</h1>' +
+      '<p class="lead">搜索课程术语与专题知识库。当前包含 <b>' + window.TERMS.length + '</b> 个核心概念和 <b>' +
+      window.KNOWLEDGE_BASE.length + '</b> 个延伸专题' +
+      (q ? '，共匹配 <b>' + (list.length + kbList.length) + '</b> 项' : '') + '。</p>';
 
     html += '<div class="dict-search"><div class="search-box" style="max-width:340px">' +
       '<span class="ico">🔍</span><input id="dictSearch" placeholder="搜索术语、英文或含义…" value="' + esc(searchQuery) + '"></div></div>';
 
     html += '<div class="dict-head"><div>术语</div><div>一句话</div><div style="width:80px">掌握度</div></div>';
     if (!list.length) {
-      html += '<div class="empty">没有匹配的术语，换个词试试</div>';
+      if (!kbList.length) html += '<div class="empty">没有匹配内容，换个词试试</div>';
     } else {
       list.forEach(function (t) {
         const r = window.Mem.state.terms[t.id];
@@ -508,6 +596,11 @@
           '<div style="width:80px"><div class="bar" style="margin:0"><i style="width:' + Math.round(m / 5 * 100) + '%;background:' + lv.color + '"></i></div>' +
           '<div class="tiny">' + lv.label + '</div></div></div>';
       });
+    }
+    if (kbList.length) {
+      html += '<h2>专题知识库</h2><div class="kb-grid compact">' + kbList.map(function (x) {
+        return knowledgeCardHTML(x);
+      }).join('') + '</div>';
     }
     return html + '</div>';
   }
@@ -894,6 +987,83 @@
   /* ============================================================
      视图：术语详情
      ============================================================ */
+  function quickUnderstandHTML(t) {
+    const q = window.KnowledgeRelations.quick(t.id);
+    if (!q) return '';
+    return '<section class="concept-quick" aria-label="快速理解">' +
+      '<div><span>它是什么</span><p>' + esc(q.meaning) + '</p></div>' +
+      '<div><span>什么时候用</span><p>' + esc(q.useWhen) + '</p></div>' +
+      '<div><span>典型场景</span><p>' + esc(q.scenario) + '</p></div></section>';
+  }
+
+  function relationGroupHTML(title, desc, items, cls) {
+    if (!items || !items.length) return '';
+    return '<section class="relation-group ' + cls + '"><div class="relation-group-head"><b>' + title + '</b><span>' + desc + '</span></div><div class="relation-list">' +
+      items.map(function (r) {
+        return '<button type="button" class="relation-node" data-goto="term:' + esc(r.id) + '">' +
+          '<span class="relation-link">' + (cls === 'prerequisite' ? '先修' : cls === 'extension' ? '延伸' : '协同') + '</span>' +
+          '<b>' + esc(r.name) + '</b><span class="relation-one">' + esc(r.one) + '</span>' +
+          '<span class="relation-reason">' + esc(r.reason) + '</span></button>';
+      }).join('') + '</div></section>';
+  }
+
+  function mindText(text, max) {
+    const s = String(text || '').replace(/\*\*/g, '').replace(/`/g, '').replace(/\s+/g, ' ').trim();
+    return s.length > max ? s.slice(0, max - 1) + '…' : s;
+  }
+
+  function mindMapSVG(t, rel, kbTopics) {
+    const groups = [
+      { key: 'prerequisite', title: '先修知识', items: rel.prerequisite, cls: 'prerequisite' },
+      { key: 'companion', title: '协同概念', items: rel.companion, cls: 'companion' },
+      { key: 'extension', title: '后续延伸', items: rel.extension, cls: 'extension' },
+      { key: 'knowledge', title: '专题阅读', cls: 'knowledge', items: (kbTopics || []).slice(0, 3).map(function (x) {
+        return { id: x.id, name: x.title, one: x.summary, reason: '从课程概念延伸到「' + x.title + '」的产品应用。', goto: 'kb/' + x.id };
+      }) }
+    ].filter(function (g) { return g.items && g.items.length; });
+    const total = groups.reduce(function (n, g) { return n + g.items.length; }, 0);
+    const height = Math.max(620, total * 72 + 90);
+    const rootY = height / 2 - 34;
+    let paths = '', hubs = '', leaves = '';
+
+    groups.forEach(function (group, gi) {
+      const centerY = height * (gi + 1) / (groups.length + 1);
+      const hubY = centerY - 23;
+      paths += '<path class="mind-branch ' + group.cls + '" d="M250 ' + (rootY + 34) + ' C285 ' + (rootY + 34) + ' 285 ' + centerY + ' 320 ' + centerY + '"/>';
+      hubs += '<g class="mind-hub ' + group.cls + '"><rect x="320" y="' + hubY + '" width="154" height="46" rx="12"/>' +
+        '<text x="397" y="' + (hubY + 28) + '" text-anchor="middle">' + esc(group.title) + '</text></g>';
+      const startY = centerY - (group.items.length * 66) / 2;
+      group.items.forEach(function (item, i) {
+        const y = startY + i * 66;
+        paths += '<path class="mind-leaf-line ' + group.cls + '" d="M474 ' + centerY + ' C515 ' + centerY + ' 515 ' + (y + 26) + ' 556 ' + (y + 26) + '"/>';
+        leaves += '<g class="mind-leaf ' + group.cls + '" role="button" tabindex="0" data-goto="' + escAttr(item.goto || ('term:' + item.id)) + '" aria-label="查看知识点：' + escAttr(item.name) + '">' +
+          '<title>' + esc(item.reason) + '</title><rect x="556" y="' + y + '" width="390" height="54" rx="12"/>' +
+          '<text class="mind-leaf-name" x="572" y="' + (y + 22) + '">' + esc(mindText(item.name, 20)) + '</text>' +
+          '<text class="mind-leaf-desc" x="572" y="' + (y + 41) + '">' + esc(mindText(item.one, 38)) + '</text></g>';
+      });
+    });
+
+    return '<div class="mindmap-scroll" tabindex="0" aria-label="' + escAttr(t.name) + ' 知识关联脑图，可横向滚动">' +
+      '<svg class="mindmap" viewBox="0 0 980 ' + height + '" role="img" aria-label="以 ' + escAttr(t.name) + ' 为根节点的知识关联脑图">' +
+      '<defs><marker id="mindArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker></defs>' +
+      paths + '<g class="mind-root"><rect x="30" y="' + rootY + '" width="220" height="68" rx="16"/>' +
+      '<text class="mind-root-label" x="48" y="' + (rootY + 23) + '">当前知识点</text>' +
+      '<text class="mind-root-name" x="48" y="' + (rootY + 48) + '">' + esc(mindText(t.name, 17)) + '</text></g>' + hubs + leaves + '</svg></div>';
+  }
+
+  function knowledgeMapHTML(t) {
+    const rel = window.KnowledgeRelations.forTerm(t.id);
+    const kbTopics = window.KnowledgeBase.forTerm(t.id);
+    return '<div class="divider"></div><section class="knowledge-map"><div class="knowledge-map-head"><div><h2>知识关联地图</h2>' +
+      '<p>从当前知识点展开先修、协同、延伸与专题阅读；点击节点可跳转，手机端可左右滑动查看完整脑图。</p></div></div>' + mindMapSVG(t, rel, kbTopics) +
+      '<details class="relation-details"><summary>查看每条关联的解释</summary><div>' +
+      relationGroupHTML('先修知识', '先理解这些，当前概念会更容易懂', rel.prerequisite, 'prerequisite') +
+      relationGroupHTML('协同概念', '实际产品方案中通常会一起使用', rel.companion, 'companion') +
+      relationGroupHTML('后续延伸', '掌握当前概念后继续学习', rel.extension, 'extension') +
+      (kbTopics.length ? '<section class="relation-group knowledge"><div class="relation-group-head"><b>专题阅读</b><span>把当前概念连接到产品方法和业务应用</span></div><div class="kb-grid compact">' +
+        kbTopics.map(knowledgeCardHTML).join('') + '</div></section>' : '') + '</div></details></section>';
+  }
+
   function viewTerm(id) {
     const t = T(id);
     if (!t) return '<div class="page"><div class="empty">找不到这个术语</div></div>';
@@ -926,8 +1096,8 @@
     /* ---------- 如果它在今天的计划里：说清楚这是第几项、要做到什么才算完成 ---------- */
     html += planStripHTML(t);
 
-    // 一句话
-    html += '<div class="callout blue"><span class="emo">💡</span><div class="ct"><b>一句话</b><br>' + esc(t.one) + '</div></div>';
+    // 三段式快速理解
+    html += quickUnderstandHTML(t);
 
     // 类比
     html += '<div class="sec"><div class="sec-h"><span class="ico">🥕</span>打个比方</div>' +
@@ -992,13 +1162,8 @@
     // 今日计划内的上一项 / 下一项
     html += planNavHTML(t);
 
-    // 相关
-    html += '<div class="divider"></div><div class="sec-h"><span class="ico">🔗</span>相关概念</div>' +
-      '<div class="related-chips">' + t.related.map(function (rid) {
-        const r = T(rid); if (!r) return '';
-        return '<span class="chip" data-goto="term:' + r.id + '">' + masteryDot(r.id) + esc(r.name) +
-          ' <span class="tiny">' + esc(window.CATS[r.cat].name) + '</span></span>';
-      }).join('') + '</div>';
+    // 知识关联地图
+    html += knowledgeMapHTML(t);
 
     html += '<div style="height:40px"></div></div>';
     return html;
@@ -1164,6 +1329,8 @@
     if (m) return { route: 'term', id: decodeURIComponent(m[1]) };
     const p = h.match(/^practice[:\/](.+)$/);
     if (p) return { route: 'practice-detail', id: decodeURIComponent(p[1]) };
+    const kb = h.match(/^kb[:\/](.+)$/);
+    if (kb) return { route: 'kb-topic', id: decodeURIComponent(kb[1]) };
     if (h.indexOf('dict') === 0) {
       const q = h.split('?q=')[1];
       return { route: 'dict', q: q ? decodeURIComponent(q) : '' };
@@ -1190,6 +1357,7 @@
     const titles = {
       home: '今日学习', learn: '今日学习', plan: '学习计划', path: '学习路径', dict: '术语词典',
       practice: '实战练习', 'practice-detail': '实战练习', interview: '面试测评',
+      kb: '专题知识库', 'kb-topic': '专题知识库',
       my: '我的学习', review: '我的学习', mastery: '我的学习', settings: '我的学习'
     };
     try {
@@ -1197,6 +1365,8 @@
       else if (r.route === 'learn') html = viewLearn();
       else if (r.route === 'plan') html = viewPlan();
       else if (r.route === 'path') html = viewPath();
+      else if (r.route === 'kb') html = viewKnowledgeBase();
+      else if (r.route === 'kb-topic') html = viewKnowledgeTopic(r.id);
       else if (r.route === 'dict') { searchQuery = r.q || ''; html = viewDict(); }
       else if (r.route === 'practice') html = viewPractice();
       else if (r.route === 'practice-detail') html = viewPracticeDetail(r.id);
@@ -1215,6 +1385,7 @@
 
     content.innerHTML = html;
     content.scrollTop = 0;
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
 
     // 面包屑
     if (r.route === 'term' && currentTerm) {
@@ -1222,6 +1393,9 @@
     } else if (r.route === 'practice-detail') {
       const p = window.Lab.exercise(r.id);
       crumb.innerHTML = '<span>实战练习</span><span class="sep">/</span><b>' + esc(p ? p.title : '练习') + '</b>';
+    } else if (r.route === 'kb-topic') {
+      const k = window.KnowledgeBase.get(r.id);
+      crumb.innerHTML = '<span>专题知识库</span><span class="sep">/</span><b>' + esc(k ? k.title : '专题') + '</b>';
     } else {
       crumb.innerHTML = '<b>' + (titles[r.route] || '今日学习') + '</b>';
     }
@@ -1231,12 +1405,15 @@
       el.classList.toggle('active', el.dataset.route === r.route ||
         (r.route === 'learn' && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
+        (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
         (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.mobile-nav [data-route]').forEach(function (el) {
       el.classList.toggle('active', el.dataset.route === r.route ||
         (r.route === 'learn' && el.dataset.route === 'home') ||
+        (r.route === 'term' && el.dataset.route === 'path') ||
+        (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
         (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
@@ -1285,7 +1462,8 @@
     const el = e.target.closest && e.target.closest('[role=button]');
     if (!el || el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
     e.preventDefault();
-    el.click();
+    if (typeof el.click === 'function') el.click();
+    else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   });
 
   /* ============================================================
@@ -1294,8 +1472,26 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day],[data-kb-answer]');
     if (!el) return;
+
+    if (el.dataset.kbAnswer !== undefined) {
+      const box = el.closest('.kb-check');
+      if (!box || box.dataset.done) return;
+      box.dataset.done = '1';
+      const ok = el.dataset.kbAnswer === box.dataset.correct;
+      box.querySelectorAll('[data-kb-answer]').forEach(function (button) {
+        button.disabled = true;
+        if (button.dataset.kbAnswer === box.dataset.correct) button.classList.add('correct');
+        else if (button === el) button.classList.add('wrong');
+      });
+      const x = window.KnowledgeBase.get(parseHash().id);
+      const explain = box.querySelector('.kb-check-explain');
+      explain.hidden = false;
+      explain.innerHTML = '<b>' + (ok ? '回答正确。' : '这项选择不准确。') + '</b><p><strong>核心判断：</strong>' +
+        esc(x.summary) + '</p><p><strong>如何应用：</strong>' + esc(x.application) + '</p>';
+      return;
+    }
 
     if (el.dataset.practiceSave) {
       const answer = $('#practiceAnswer');
