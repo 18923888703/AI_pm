@@ -491,11 +491,65 @@
       '<p>' + esc(x.summary) + '</p><span class="kb-more">阅读专题 <span aria-hidden="true">→</span></span></article>';
   }
 
+  function knowledgeBaseMapHTML(categories) {
+    const ordered = [categories[0], categories[1], categories[2], categories[7], categories[3], categories[4], categories[5], categories[6]];
+    const width = 1180, height = 1100;
+    const root = { x: 500, y: 516, w: 180, h: 68 };
+    const centers = [150, 410, 670, 930];
+    let paths = '', hubs = '', leaves = '';
+    ordered.forEach(function (category, index) {
+      const items = window.KNOWLEDGE_BASE.filter(function (x) { return x.category === category; });
+      const left = index < 4;
+      const sideIndex = left ? index : index - 4;
+      const centerY = centers[sideIndex];
+      const hubX = left ? 250 : 750;
+      const hubW = 180, hubH = 46;
+      const leafX = left ? 10 : 960;
+      const leafW = 210, leafH = 38, gap = 6;
+      const total = items.length * leafH + Math.max(0, items.length - 1) * gap;
+      const startY = centerY - total / 2;
+      const rootEdgeX = left ? root.x : root.x + root.w;
+      const hubEdgeX = left ? hubX + hubW : hubX;
+      const hubLeafX = left ? hubX : hubX + hubW;
+      const leafEdgeX = left ? leafX + leafW : leafX;
+      const bendRoot = left ? 462 : 718;
+      const bendLeaf = left ? 234 : 946;
+
+      paths += '<path class="kb-map-trunk cat-' + index + '" d="M' + rootEdgeX + ' ' + (root.y + root.h / 2) +
+        ' C' + bendRoot + ' ' + (root.y + root.h / 2) + ' ' + bendRoot + ' ' + centerY + ' ' + hubEdgeX + ' ' + centerY + '"/>';
+      hubs += '<g class="kb-map-hub cat-' + index + '"><rect x="' + hubX + '" y="' + (centerY - hubH / 2) + '" width="' + hubW + '" height="' + hubH + '" rx="13"/>' +
+        '<text x="' + (hubX + hubW / 2) + '" y="' + (centerY + 5) + '" text-anchor="middle">' + esc(category) + '</text>' +
+        '<text class="kb-map-count" x="' + (hubX + hubW / 2) + '" y="' + (centerY + 20) + '" text-anchor="middle">' + items.length + ' 个专题</text></g>';
+      items.forEach(function (item, itemIndex) {
+        const y = startY + itemIndex * (leafH + gap);
+        const leafCenterY = y + leafH / 2;
+        paths += '<path class="kb-map-link cat-' + index + '" d="M' + hubLeafX + ' ' + centerY +
+          ' C' + bendLeaf + ' ' + centerY + ' ' + bendLeaf + ' ' + leafCenterY + ' ' + leafEdgeX + ' ' + leafCenterY + '"/>';
+        leaves += '<g class="kb-map-topic cat-' + index + '" role="button" tabindex="0" data-goto="kb/' + escAttr(item.id) +
+          '" aria-label="阅读专题：' + escAttr(item.title) + '"><title>' + esc(item.summary) + '</title>' +
+          '<rect x="' + leafX + '" y="' + y + '" width="' + leafW + '" height="' + leafH + '" rx="10"/>' +
+          '<text x="' + (left ? leafX + leafW - 12 : leafX + 12) + '" y="' + (y + 24) + '" text-anchor="' + (left ? 'end' : 'start') + '">' +
+          esc(mindText(item.title, 15)) + '</text></g>';
+      });
+    });
+
+    return '<section class="kb-overview-map" aria-labelledby="kbMapTitle"><div class="kb-map-head"><div><h2 id="kbMapTitle">知识关联地图</h2>' +
+      '<p>从能力分类理解知识结构，点击任一专题节点即可进入学习。</p></div><div class="kb-map-controls" aria-label="移动脑图视图">' +
+      '<button type="button" data-kb-pan="-1">← 左侧分支</button><button type="button" data-kb-center="1">回到中心</button><button type="button" data-kb-pan="1">右侧分支 →</button></div></div>' +
+      '<div class="kb-overview-map-scroll" tabindex="0" aria-label="AI PM 专题知识库关联脑图，可横向滚动">' +
+      '<svg class="kb-overview-map-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="以 AI PM 能力体系为中心，连接八类能力和二十九个专题的知识脑图">' +
+      paths + '<g class="kb-map-root"><rect x="' + root.x + '" y="' + root.y + '" width="' + root.w + '" height="' + root.h + '" rx="18"/>' +
+      '<text class="kb-map-root-small" x="' + (root.x + root.w / 2) + '" y="' + (root.y + 24) + '" text-anchor="middle">知识中心</text>' +
+      '<text class="kb-map-root-title" x="' + (root.x + root.w / 2) + '" y="' + (root.y + 48) + '" text-anchor="middle">AI PM 能力体系</text></g>' +
+      hubs + leaves + '</svg></div><div class="kb-map-hint"><span>技术与工具</span><i></i><b>AI PM 能力体系</b><i></i><span>产品与业务</span></div></section>';
+  }
+
   function viewKnowledgeBase() {
     const categories = window.KnowledgeBase.categories();
     let html = '<div class="page kb-page"><div class="kb-hero"><span class="eyebrow">AI PM KNOWLEDGE BASE</span>' +
       '<h1>专题知识库</h1><p>从导入资料中去重、校正并结构化的延伸内容。它不替代 61 个核心概念，而是帮助你把技术、产品方法和商业判断连起来。</p>' +
-      '<div class="kb-stats"><span><b>' + window.KNOWLEDGE_BASE.length + '</b> 个专题</span><span><b>' + categories.length + '</b> 类能力</span><span>已关联课程脑图</span></div></div>';
+      '<div class="kb-stats"><span><b>' + window.KNOWLEDGE_BASE.length + '</b> 个专题</span><span><b>' + categories.length + '</b> 类能力</span><span>已关联课程脑图</span></div></div>' +
+      knowledgeBaseMapHTML(categories) + '<div class="kb-list-intro"><h2>全部专题</h2><p>脑图用于理解结构；下方按分类浏览完整解释。</p></div>';
     categories.forEach(function (category) {
       const items = window.KNOWLEDGE_BASE.filter(function (x) { return x.category === category; });
       html += '<section class="kb-section"><div class="kb-section-head"><h2>' + esc(category) + '</h2><span>' + items.length + ' 个专题</span></div>' +
@@ -1437,6 +1491,10 @@
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     }
     if (r.route === 'settings') bindSettings();
+    if (r.route === 'kb') requestAnimationFrame(function () {
+      const map = document.querySelector('.kb-overview-map-scroll');
+      if (map) map.scrollLeft = Math.max(0, (map.scrollWidth - map.clientWidth) / 2);
+    });
   }
 
   /** 统一跳转：把 term:xxx 规范成 term/xxx；目标没变时也要刷一次（否则点了像没反应） */
@@ -1472,8 +1530,19 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day],[data-kb-answer]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center]');
     if (!el) return;
+
+    if (el.dataset.kbPan !== undefined || el.dataset.kbCenter !== undefined) {
+      const map = document.querySelector('.kb-overview-map-scroll');
+      if (!map) return;
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const target = el.dataset.kbCenter !== undefined
+        ? (map.scrollWidth - map.clientWidth) / 2
+        : map.scrollLeft + Number(el.dataset.kbPan) * Math.max(320, map.clientWidth * 0.75);
+      map.scrollTo({ left: Math.max(0, target), behavior: reduce ? 'auto' : 'smooth' });
+      return;
+    }
 
     if (el.dataset.kbAnswer !== undefined) {
       const box = el.closest('.kb-check');
