@@ -604,11 +604,12 @@ body.simple-mode .simple-only{display:block}
 .assessment-start{height:42px;padding:0 22px}
 .last-score{margin:0 0 14px;font-size:13px;color:var(--text-2)}
 .last-score b{font-size:18px;color:var(--text)}
-.assessment-top{margin:12px 0 42px}
+.assessment-top{margin:12px 0 12px}
 .assessment-top > div:first-child{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px}
 .assessment-top > div:first-child b{color:var(--blue)}
 .assessment-progress{height:6px;background:var(--border);border-radius:8px;overflow:hidden}
 .assessment-progress i{display:block;height:100%;background:var(--blue);border-radius:8px}
+.assessment-session-warning{margin:0 0 20px;padding:8px 11px;border-radius:8px;background:rgba(217,115,13,.08);color:#8b4b0d;font-size:11.5px;line-height:1.55}
 .assessment-question-meta{display:flex;gap:6px;margin-bottom:12px}
 .assessment-question-meta span{font-size:11px;line-height:22px;padding:0 8px;border-radius:999px;background:var(--bg-soft);color:var(--text-2);border:1px solid var(--border)}
 .assessment-question-meta span.review{background:rgba(105,64,165,.08);color:#6940a5;border-color:rgba(105,64,165,.2)}

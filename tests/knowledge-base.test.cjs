@@ -14,6 +14,7 @@ const ids = new Set();
 const termIds = new Set(terms.map((x) => x.id));
 
 assert(topics.length >= 25, '知识库专题数量不足');
+assert.equal(context.window.KnowledgeBase.categories().length, 8, '知识库应保持八类能力结构');
 topics.forEach((topic) => {
   assert(topic.id && !ids.has(topic.id), '专题 ID 缺失或重复：' + topic.id);
   ids.add(topic.id);
@@ -22,6 +23,9 @@ topics.forEach((topic) => {
   assert(Array.isArray(topic.relatedTerms) && topic.relatedTerms.length >= 3, '专题课程关联不足：' + topic.id);
   topic.relatedTerms.forEach((id) => assert(termIds.has(id), '专题关联了不存在的概念：' + topic.id + ' -> ' + id));
 });
+
+const evalEngineering = context.window.KnowledgeBase.get('eval-engineering');
+assert(evalEngineering && evalEngineering.relatedTerms.includes('eval'), '应包含 Eval 工程体系专题并关联核心课程');
 
 terms.forEach((term) => {
   const related = context.window.KnowledgeBase.forTerm(term.id);

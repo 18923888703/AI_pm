@@ -6,6 +6,7 @@
    ============================================================ */
 
 (function () {
+  const PAGE_RUN_ID = 'assessment-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
   const PRACTICES = [
     {
       id: 'brief-to-task', title: '把模糊需求写成可执行任务', track: '需求与 Prompt', level: 2, min: 12,
@@ -293,7 +294,8 @@
       practices: {},
       interview: {
         answers: [], startedAt: 0, completedAt: 0, result: null, history: [],
-        sessionQuestions: [], questionStats: {}, lastQuestionIds: [], recentSessions: [], pendingOpen: null, feedback: null
+        sessionQuestions: [], questionStats: {}, lastQuestionIds: [], recentSessions: [], pendingOpen: null, feedback: null,
+        runToken: '', lastAbortReason: '', lastAbortAt: 0
       },
       plan: null
     };
@@ -313,6 +315,10 @@
     if (!Array.isArray(S.interview.recentSessions)) S.interview.recentSessions = [];
     if (S.interview.pendingOpen && typeof S.interview.pendingOpen !== 'object') S.interview.pendingOpen = null;
     if (S.interview.feedback && typeof S.interview.feedback !== 'object') S.interview.feedback = null;
+    if (S.interview.startedAt && !S.interview.completedAt && S.interview.runToken !== PAGE_RUN_ID) {
+      resetInterviewAttempt('refresh');
+      window.Mem.save();
+    }
     // 旧版本进行到一半的固定题测评无法可靠映射到新版随机题，安全回到起始页。
     if (S.interview.startedAt && !S.interview.completedAt && (!S.interview.sessionQuestions.length || oldVersion < 3)) {
       S.interview.answers = [];
@@ -337,6 +343,20 @@
     return S;
   }
   function save() { window.Mem.state.lab = S; window.Mem.save(); }
+  function resetInterviewAttempt(reason) {
+    if (!S || !S.interview || !S.interview.startedAt || S.interview.completedAt) return false;
+    S.interview.answers = [];
+    S.interview.sessionQuestions = [];
+    S.interview.pendingOpen = null;
+    S.interview.feedback = null;
+    S.interview.startedAt = 0;
+    S.interview.completedAt = 0;
+    S.interview.result = null;
+    S.interview.runToken = '';
+    S.interview.lastAbortReason = reason || 'exit';
+    S.interview.lastAbortAt = Date.now();
+    return true;
+  }
   function exercise(id) { return PRACTICES.find(function (x) { return x.id === id; }) || null; }
   function practiceRec(id) {
     load();
@@ -500,6 +520,11 @@
   function finishInterviewIfReady() {
     const questions = interviewQuestions();
     if (S.interview.answers.length !== questions.length) return null;
+    if (S.interview.completedAt && S.interview.result) return S.interview.result;
+    questions.forEach(function (question, index) {
+      const answer = S.interview.answers[index];
+      updateQuestionStat(question, !!answer && (answer.kind === 'open' ? answer.score >= 4 : answer.correct));
+    });
     const result = scoreInterview();
     S.interview.result = result;
     S.interview.completedAt = Date.now();
@@ -511,6 +536,7 @@
       questionIds: S.interview.lastQuestionIds.slice(), at: result.at
     }]).slice(-10);
     S.plan = buildPlan(result);
+    S.interview.runToken = '';
     return result;
   }
 
@@ -533,6 +559,9 @@
       S.interview.sessionQuestions = buildInterviewSession();
       S.interview.pendingOpen = null;
       S.interview.feedback = null;
+      S.interview.runToken = PAGE_RUN_ID;
+      S.interview.lastAbortReason = '';
+      S.interview.lastAbortAt = 0;
       S.interview.startedAt = Date.now();
       S.interview.completedAt = 0;
       S.interview.result = null;
@@ -548,7 +577,6 @@
       const question = sessionQuestions[S.interview.answers.length];
       if (!question || question.type !== 'mcq') return null;
       const hit = String(optionId) === question.correctOptionId;
-      updateQuestionStat(question, hit);
       S.interview.answers.push({ kind: 'mcq', questionId: question.id, value: String(optionId), correct: hit, score: hit ? 5 : 0 });
       const selected = (question.options || []).find(function (o) { return o.id === String(optionId); });
       const correct = (question.options || []).find(function (o) { return o.id === question.correctOptionId; });
@@ -588,7 +616,6 @@
       const totalWeight = rubric.reduce(function (n, x) { return n + (x.weight || 1); }, 0) || 1;
       const gotWeight = rubric.reduce(function (n, x) { return n + (chosen.has(x.id) ? (x.weight || 1) : 0); }, 0);
       const points = +(gotWeight / totalWeight * 5).toFixed(2);
-      updateQuestionStat(question, points >= 4);
       S.interview.answers.push({
         kind: 'open', questionId: question.id, text: pending.text,
         rubricIds: Array.from(chosen), score: points, correct: points >= 4
@@ -598,6 +625,12 @@
       save(); return S.interview.result;
     },
     interview() { return load().interview; },
+    abortInterview(reason) {
+      S = load();
+      const aborted = resetInterviewAttempt(reason || 'exit');
+      if (aborted) save();
+      return aborted;
+    },
     interviewQuestions: interviewQuestions,
     interviewBankSize() { return currentBank().length; },
     interviewSessionSize() { return SESSION_SIZE; },

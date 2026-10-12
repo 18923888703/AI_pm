@@ -175,6 +175,14 @@
       relatedTerms: ['problemframing', 'outcomemetric', 'riskgrading'], keywords: ['结论先行', '结构化表达', 'MECE']
     },
     {
+      id: 'eval-engineering', category: 'AI 产品落地', title: 'Eval 工程体系：从评估集到 CI 门禁',
+      summary: 'Eval 是标准化、可重复的 AI 质量工程：用固定评估集、分维度标准、多方法评分和版本报告，让每次模型、Prompt 或知识库改动都能被比较和拦截。',
+      keyPoints: ['评估集覆盖真实场景、难例与高风险边界，并为每题配置标准答案或评分要点', '评分按维度组合规则、语义相似度、LLM-as-Judge 与人工复核', '把执行、报告和阈值接入 CI，失败用例进入标注与复测闭环'],
+      application: '发布 AI 客服新版本前自动跑 Eval；正确性与安全性未过硬门槛则阻断发布，报告同时给出失败用例、原因和版本趋势。',
+      relatedTerms: ['eval', 'goldenset', 'llmjudge', 'observability', 'flywheel', 'rollout'],
+      keywords: ['自动化测试', '评估维度', '评估报告', 'CI', '发布门禁', 'Bad Case', '标注一致性']
+    },
+    {
       id: 'mair', category: 'AI 产品落地', title: 'MAIR：寻找 AI 机会点',
       summary: 'MAIR 从业务流程出发，识别高价值脑力劳动，再判断 AI 替代或辅助是否值得。',
       keyPoints: ['M：梳理端到端流程', 'A：找到需要判断、分析或创作的环节', 'I/R：评估价值，再匹配合适 AI 方案'],

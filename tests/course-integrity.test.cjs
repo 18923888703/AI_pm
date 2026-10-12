@@ -24,6 +24,11 @@ assert.ok(rerank, '应存在 Rerank 知识点');
 assert.equal(rerank.quiz.length, 2, 'Rerank 应包含两道小测');
 assert.ok(rerank.steps.length >= 4 && rerank.pitfalls.length >= 4, 'Rerank 内容应覆盖链路与常见误区');
 
+const evaluation = terms.find((t) => t.id === 'eval');
+assert.ok(evaluation && evaluation.name.includes('Eval'), '应存在 Eval 工程体系知识点');
+assert.ok(evaluation.steps.length >= 6 && evaluation.pitfalls.length >= 4, 'Eval 应覆盖评估集、评分、报告、CI 与反馈闭环');
+assert.ok(evaluation.related.includes('goldenset') && evaluation.related.includes('llmjudge') && evaluation.related.includes('rollout'));
+
 const ids = new Set(terms.map((t) => t.id));
 context.window.Curriculum.lessons.forEach((lesson) => {
   lesson.ids.forEach((id) => assert.ok(ids.has(id), `课程引用了不存在的知识点：${id}`));

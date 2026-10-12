@@ -11,6 +11,7 @@
   let termEnterAt = 0;
   let searchQuery = '';
   let abortCtl = null;
+  let activeRoute = null;
 
   const T = function (id) { return window.TERMS.find(function (t) { return t.id === id; }); };
   const STAGE_ICONS = ['🌱', '🔧', '🔄', '🚀', '⚡', '🎯'];
@@ -537,7 +538,7 @@
       '<p>从能力分类理解知识结构，点击任一专题节点即可进入学习。</p></div><div class="kb-map-controls" aria-label="移动脑图视图">' +
       '<button type="button" data-kb-pan="-1">← 左侧分支</button><button type="button" data-kb-center="1">回到中心</button><button type="button" data-kb-pan="1">右侧分支 →</button></div></div>' +
       '<div class="kb-overview-map-scroll" tabindex="0" aria-label="AI PM 专题知识库关联脑图，可横向滚动">' +
-      '<svg class="kb-overview-map-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="以 AI PM 能力体系为中心，连接八类能力和二十九个专题的知识脑图">' +
+      '<svg class="kb-overview-map-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="以 AI PM 能力体系为中心，连接八类能力和 ' + window.KNOWLEDGE_BASE.length + ' 个专题的知识脑图">' +
       paths + '<g class="kb-map-root"><rect x="' + root.x + '" y="' + root.y + '" width="' + root.w + '" height="' + root.h + '" rx="18"/>' +
       '<text class="kb-map-root-small" x="' + (root.x + root.w / 2) + '" y="' + (root.y + 24) + '" text-anchor="middle">知识中心</text>' +
       '<text class="kb-map-root-title" x="' + (root.x + root.w / 2) + '" y="' + (root.y + 48) + '" text-anchor="middle">AI PM 能力体系</text></g>' +
@@ -831,6 +832,7 @@
       const dim = window.INTERVIEW_DIMS[q.dimension];
       let html = '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (idx + 1) + ' / ' + questions.length + ' 题</span><b>' + esc(dim.name) + '</b></div>' +
         '<div class="assessment-progress"><i style="width:' + Math.round(idx / questions.length * 100) + '%"></i></div></div>' +
+        '<div class="assessment-session-warning">本轮需要连续完成。刷新页面或退出测评会作废当前答案，返回后重新抽题计分。</div>' +
         '<div class="assessment-card"><div class="assessment-question-meta"><span>随机题</span>' +
         (q.review ? '<span class="review">变式复测</span>' : '<span>首次抽到</span>') +
         '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>';
@@ -871,6 +873,9 @@
     const bankSize = window.Lab.interviewBankSize();
     let html = '<div class="page interview-intro"><h1>AI PM 面试测评</h1>' +
       '<p class="lead">每次从 ' + bankSize + ' 道精选题中分层抽取 12 道客观题与 8 道开放题，覆盖八个能力维度。答对过的知识点仍会换一种问法复测。</p>' +
+      (iv.lastAbortReason ? '<div class="callout yellow"><span class="emo">↻</span><div class="ct"><b>上一轮测评已作废</b><br>' +
+        (iv.lastAbortReason === 'refresh' ? '页面曾被刷新或重新打开' : '你在完成前退出了测评') +
+        '，未完成答案没有计入成绩和题目统计。请重新开始测评。</div></div>' : '') +
       '<div class="assessment-facts"><div><b>' + sessionSize + '</b><span>每次抽题</span></div><div><b>' + bankSize + '</b><span>精选题库</span></div><div><b>25</b><span>分钟左右</span></div></div>' +
       '<div class="dimension-preview">';
     Object.keys(window.INTERVIEW_DIMS).forEach(function (k) {
@@ -1394,6 +1399,10 @@
 
   function render() {
     const r = parseHash();
+    if (activeRoute === 'interview' && r.route !== 'interview') {
+      window.Lab.abortInterview('exit');
+    }
+    activeRoute = r.route;
     // 记录上一个术语的停留时长
     if (currentTerm) {
       window.Mem.dwell(currentTerm.id, Date.now() - termEnterAt);

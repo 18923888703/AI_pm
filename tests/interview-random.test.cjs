@@ -65,6 +65,20 @@ finishPerfectSession();
 assert.equal(Lab.interview().result.score, 100);
 
 const previousIds = new Set(first.map((q) => q.id));
+const abandoned = Lab.startInterview();
+const abandonedFirst = abandoned[0];
+const statBefore = (Lab.interview().questionStats[abandonedFirst.variantGroup] || { attempts: 0 }).attempts;
+if (abandonedFirst.type === 'mcq') Lab.answerInterview(abandonedFirst.correctOptionId);
+else {
+  Lab.submitOpenAnswer('我会先给出结论，再说明判断依据、执行步骤、指标和风险处理。');
+  Lab.scoreOpenAnswer(abandonedFirst.rubric.map((r) => r.id));
+}
+assert.equal((Lab.interview().questionStats[abandonedFirst.variantGroup] || { attempts: 0 }).attempts, statBefore, '未完成测评不应提前计入题目统计');
+assert.equal(Lab.abortInterview('exit'), true, '退出进行中的测评应作废本轮');
+assert.equal(Lab.interview().startedAt, 0);
+assert.equal(Lab.interview().answers.length, 0);
+assert.equal(Lab.interview().lastAbortReason, 'exit');
+
 const second = Lab.startInterview();
 assertSession(second);
 assert.equal(second.filter((q) => previousIds.has(q.id)).length, 0, '最近一轮原题不应重复');
@@ -77,5 +91,19 @@ assert.equal(result.total, 20);
 assert.equal(result.types.mcq.max, 60);
 assert.equal(result.types.open.max, 40);
 assert.equal(result.reviewCorrect, result.reviewCount);
+
+Lab.startInterview();
+const refreshQuestion = Lab.interviewQuestions()[0];
+if (refreshQuestion.type === 'mcq') Lab.answerInterview(refreshQuestion.correctOptionId);
+const reloadContext = { window: { Mem: { state, save() {} } }, Math: seededMath, Date, Set, Map, console };
+vm.createContext(reloadContext);
+['assets/practice.js', 'assets/interview-bank.js'].forEach((file) => {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), reloadContext, { filename: file });
+});
+const refreshed = reloadContext.window.Lab.interview();
+assert.equal(refreshed.startedAt, 0, '刷新页面后进行中的测评必须重置');
+assert.equal(refreshed.answers.length, 0, '刷新页面后不应保留未完成答案');
+assert.equal(refreshed.sessionQuestions.length, 0, '刷新页面后应重新抽题');
+assert.equal(refreshed.lastAbortReason, 'refresh');
 
 console.log('interview randomization tests passed');
