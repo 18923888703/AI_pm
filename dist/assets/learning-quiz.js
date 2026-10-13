@@ -141,7 +141,7 @@
     return active[termId];
   }
 
-  function answer(termId, questionId, optionId) {
+  function answer(termId, questionId, optionId, source) {
     const q = (BANK[termId] || []).find(function (x) { return x.id === questionId; });
     if (!q) return null;
     const term = window.TERMS.find(function (x) { return x.id === termId; });
@@ -156,6 +156,7 @@
     if (ok) rec.correct++; else rec.wrong++;
     rec.recentIds = (rec.recentIds || []).concat(q.id).slice(-6);
     delete active[termId];
+    if (window.SpacedReview) window.SpacedReview.record(termId, q.id, q.variantType, ok, source || 'term');
     window.Mem.save();
     return Object.assign({
       correct: ok, correctOptionId: q.correctOptionId,
@@ -232,7 +233,7 @@
     const s = daily();
     const q = dailyQuestion();
     if (!s || !q || s.feedback) return null;
-    const result = answer(q.termId, q.id, optionId);
+    const result = answer(q.termId, q.id, optionId, 'daily');
     if (!result) return null;
     const term = window.TERMS.find(function (x) { return x.id === q.termId; });
     window.Mem.completeDailyQuiz(q.termId, term.cat, result.correct);
@@ -305,7 +306,7 @@
   function answerPractice(optionId) {
     const s = practice(), q = practiceQuestion();
     if (!s || !q || s.feedback) return null;
-    const result = answer(q.termId, q.id, optionId);
+    const result = answer(q.termId, q.id, optionId, 'practice');
     if (!result) return null;
     const term = window.TERMS.find(function (x) { return x.id === q.termId; });
     if (window.Mem.quiz && term) window.Mem.quiz(q.termId, term.cat, result.correct);
@@ -325,12 +326,79 @@
     window.Mem.save(); return s;
   }
 
+  function spaced() { return window.Mem.state.spacedSession || null; }
+
+  function pickSpaced(id) {
+    const bank = BANK[id] || [];
+    const rec = record(id);
+    const status = window.SpacedReview.status(id) || {};
+    const recent = new Set((rec.recentIds || []).slice(-2));
+    let candidates = bank.filter(function (q) { return q.id !== status.lastQuestionId && !recent.has(q.id); });
+    if (!candidates.length) candidates = bank.filter(function (q) { return q.id !== status.lastQuestionId; });
+    if (!candidates.length) candidates = bank.slice();
+    const differentType = candidates.filter(function (q) { return q.variantType !== status.lastVariantType; });
+    if (differentType.length) candidates = differentType;
+    candidates = shuffled(candidates).sort(function (a, b) {
+      const aa = rec.answered[a.id] || { attempts: 0, lastAt: 0 };
+      const bb = rec.answered[b.id] || { attempts: 0, lastAt: 0 };
+      return aa.attempts - bb.attempts || aa.lastAt - bb.lastAt;
+    });
+    return candidates[0] || null;
+  }
+
+  function startSpaced() {
+    const existing = spaced();
+    if (existing && !existing.completedAt) return existing;
+    const due = window.SpacedReview.due().slice(0, 6);
+    if (!due.length) return null;
+    const questions = due.map(function (item) {
+      const q = pickSpaced(item.termId);
+      return { termId: item.termId, questionId: q.id, review: true,
+        optionIds: shuffled(q.options.map(function (o) { return o.id; })) };
+    });
+    window.Mem.state.spacedSession = {
+      startedAt: Date.now(), completedAt: 0, index: 0,
+      questions: questions, responses: [], feedback: null, result: null
+    };
+    window.Mem.save(); return spaced();
+  }
+
+  function spacedQuestion() {
+    const s = spaced();
+    return s && (!s.completedAt || s.feedback) ? resolveQuestion(s.questions[s.index]) : null;
+  }
+
+  function answerSpaced(optionId) {
+    const s = spaced(), q = spacedQuestion();
+    if (!s || !q || s.feedback) return null;
+    const result = answer(q.termId, q.id, optionId, 'spaced');
+    if (!result) return null;
+    const term = window.TERMS.find(function (x) { return x.id === q.termId; });
+    if (window.Mem.quiz && term) window.Mem.quiz(q.termId, term.cat, result.correct);
+    s.responses.push({ termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() });
+    s.feedback = Object.assign({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId) }, result);
+    finishSession(s);
+    window.Mem.save(); return s.feedback;
+  }
+
+  function nextSpaced() {
+    const s = spaced();
+    if (!s || !s.feedback) return s;
+    s.feedback = null;
+    if (s.completedAt) { window.Mem.save(); return s; }
+    s.index++;
+    finishSession(s);
+    window.Mem.save(); return s;
+  }
+
   window.LEARNING_QUIZ_BANK = BANK;
   window.LearningQuiz = {
     pick: pick, answer: answer, bank: function (termId) { return (BANK[termId] || []).slice(); },
     startDaily: startDaily, daily: daily, dailyQuestion: dailyQuestion,
     answerDaily: answerDaily, nextDaily: nextDaily, dailyResult: dailyResult,
     startPractice: startPractice, practice: practice, practiceQuestion: practiceQuestion,
-    answerPractice: answerPractice, nextPractice: nextPractice
+    answerPractice: answerPractice, nextPractice: nextPractice,
+    startSpaced: startSpaced, spaced: spaced, spacedQuestion: spacedQuestion,
+    answerSpaced: answerSpaced, nextSpaced: nextSpaced
   };
 })();

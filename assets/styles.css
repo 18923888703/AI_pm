@@ -444,6 +444,26 @@ body.simple-mode .simple-only{display:block}
 .home-data-strip b{font-size:22px;line-height:1.2}
 .home-data-strip span{font-size:12px;color:var(--text-2);margin-top:4px}
 .home-next{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:4px 0 28px;border-bottom:1px solid var(--border)}
+.home-spaced{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 16px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text-2)}
+.home-spaced b{color:var(--text);font-variant-numeric:tabular-nums}
+.home-spaced button{border:0;background:transparent;color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;padding:3px 0;white-space:nowrap}
+.home-spaced button:hover{text-decoration:underline;text-underline-offset:3px}
+.spaced-overview{display:flex;align-items:center;gap:24px;flex-wrap:wrap;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 0;margin:18px 0}
+.spaced-overview > div{display:flex;align-items:baseline;gap:6px}
+.spaced-overview > div b{font-size:22px;font-variant-numeric:tabular-nums}
+.spaced-overview > div span,.spaced-next{font-size:12px;color:var(--text-2)}
+.spaced-overview > button,.spaced-next{margin-left:auto}
+.spaced-due-list{margin-bottom:30px}
+.spaced-due-list > div{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--border);padding:9px 0}
+.spaced-due-list b{font-size:13.5px;min-width:130px}
+.spaced-due-list span{font-size:12px;color:var(--text-2)}
+.spaced-result-note{font-size:13px;line-height:1.75;color:var(--text-2);padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.mastery-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px 0;margin:18px 0 6px}
+.mastery-compare > div{display:flex;flex-direction:column;gap:3px}
+.mastery-compare span{font-size:12px;color:var(--text-2)}
+.mastery-compare b{font-size:25px;font-variant-numeric:tabular-nums}
+.mastery-compare small{font-size:11px;color:var(--text-3)}
+.mastery-definition{line-height:1.65}
 .home-next h2{font-size:22px;margin:9px 0 3px}
 .home-next p{margin:0;color:var(--text-2);max-width:64ch}
 .home-next .btn{height:40px;padding:0 16px;flex:0 0 auto}
@@ -1009,6 +1029,10 @@ body.simple-mode .simple-only{display:block}
   .home-data-strip > div:nth-child(3){padding-left:0}
   .home-data-strip > div:nth-child(5){grid-column:1/-1;border:0;padding-left:0}
   .home-next{align-items:stretch;flex-direction:column;gap:16px}
+  .home-spaced{align-items:flex-start;flex-direction:column;gap:4px}
+  .spaced-overview{gap:10px 18px}
+  .spaced-overview > button,.spaced-next{margin-left:0;width:100%}
+  .spaced-due-list > div{align-items:flex-start;flex-direction:column;gap:2px}
   .home-next .btn{width:100%;justify-content:center}
   .plan-card{padding:15px 14px;margin-left:-4px;margin-right:-4px}
   .plan-top{align-items:center}

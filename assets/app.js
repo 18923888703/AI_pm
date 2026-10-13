@@ -210,7 +210,7 @@
      侧栏
      ============================================================ */
   function renderSidebar() {
-    const rq = window.Mem.reviewQueue(99);
+    const rq = window.SpacedReview.due();
     const rc = $('#reviewCount');
     if (rc) { rc.textContent = rq.length ? String(rq.length) : ''; rc.className = 'nav-count' + (rq.length ? ' hot' : ''); }
 
@@ -348,6 +348,7 @@
     const overall = Math.round(sy.learnedCount / sy.totalTerms * 100);
     const dailySession = window.LearningQuiz.daily();
     const dailyResult = window.LearningQuiz.dailyResult();
+    const longTerm = window.SpacedReview.summary();
 
     let html = '<div class="page home-focus"><h1>' + (pd.allDone ? '今天完成了' : '今天继续向前') + '</h1>' +
       '<p class="lead">' + esc(pd.lessonTitle) + '</p>' +
@@ -356,12 +357,16 @@
       '<div><b>' + displayRemainMin + '</b><span>剩余分钟</span></div>' +
       '<div><b>' + Math.max(1, hp.streak) + '</b><span>连续天数</span></div>' +
       '<div><b>' + overall + '%</b><span>课程进度</span></div>' +
-      '<div><b>' + (dailyResult ? dailyResult.score + '%' : '—') + '</b><span>今日掌握度</span></div></div>' +
+      '<div><b>' + (dailyResult ? dailyResult.score + '%' : '—') + '</b><span>今日答对率</span></div></div>' +
       '<section class="home-next"><div><span class="tag">' + (pd.lessonKind === 'checkpoint' ? '阶段检查' : '第 ' + sy.realNo + ' 课') + '</span>' +
       '<h2>' + esc(pd.lessonTitle) + '</h2><p>' + esc(pd.lessonGoal) + '</p></div>' +
       (dailySession && !dailySession.completedAt ? '<button class="btn primary" data-route="learn">继续答题 →</button>' :
         firstUndone ? '<button class="btn primary" data-learn-start="1">' + (completed.length ? '继续学习' : '开始学习') + ' →</button>' :
-        '<button class="btn" data-route="path">查看学习路径</button>') + '</section>';
+        '<button class="btn" data-route="path">查看学习路径</button>') + '</section>' +
+      '<div class="home-spaced"><span>长期掌握度 <b>' + (longTerm.score == null ? '待复测' : longTerm.score + '%') + '</b>' +
+      ' · 跨日掌握 ' + longTerm.mastered + '/' + longTerm.total + ' 个知识点</span>' +
+      (longTerm.due ? '<button type="button" data-spaced-start="1">到期复测 ' + longTerm.due + ' 个 →</button>' :
+        '<button type="button" data-route="review">查看复习安排 →</button>') + '</div>';
 
     if (pending.length) {
       html += '<div class="home-tag-section"><h2>待学习</h2><div class="knowledge-tags">' + pending.map(function (it) {
@@ -467,7 +472,7 @@
     }
     if (session.completedAt && session.result) {
       return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
-        '<div><h1>今日学习完成</h1><p class="lead">今日掌握度 ' + session.result.score + ' 分，答对 ' + session.result.correct + '/' + session.result.total + ' 题。</p>' +
+        '<div><h1>今日学习完成</h1><p class="lead">今日答对率 ' + session.result.score + ' 分，答对 ' + session.result.correct + '/' + session.result.total + ' 题；长期掌握度以跨日复测为准。</p>' +
         '<button class="btn" data-route="home">查看今日数据</button></div></div>' +
         learningAdviceHTML(session.responses, session.questions.map(function (q) { return q.termId; }), false) +
         '<h2>今日知识点</h2><div class="knowledge-tags">' +
@@ -506,7 +511,7 @@
     if (!session || !session.questions.length) return '<div class="page"><h1>巩固复习</h1><p class="lead">完成今日学习后，可从成绩页启动针对性练习。</p><button class="btn" data-route="learn">返回今日学习</button></div>';
     if (session.completedAt && session.result) {
       return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
-        '<div><h1>巩固练习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。本轮成绩单独记录，不改变今日掌握度。</p>' +
+        '<div><h1>巩固练习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。本轮成绩单独记录，不改变今日答对率。</p>' +
         '<button class="btn" data-route="learn">返回今日成绩</button></div></div>' +
         learningAdviceHTML(session.responses, session.focusIds, true) + finalAnswerReviewHTML(session) + '</div>';
     }
@@ -527,6 +532,41 @@
     html += '</div>' + (session.feedback ? answerExplanationHTML(session.feedback) +
       '<div class="assessment-open-actions"><button class="btn primary" data-review-next="1">' +
       (session.index + 1 >= session.questions.length ? '查看巩固结果' : '下一题 →') + '</button></div>' : '') + '</div></div>';
+    return html;
+  }
+
+  function viewSpaced() {
+    const session = window.LearningQuiz.spaced();
+    if (!session || !session.questions.length) return '<div class="page"><h1>到期复测</h1><p class="lead">目前没有到期知识点。复测会在「我的学习」中按时间安排。</p><button class="btn" data-route="review">查看复习安排</button></div>';
+    const longTerm = window.SpacedReview.summary();
+    if (session.completedAt && session.result) {
+      const pending = session.responses.filter(function (r) { return !r.correct; }).length;
+      const nextText = longTerm.nextAt ? '下次到期：' + new Date(longTerm.nextAt).toLocaleDateString('zh-CN') + '。' : '';
+      return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
+        '<div><h1>到期复测完成</h1><p class="lead">本轮答对 ' + session.result.correct + '/' + session.result.total + ' 题。长期掌握度：' +
+        (longTerm.score == null ? '待建立' : longTerm.score + '%') + '（已跨日掌握 ' + longTerm.mastered + '/' + longTerm.total + ' 个知识点）。</p>' +
+        '<button class="btn" data-route="review">查看下次复测安排</button></div></div>' +
+        '<div class="spaced-result-note">' + (pending ? '有 ' + pending + ' 个知识点答错，已安排约 1 天后再测。' :
+          '本轮答对会延长复测间隔；首次跨日答对仍需再通过一次不同日期的到期复测。') +
+        ' ' + nextText + '</div>' +
+        finalAnswerReviewHTML(session) + '</div>';
+    }
+    const q = window.LearningQuiz.spacedQuestion();
+    if (!q) return '<div class="page"><div class="empty">复测题暂时无法读取。<br><br><button class="btn" data-route="review">返回复习安排</button></div></div>';
+    const term = T(q.termId);
+    const progress = Math.round(session.responses.length / session.questions.length * 100);
+    let html = '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (session.index + 1) + ' / ' + session.questions.length + ' 题</span><b>' + esc(term.name) + '</b></div>' +
+      '<div class="assessment-progress" role="progressbar" aria-label="到期复测进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
+      '<div class="daily-progress-line"><span>答题进度</span><b>' + progress + '%</b></div>' +
+      '<div class="assessment-card"><div class="assessment-question-meta"><span>到期复测</span><span class="review">不同问法</span></div>' +
+      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
+    q.options.forEach(function (o, i) {
+      const feedback = session.feedback;
+      const cls = feedback ? (o.id === feedback.correctOptionId ? ' correct' : o.id === feedback.selectedOptionId ? ' wrong' : '') : '';
+      html += '<button class="' + cls + '" data-spaced-answer="' + escAttr(o.id) + '"' + (feedback ? ' disabled' : '') + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
+    });
+    html += '</div>' + (session.feedback ? answerExplanationHTML(session.feedback) +
+      '<div class="assessment-open-actions"><button class="btn primary" data-spaced-next="1">下一题 →</button></div>' : '') + '</div></div>';
     return html;
   }
 
@@ -1003,13 +1043,31 @@
   }
 
   function viewReview() {
-    const q = window.Mem.reviewQueue(99);
-    let html = '<div class="page"><h1>我的学习</h1>' + myTabs('review') + '<h2>复习队列</h2>' +
-      '<p class="lead">掌握度不到「已掌握」、且越久没看的排在越前面。这是你的记忆在替你排优先级。</p>';
+    const due = window.SpacedReview.due();
+    const dueIds = new Set(due.map(function (r) { return r.termId; }));
+    const q = window.Mem.reviewQueue(99).filter(function (r) { return !dueIds.has(r.term.id); });
+    const longTerm = window.SpacedReview.summary();
+    const session = window.LearningQuiz.spaced();
+    let html = '<div class="page"><h1>我的学习</h1>' + myTabs('review') + '<h2>到期复测</h2>' +
+      '<p class="lead">当天答对只说明当前会做；隔天换题答对，才逐步计入长期掌握。答错后约 1 天再复测，连续通过则逐渐拉开间隔。</p>' +
+      '<div class="spaced-overview"><div><b>' + due.length + '</b><span>个知识点到期</span></div><div><b>' +
+      (longTerm.score == null ? '待复测' : longTerm.score + '%') + '</b><span>长期掌握度 · ' + longTerm.mastered + '/' + longTerm.total + '</span></div>' +
+      ((session && !session.completedAt) ? '<button class="btn primary" data-route="spaced">继续复测 →</button>' :
+        due.length ? '<button class="btn primary" data-spaced-start="1">开始到期复测 →</button>' :
+        '<span class="spaced-next">' + (longTerm.nextAt ? '下次预计 ' + new Date(longTerm.nextAt).toLocaleDateString('zh-CN') : '学习后会自动安排') + '</span>') + '</div>';
+
+    if (due.length) {
+      html += '<div class="spaced-due-list">' + due.slice(0, 8).map(function (r) {
+        const term = T(r.termId);
+        return '<div><b>' + esc(term.name) + '</b><span>' +
+          (r.lastReviewedAt ? '上次复测' + (r.successStreak ? '答对' : '答错') : '等待首次跨日复测') +
+          ' · 优先换题干与考查角度</span></div>';
+      }).join('') + '</div>';
+    }
+    html += '<h2>其他薄弱概念</h2><p class="lead">这里按答题表现和距离上次学习的时间排序；到期复测以顶部时间表为准。</p>';
 
     if (!q.length) {
-      html += '<div class="empty">🎉 暂时没有需要复习的内容<br><br>' +
-        '<button class="btn" data-route="path">去学习路径看看</button></div>';
+      html += '<div class="empty">目前没有其他薄弱概念。</div>';
       return html + '</div>';
     }
     html += '<div class="term-list">';
@@ -1034,6 +1092,13 @@
     const lv = window.Mem.level();
     let html = '<div class="page"><h1>我的学习</h1>' + myTabs('progress') + '<h2>学习进度</h2>' +
       '<p class="lead">这里是我对你的长期记忆。它会跨会话保留，并决定我怎么给你讲新东西。</p>';
+    const longTerm = window.SpacedReview.summary();
+    const today = window.LearningQuiz.dailyResult();
+    html += '<div class="mastery-compare"><div><span>今日答对率</span><b>' + (today ? today.score + '%' : '待答题') + '</b><small>只统计今天的题目</small></div>' +
+      '<div><span>长期掌握度</span><b>' + (longTerm.score == null ? '待复测' : longTerm.score + '%') +
+      '</b><small>跨日掌握 ' + longTerm.mastered + '/' + longTerm.total + ' 个知识点</small></div></div>' +
+      '<p class="tiny mastery-definition">一个知识点需在两个不同日期的到期复测中答对，才计入长期掌握；答错后重新安排复测。</p>' +
+      (longTerm.due ? '<button class="btn sm" data-spaced-start="1">复测到期的 ' + longTerm.due + ' 个知识点 →</button>' : '');
 
     /* 学习习惯 */
     html += '<h2>学习习惯</h2><div class="card">' +
@@ -1049,7 +1114,7 @@
       '</div>';
 
     /* 水平构成 */
-    html += '<h2>水平构成</h2><div class="card">' +
+    html += '<h2>综合学习画像</h2><div class="card">' +
       '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">' +
       '<span style="font-size:20px;font-weight:700;color:' + lv.grade.color + '">' + lv.grade.name + '</span>' +
       '<span class="muted">' + lv.score + ' / 100</span>' +
@@ -1522,7 +1587,7 @@
 
     let html = '';
     const titles = {
-      home: '今日学习', learn: '今日学习', reinforce: '巩固复习', plan: '学习计划', path: '学习路径', dict: '术语词典',
+      home: '今日学习', learn: '今日学习', reinforce: '巩固复习', spaced: '到期复测', plan: '学习计划', path: '学习路径', dict: '术语词典',
       practice: '实战练习', 'practice-detail': '实战练习', interview: '面试测评',
       kb: '专题知识库', 'kb-topic': '专题知识库',
       my: '我的学习', review: '我的学习', mastery: '我的学习', settings: '我的学习'
@@ -1531,6 +1596,7 @@
       if (r.route === 'term') html = viewTerm(r.id);
       else if (r.route === 'learn') html = viewLearn();
       else if (r.route === 'reinforce') html = viewReinforce();
+      else if (r.route === 'spaced') html = viewSpaced();
       else if (r.route === 'plan') html = viewPlan();
       else if (r.route === 'path') html = viewPath();
       else if (r.route === 'kb') html = viewKnowledgeBase();
@@ -1574,7 +1640,7 @@
         (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (r.route === 'kb-topic' && el.dataset.route === 'kb') ||
-        (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
+        (['review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.mobile-nav [data-route]').forEach(function (el) {
@@ -1582,7 +1648,7 @@
         (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
-        (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
+        (['review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.tree-item').forEach(function (el) {
@@ -1644,7 +1710,7 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center]');
     if (!el) return;
 
     if (el.dataset.kbPan !== undefined || el.dataset.kbCenter !== undefined) {
@@ -1751,7 +1817,9 @@
     }
     if (el.dataset.reviewStart) {
       const ongoing = window.LearningQuiz.practice();
-      const base = parseHash().route === 'reinforce' && ongoing ? ongoing : window.LearningQuiz.daily();
+      const route = parseHash().route;
+      const base = route === 'reinforce' && ongoing ? ongoing :
+        route === 'spaced' ? window.LearningQuiz.spaced() : window.LearningQuiz.daily();
       const wrong = (base && base.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; });
       const ids = wrong.length ? wrong : (base && base.focusIds || (base && base.questions || []).map(function (q) { return q.termId; }));
       window.LearningQuiz.startPractice(ids);
@@ -1763,6 +1831,19 @@
     }
     if (el.dataset.reviewNext) {
       window.LearningQuiz.nextPractice();
+      render(); return;
+    }
+    if (el.dataset.spacedStart) {
+      if (window.LearningQuiz.startSpaced()) go('spaced');
+      else toast('暂时没有到期知识点，学完新内容后会自动安排');
+      return;
+    }
+    if (el.dataset.spacedAnswer !== undefined) {
+      window.LearningQuiz.answerSpaced(el.dataset.spacedAnswer);
+      render(); return;
+    }
+    if (el.dataset.spacedNext) {
+      window.LearningQuiz.nextSpaced();
       render(); return;
     }
     if (el.dataset.planDay) {
@@ -2099,6 +2180,7 @@
     await window.Store.init();
     window.Store.onChange = function () { renderSidebar(); };
     window.Mem.init();
+    window.SpacedReview.initialize();
     render();
     updateModePill();
     closeChat();

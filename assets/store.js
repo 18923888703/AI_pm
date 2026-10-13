@@ -236,6 +236,19 @@
     out.quizVariants = mergedQuiz;
 
     out.learningPractice = newest.learningPractice || (base === a ? b.learningPractice : a.learningPractice) || null;
+    out.spacedSession = newest.spacedSession || (base === a ? b.spacedSession : a.spacedSession) || null;
+    const mergedSpaced = JSON.parse(JSON.stringify(a.spacedReview || {}));
+    Object.keys(b.spacedReview || {}).forEach(function (id) {
+      const other = b.spacedReview[id];
+      const current = mergedSpaced[id];
+      if (!current) { mergedSpaced[id] = JSON.parse(JSON.stringify(other)); return; }
+      const later = (other.lastAt || 0) >= (current.lastAt || 0) ? other : current;
+      const histories = unionBy([].concat(current.reviewHistory || [], other.reviewHistory || []), function (h) {
+        return h.at + '|' + h.questionId;
+      }).sort(function (x, y) { return x.at - y.at; }).slice(-20);
+      mergedSpaced[id] = Object.assign({}, later, { reviewHistory: histories });
+    });
+    out.spacedReview = mergedSpaced;
 
     out.prefs = newest.prefs || base.prefs;
     out.plan = newest.plan || base.plan;

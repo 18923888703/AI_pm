@@ -47,7 +47,9 @@
       planLog: {},      // date -> {total, done, min, lessonNo}
       quizVariants: {}, // termId -> 变式题历史
       dailyLearning: null,
-      learningPractice: null
+      learningPractice: null,
+      spacedReview: {},
+      spacedSession: null
     };
   };
 
@@ -72,6 +74,8 @@
     filled.quizVariants = (o && o.quizVariants && typeof o.quizVariants === 'object') ? o.quizVariants : {};
     filled.dailyLearning = (o && o.dailyLearning && typeof o.dailyLearning === 'object') ? o.dailyLearning : null;
     filled.learningPractice = (o && o.learningPractice && typeof o.learningPractice === 'object') ? o.learningPractice : null;
+    filled.spacedReview = (o && o.spacedReview && typeof o.spacedReview === 'object') ? o.spacedReview : {};
+    filled.spacedSession = (o && o.spacedSession && typeof o.spacedSession === 'object') ? o.spacedSession : null;
     return filled;
   }
 
