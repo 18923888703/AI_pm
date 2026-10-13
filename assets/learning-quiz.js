@@ -127,6 +127,7 @@
     const term = window.TERMS.find(function (x) { return x.id === termId; });
     const selectedOption = (q.options || []).find(function (x) { return x.id === optionId; });
     const correctOption = (q.options || []).find(function (x) { return x.id === q.correctOptionId; });
+    if (!selectedOption) return null;
     const rec = record(termId);
     const ok = optionId === q.correctOptionId;
     const qr = rec.answered[q.id] || { attempts: 0, correct: 0, wrong: 0, lastAt: 0 };
@@ -136,7 +137,7 @@
     rec.recentIds = (rec.recentIds || []).concat(q.id).slice(-6);
     delete active[termId];
     window.Mem.save();
-    return {
+    return Object.assign({
       correct: ok, correctOptionId: q.correctOptionId,
       selectedOptionText: selectedOption ? selectedOption.text : '',
       correctOptionText: correctOption ? correctOption.text : '',
@@ -145,7 +146,7 @@
       conceptSummary: term ? term.one : '',
       pmView: term ? term.pm : '',
       pitfall: term && term.pitfalls && term.pitfalls.length ? term.pitfalls[0] : ''
-    };
+    }, window.Explanations ? window.Explanations.learning(q, term, optionId) : {});
   }
 
   function dayKey() {

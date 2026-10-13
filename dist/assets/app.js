@@ -35,7 +35,7 @@
 
   /** 极简 Markdown：加粗 / 行内代码 / 引用 / 分割线 / 换行 */
   function md(s) {
-    let h = esc(s);
+    let h = esc(String(s || '').replace(/。{2,}/g, '。'));
     h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
     h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     h = h.split('\n').map(function (line) {
@@ -378,15 +378,40 @@
   }
 
   function answerExplanationHTML(f) {
+    // 旧版进行中的今日学习保留答案，同时补上新详解。
+    if (!f.teaching && f.termId && window.LearningQuiz && window.Explanations) {
+      const term = T(f.termId);
+      const question = window.LearningQuiz.bank(f.termId).find(function (q) { return q.id === f.questionId; });
+      if (term && question) f = Object.assign({}, f, window.Explanations.learning(question, term, f.selectedOptionId));
+    }
     let html = '<div class="answer-explanation ' + (f.correct ? 'is-correct' : 'is-wrong') + '">' +
       '<div class="answer-verdict"><b>' + (f.correct ? '判断正确' : '这道题答错了') + '</b><span>' +
-      (f.correct ? '你抓住了这个概念的关键判断。' : '先对照差异，再记住判断原则。') + '</span></div>' +
+      (f.correct ? '看看判断依据，确认自己也能解释原因。' : '看清选项的差异，再用具体场景理解。') + '</span></div>' +
       '<div class="answer-compare"><div><span>你的选择</span><p>' + esc(f.selectedOptionText || '—') + '</p></div>' +
       '<div><span>正确答案</span><p>' + esc(f.correctOptionText || '—') + '</p></div></div>' +
-      '<div class="answer-reason"><b>为什么</b><p>' + esc(f.explanation || '') + '</p></div>';
-    if (f.conceptSummary) html += '<div class="answer-memory"><b>一句话记住「' + esc(f.conceptName) + '」</b><p>' + esc(f.conceptSummary) + '</p></div>';
-    if (f.pmView) html += '<details><summary>放到产品工作里怎么用</summary><p>' + esc(f.pmView) + '</p></details>';
-    if (!f.correct && f.pitfall) html += '<details><summary>最容易踩的坑</summary><p>' + esc(f.pitfall) + '</p></details>';
+      (!f.correct && f.selectedReason ? '<div class="answer-reason answer-selected-reason"><b>你选的这一项，具体错在哪里</b><p>' + md(f.selectedReason) + '</p></div>' : '') +
+      '<div class="answer-reason"><b>正确答案为什么成立</b><p>' + md(f.explanation || '') + '</p></div>';
+    const teach = f.teaching;
+    if (teach) {
+      html += '<section class="answer-teaching"><h3>把「' + esc(teach.name) + '」讲明白</h3>' +
+        '<p class="answer-definition">' + md(teach.summary) + '</p>' +
+        (teach.analogy ? '<div class="answer-story"><b>换成生活中的例子</b><p>' + md(teach.analogy) + '</p></div>' : '') +
+        '<h4>分几步理解</h4><ol class="answer-steps">' + (teach.steps || []).map(function (step) { return '<li>' + md(step) + '</li>'; }).join('') + '</ol>' +
+        '<div class="answer-story"><b>放到具体场景里</b><p>' + md(teach.scenario) + '</p></div>' +
+        (teach.application ? '<div class="answer-reason"><b>做产品时如何判断</b><p>' + md(teach.application) + '</p></div>' : '') +
+        '<div class="answer-memory"><b>下次遇到类似题，记住这句话</b><p>' + md(teach.memory || teach.summary) + '</p></div></section>';
+      if (teach.contrasts && teach.contrasts.length) {
+        html += '<details class="answer-options-detail"><summary>容易混淆的概念，分别解决什么</summary><dl class="answer-contrasts">' + teach.contrasts.map(function (x) {
+          return '<dt>' + esc(x.name) + '</dt><dd>' + md(x.meaning) + '</dd>';
+        }).join('') + '</dl></details>';
+      }
+    } else if (f.conceptSummary) html += '<div class="answer-memory"><b>一句话记住「' + esc(f.conceptName) + '」</b><p>' + md(f.conceptSummary) + '</p></div>';
+    if (f.optionReviews && f.optionReviews.length) {
+      html += '<details class="answer-options-detail"><summary>逐项看其他选项为什么对或错</summary><div>' + f.optionReviews.map(function (o) {
+        return '<div class="answer-option-review"><b>' + (o.correct ? '正确选项' : '错误选项') + (o.selected ? ' · 你的选择' : '') + '</b><p>' + esc(o.text) + '</p><p class="answer-option-reason">' + md(o.reason) + '</p></div>';
+      }).join('') + '</div></details>';
+    }
+    if (!f.correct && f.pitfall) html += '<div class="answer-reason"><b>再提醒一个常见误区</b><p>' + md(f.pitfall) + '</p></div>';
     return html + '</div>';
   }
 
@@ -573,21 +598,24 @@
     let prompt, correct, choices;
     if (type === 0) {
       prompt = '下面哪项最准确地概括了「' + x.title + '」？';
-      correct = { id: 'correct', text: x.summary };
-      choices = [correct].concat(pool.map(function (p, i) { return { id: 'd' + i, text: p.summary }; }));
+      correct = { id: 'correct', text: x.summary, reason: '这项对应当前专题的定义。三个判断要点是：' + x.keyPoints.join('；') + '。' };
+      choices = [correct].concat(pool.map(function (p, i) { return { id: 'd' + i, text: p.summary,
+        reason: '这项解释的是「' + p.title + '」。它的应用是：' + p.application + '。本题问「' + x.title + '」，需要抓住：' + x.keyPoints[0] + '。' }; }));
     } else if (type === 1) {
       prompt = '在实际产品工作中，哪种做法最符合「' + x.title + '」？';
-      correct = { id: 'correct', text: x.application };
-      choices = [correct].concat(pool.map(function (p, i) { return { id: 'd' + i, text: p.application }; }));
+      correct = { id: 'correct', text: x.application, reason: '这项把专题原则落实为具体操作：' + x.keyPoints.join('；') + '。' };
+      choices = [correct].concat(pool.map(function (p, i) { return { id: 'd' + i, text: p.application,
+        reason: '这项是「' + p.title + '」的应用场景：' + p.summary + '。它可以在自己的场景中成立，但没有回答当前专题要解决的问题：' + x.summary }; }));
     } else {
       const foreign = pool[0];
       prompt = '下面哪一项不属于「' + x.title + '」的核心判断？';
-      correct = { id: 'correct', text: foreign.keyPoints[0] };
-      choices = x.keyPoints.map(function (p, i) { return { id: 'p' + i, text: p }; }).concat([correct]);
+      correct = { id: 'correct', text: foreign.keyPoints[0], reason: '题目问的是“不属于”。这一项来自「' + foreign.title + '」，而当前专题的核心是：' + x.summary };
+      choices = x.keyPoints.map(function (p, i) { return { id: 'p' + i, text: p,
+        reason: '题目要求找“不属于”的项。这一项实际是当前专题的核心要点，它与「' + x.title + '」的定义相符：' + x.summary + '。因此不应排除这一项。' }; }).concat([correct]);
     }
     return '<section class="kb-check" data-correct="correct"><div class="sec-h"><span class="ico">✅</span>快速自测 · 每次随机换一种问法</div>' +
       '<h2>' + esc(prompt) + '</h2><div class="kb-check-options">' + shuffled(choices).map(function (o, i) {
-        return '<button type="button" data-kb-answer="' + escAttr(o.id) + '"><span>' + 'ABCD'[i] + '</span>' + esc(o.text) + '</button>';
+        return '<button type="button" data-kb-answer="' + escAttr(o.id) + '" data-answer-text="' + escAttr(o.text) + '" data-answer-reason="' + escAttr(o.reason) + '"><span>' + 'ABCD'[i] + '</span>' + esc(o.text) + '</button>';
       }).join('') + '</div><div class="kb-check-explain" hidden></div></section>';
   }
 
@@ -720,7 +748,12 @@
       html += '<button class="practice-option' + cls + '" data-practice-choice="' + i + '" data-practice-id="' + p.id + '"' +
         (r.decision != null ? ' disabled' : '') + '><span>' + 'ABCD'[i] + '</span>' + esc(o) + '</button>';
     });
-    if (r.decision != null) html += '<div class="practice-explain">' + (r.correct ? '判断正确。' : '这一步需要再想想。') + esc(p.decision.why) + '</div>';
+    if (r.decision != null) html += answerExplanationHTML({ correct: r.correct,
+      selectedOptionText: p.decision.options[r.decision], correctOptionText: p.decision.options[p.decision.a],
+      explanation: p.decision.why,
+      selectedReason: p.decision.why + '。对照这道练习的真实场景：' + p.scenario,
+      teaching: { name: p.title, summary: p.decision.why, steps: p.reference,
+        scenario: p.scenario, application: '验收时逐项检查：' + p.checkpoints.join('；'), memory: p.decision.why } });
     html += '</div><details class="reference-answer"><summary>查看参考拆解</summary><div>' +
       p.reference.map(function (x) { return '<p>· ' + esc(x) + '</p>'; }).join('') + '</div></details>' +
       '<h2>完成后自评</h2><p class="muted small">不是给内容打分，而是判断你能否独立完成同类任务。</p>' +
@@ -804,7 +837,10 @@
     if (wrong.length) {
       html += '<h2>客观题错题</h2><div class="wrong-list">' + wrong.map(function (x) {
         const correct = (x.q.options || []).find(function (o) { return o.id === x.q.correctOptionId; });
-        return '<details><summary>' + esc(x.q.prompt) + '</summary><p><b>正确答案：</b>' + esc(correct ? correct.text : '—') + '</p><p>' + esc(x.q.explanation) + '</p></details>';
+        const selected = (x.q.options || []).find(function (o) { return x.answer && o.id === x.answer.value; });
+        const feedback = Object.assign({ correct: false, selectedOptionText: selected ? selected.text : '未选择', correctOptionText: correct ? correct.text : '—', explanation: x.q.explanation },
+          window.Explanations.interview(x.q, selected ? selected.id : ''));
+        return '<details><summary>' + esc(x.q.prompt) + '</summary>' + answerExplanationHTML(feedback) + '</details>';
       }).join('') + '</div>';
     }
     if (openAnswers.length) {
@@ -1563,8 +1599,14 @@
       const x = window.KnowledgeBase.get(parseHash().id);
       const explain = box.querySelector('.kb-check-explain');
       explain.hidden = false;
-      explain.innerHTML = '<b>' + (ok ? '回答正确。' : '这项选择不准确。') + '</b><p><strong>核心判断：</strong>' +
-        esc(x.summary) + '</p><p><strong>如何应用：</strong>' + esc(x.application) + '</p>';
+      const reviews = Array.from(box.querySelectorAll('[data-kb-answer]')).map(function (button) {
+        return { id: button.dataset.kbAnswer, text: button.dataset.answerText, reason: button.dataset.answerReason,
+          correct: button.dataset.kbAnswer === box.dataset.correct, selected: button === el };
+      });
+      const right = reviews.find(function (o) { return o.correct; });
+      explain.innerHTML = answerExplanationHTML({ correct: ok, selectedOptionText: el.dataset.answerText, correctOptionText: right.text,
+        selectedReason: el.dataset.answerReason, explanation: right.reason, optionReviews: reviews,
+        teaching: { name: x.title, summary: x.summary, steps: x.keyPoints, scenario: x.application, memory: x.keyPoints[0] } });
       return;
     }
 

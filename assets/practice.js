@@ -576,15 +576,16 @@
       if (S.interview.answers.length >= sessionQuestions.length) return null;
       const question = sessionQuestions[S.interview.answers.length];
       if (!question || question.type !== 'mcq') return null;
+      if (!question.options.some(function (o) { return o.id === String(optionId); })) return null;
       const hit = String(optionId) === question.correctOptionId;
       S.interview.answers.push({ kind: 'mcq', questionId: question.id, value: String(optionId), correct: hit, score: hit ? 5 : 0 });
       const selected = (question.options || []).find(function (o) { return o.id === String(optionId); });
       const correct = (question.options || []).find(function (o) { return o.id === question.correctOptionId; });
-      S.interview.feedback = {
+      S.interview.feedback = Object.assign({
         questionId: question.id, correct: hit, selectedOptionId: String(optionId), correctOptionId: question.correctOptionId,
         selectedOptionText: selected ? selected.text : '', correctOptionText: correct ? correct.text : '',
         explanation: question.explanation || '', conceptName: (window.INTERVIEW_DIMS[question.dimension] || {}).name || '判断原则'
-      };
+      }, window.Explanations ? window.Explanations.interview(question, String(optionId)) : {});
       save();
       return S.interview.result;
     },
