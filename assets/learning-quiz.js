@@ -72,13 +72,33 @@
       explanation: term.pm
     });
 
-    // 少数知识点原本有两道题；统一只保留三种最有区分度的变式。
-    const picked = [];
-    ['definition', 'scenario', 'boundary', 'tradeoff'].forEach(function (kind) {
-      const q = out.find(function (x) { return x.variantType === kind && picked.indexOf(x) < 0; });
-      if (q && picked.length < 3) picked.push(q);
+    const mechanismId = term.id + '-generated-mechanism';
+    const mechanism = term.steps && term.steps[0] ? term.steps[0] : term.one;
+    const mechanismOptions = makeOptions(mechanismId, mechanism, related.map(function (x) { return x.steps && x.steps[0] || x.one; }));
+    out.push({
+      id: mechanismId, termId: term.id, variantGroup: term.id, variantType: 'mechanism',
+      prompt: '下面哪项更准确地说明「' + term.name + '」如何工作？', options: mechanismOptions,
+      correctOptionId: mechanismOptions.find(function (x) { return x.correct; }).id,
+      explanation: mechanism
     });
-    out.forEach(function (q) { if (picked.length < 3 && picked.indexOf(q) < 0) picked.push(q); });
+
+    const boundaryId = term.id + '-generated-pitfall';
+    const pitfall = term.pitfalls && term.pitfalls[0] ? term.pitfalls[0] : term.pm;
+    const boundaryOptions = makeOptions(boundaryId, pitfall, related.map(function (x) { return x.pitfalls && x.pitfalls[0] || x.pm; }));
+    out.push({
+      id: boundaryId, termId: term.id, variantGroup: term.id, variantType: 'pitfall',
+      prompt: '应用「' + term.name + '」时，哪种误区最需要警惕？', options: boundaryOptions,
+      correctOptionId: boundaryOptions.find(function (x) { return x.correct; }).id,
+      explanation: pitfall
+    });
+
+    // 保留旧题 ID 和历史；每个知识点新增不同角度的变式，供错题巩固抽取。
+    const picked = [];
+    ['definition', 'scenario', 'boundary', 'tradeoff', 'mechanism', 'pitfall'].forEach(function (kind) {
+      const q = out.find(function (x) { return x.variantType === kind && picked.indexOf(x) < 0; });
+      if (q && picked.length < 5) picked.push(q);
+    });
+    out.forEach(function (q) { if (picked.length < 5 && picked.indexOf(q) < 0) picked.push(q); });
     return picked;
   }
 
@@ -179,7 +199,11 @@
   function dailyQuestion() {
     const s = daily();
     if (!s || s.completedAt || !s.questions[s.index]) return null;
-    const ref = s.questions[s.index];
+    return resolveQuestion(s.questions[s.index]);
+  }
+
+  function resolveQuestion(ref) {
+    if (!ref) return null;
     const base = (BANK[ref.termId] || []).find(function (q) { return q.id === ref.questionId; });
     if (!base) return null;
     const byId = {};
@@ -195,6 +219,7 @@
     const q = dailyQuestion();
     if (!s || !q || s.feedback) return null;
     const result = answer(q.termId, q.id, optionId);
+    if (!result) return null;
     const term = window.TERMS.find(function (x) { return x.id === q.termId; });
     window.Mem.completeDailyQuiz(q.termId, term.cat, result.correct);
     const response = { termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() };
@@ -222,10 +247,74 @@
     const s = daily(); return s && s.result ? s.result : null;
   }
 
+  function practice() { return window.Mem.state.learningPractice || null; }
+
+  function startPractice(termIds) {
+    const unique = Array.from(new Set((termIds || []).filter(function (id) { return BANK[id]; })));
+    const existing = practice();
+    if (existing && !existing.completedAt && existing.date === dayKey() &&
+        existing.focusIds.length === unique.length &&
+        existing.focusIds.every(function (id) { return unique.indexOf(id) >= 0; })) return existing;
+    const questions = [];
+    unique.forEach(function (termId) {
+      const rec = record(termId);
+      const recent = new Set((rec.recentIds || []).slice(-2));
+      const bank = BANK[termId];
+      const ranked = shuffled(bank).sort(function (a, b) {
+        const aa = rec.answered[a.id] || { attempts: 0, lastAt: 0 };
+        const bb = rec.answered[b.id] || { attempts: 0, lastAt: 0 };
+        return (recent.has(a.id) - recent.has(b.id)) || aa.attempts - bb.attempts || aa.lastAt - bb.lastAt;
+      });
+      const first = ranked[0];
+      const second = ranked.find(function (q) { return q.id !== first.id && q.variantType !== first.variantType; }) || ranked[1];
+      [first, second].filter(Boolean).forEach(function (q) {
+        questions.push({ termId: termId, questionId: q.id, review: true, optionIds: shuffled(q.options.map(function (o) { return o.id; })) });
+      });
+    });
+    window.Mem.state.learningPractice = {
+      date: dayKey(), startedAt: Date.now(), completedAt: 0, index: 0,
+      focusIds: unique, questions: shuffled(questions), responses: [], feedback: null, result: null
+    };
+    window.Mem.save(); return practice();
+  }
+
+  function practiceQuestion() {
+    const s = practice();
+    return s && !s.completedAt ? resolveQuestion(s.questions[s.index]) : null;
+  }
+
+  function answerPractice(optionId) {
+    const s = practice(), q = practiceQuestion();
+    if (!s || !q || s.feedback) return null;
+    const result = answer(q.termId, q.id, optionId);
+    if (!result) return null;
+    const term = window.TERMS.find(function (x) { return x.id === q.termId; });
+    if (window.Mem.quiz && term) window.Mem.quiz(q.termId, term.cat, result.correct);
+    s.responses.push({ termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() });
+    s.feedback = Object.assign({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId) }, result);
+    window.Mem.save(); return s.feedback;
+  }
+
+  function nextPractice() {
+    const s = practice();
+    if (!s || !s.feedback) return s;
+    s.feedback = null;
+    s.index++;
+    if (s.index >= s.questions.length) {
+      const correct = s.responses.filter(function (x) { return x.correct; }).length;
+      s.completedAt = Date.now();
+      s.result = { correct: correct, total: s.responses.length,
+        score: s.responses.length ? Math.round(correct / s.responses.length * 100) : 0, at: Date.now() };
+    }
+    window.Mem.save(); return s;
+  }
+
   window.LEARNING_QUIZ_BANK = BANK;
   window.LearningQuiz = {
     pick: pick, answer: answer, bank: function (termId) { return (BANK[termId] || []).slice(); },
     startDaily: startDaily, daily: daily, dailyQuestion: dailyQuestion,
-    answerDaily: answerDaily, nextDaily: nextDaily, dailyResult: dailyResult
+    answerDaily: answerDaily, nextDaily: nextDaily, dailyResult: dailyResult,
+    startPractice: startPractice, practice: practice, practiceQuestion: practiceQuestion,
+    answerPractice: answerPractice, nextPractice: nextPractice
   };
 })();

@@ -235,6 +235,8 @@
     });
     out.quizVariants = mergedQuiz;
 
+    out.learningPractice = newest.learningPractice || (base === a ? b.learningPractice : a.learningPractice) || null;
+
     out.prefs = newest.prefs || base.prefs;
     out.plan = newest.plan || base.plan;
     out.updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);

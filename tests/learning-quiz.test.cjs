@@ -12,12 +12,13 @@ vm.createContext(context);
 ['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
-context.window.Mem = { state, save() {}, completeDailyQuiz() {} };
+const reviewEvents = [];
+context.window.Mem = { state, save() {}, completeDailyQuiz() {}, quiz(id, cat, correct) { reviewEvents.push({ id, cat, correct }); } };
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/learning-quiz.js'), 'utf8'), context, { filename: 'assets/learning-quiz.js' });
 
 context.window.TERMS.forEach((term) => {
   const bank = context.window.LearningQuiz.bank(term.id);
-  assert.equal(bank.length, 3, `${term.id} 应有三道变式题`);
+  assert.equal(bank.length, 5, `${term.id} 应有五道变式题`);
   bank.forEach((q) => {
     assert.ok(q.options.length >= 3 && q.options.length <= 5);
     assert.equal(new Set(q.options.map((o) => o.id)).size, q.options.length);
@@ -46,5 +47,28 @@ while (!context.window.LearningQuiz.daily().completedAt) {
   context.window.LearningQuiz.nextDaily();
 }
 assert.equal(context.window.LearningQuiz.dailyResult().score, 100);
+
+const practice = context.window.LearningQuiz.startPractice(['rag', 'rerank']);
+assert.equal(practice.questions.length, 4, '两个知识点应各抽两道不同变式题');
+['rag', 'rerank'].forEach((id) => {
+  const refs = practice.questions.filter((q) => q.termId === id);
+  assert.equal(new Set(refs.map((q) => q.questionId)).size, 2, '本轮原题不应重复');
+  assert.equal(new Set(refs.map((q) => context.window.LearningQuiz.bank(id).find((x) => x.id === q.questionId).variantType)).size, 2);
+});
+let practiceAnswered = 0;
+while (!context.window.LearningQuiz.practice().completedAt) {
+  const q = context.window.LearningQuiz.practiceQuestion();
+  const chosen = practiceAnswered === 0 ? q.options.find((o) => o.id !== q.correctOptionId).id : q.correctOptionId;
+  const feedback = context.window.LearningQuiz.answerPractice(chosen);
+  assert.ok(feedback && feedback.explanation && feedback.correctOptionText);
+  assert.equal(context.window.LearningQuiz.practiceQuestion().id, q.id, '解析时不应跳到下一题');
+  context.window.LearningQuiz.nextPractice();
+  practiceAnswered++;
+}
+assert.equal(context.window.LearningQuiz.practice().result.score, 75);
+assert.equal(context.window.LearningQuiz.dailyResult().score, 100, '追加练习不能修改今日掌握度');
+assert.equal(reviewEvents.length, 4, '追加练习应计入知识点记忆');
+const sevenWeak = context.window.LearningQuiz.startPractice(['ai', 'model', 'llm', 'token', 'prompt', 'context', 'hallucination']);
+assert.equal(sevenWeak.questions.length, 14, '每个薄弱知识点都应获得两道新练习题');
 
 console.log('learning quiz tests passed');

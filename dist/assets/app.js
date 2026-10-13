@@ -415,6 +415,38 @@
     return html + '</div>';
   }
 
+  function learningAdviceHTML(responses, allIds, practiceMode) {
+    const wrongIds = Array.from(new Set((responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; })));
+    const focusIds = wrongIds.length ? wrongIds : (allIds || []).slice();
+    const grouped = {};
+    wrongIds.forEach(function (id) {
+      const term = T(id);
+      if (!term) return;
+      if (!grouped[term.cat]) grouped[term.cat] = [];
+      grouped[term.cat].push(term);
+    });
+    let html = '<section class="daily-advice"><h2>' + (wrongIds.length ? '建议重点巩固' : '继续做变式复测') + '</h2>';
+    if (wrongIds.length) {
+      html += '<p class="lead">本轮有 ' + wrongIds.length + ' 个知识点需要巩固。先看错题解析，再换一种情境验证自己是否真正理解。</p>';
+      Object.keys(grouped).sort(function (a, b) { return grouped[b].length - grouped[a].length; }).forEach(function (cat) {
+        html += '<div class="daily-advice-group"><div class="daily-advice-heading"><b>' + esc(window.CATS[cat].name) + '</b><span>' + grouped[cat].length + ' 个知识点</span></div>';
+        grouped[cat].forEach(function (term) {
+          const related = window.KnowledgeRelations.forTerm(term.id);
+          const before = related.prerequisite[0];
+          html += '<div class="daily-advice-row"><button type="button" data-goto="term:' + escAttr(term.id) + '">' + esc(term.name) + ' →</button>' +
+            (before ? '<span>关联先修「' + esc(before.name) + '」：' + esc(before.reason) + '</span>' : '<span>' + esc(term.one) + '</span>') + '</div>';
+        });
+        html += '</div>';
+      });
+    } else {
+      html += '<p class="lead">本轮题目全部答对。可以继续用不同问法和边界场景复测，确认自己能把概念用到实际问题里。</p>';
+    }
+    if (focusIds.length) html += '<div class="daily-advice-actions"><button type="button" class="btn primary" data-review-start="1">' +
+      (practiceMode && wrongIds.length ? '针对本轮错题再练一组' : '开始针对性巩固练习') + ' →</button>' +
+      '<span>每个重点知识点抽 2 道变式题，共 ' + (focusIds.length * 2) + ' 题；单独记录练习结果。</span></div>';
+    return html + '</section>';
+  }
+
   function viewLearn() {
     let session = window.LearningQuiz.daily();
     if (!session) {
@@ -426,8 +458,10 @@
     }
     if (session.completedAt && session.result) {
       return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
-        '<div><h1>今日学习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。答错的知识点已进入后续变式复测。</p>' +
-        '<button class="btn primary" data-route="home">查看今日数据</button></div></div><h2>今日知识点</h2><div class="knowledge-tags">' +
+        '<div><h1>今日学习完成</h1><p class="lead">今日掌握度 ' + session.result.score + ' 分，答对 ' + session.result.correct + '/' + session.result.total + ' 题。</p>' +
+        '<button class="btn" data-route="home">查看今日数据</button></div></div>' +
+        learningAdviceHTML(session.responses, session.questions.map(function (q) { return q.termId; }), false) +
+        '<h2>今日知识点</h2><div class="knowledge-tags">' +
         session.responses.map(function (r) {
           const term = T(r.termId); return '<span class="knowledge-tag ' + (r.correct ? 'done' : 'pending') + '">' + (r.correct ? '✓ ' : '需复习 · ') + esc(term ? term.name : r.termId) + '</span>';
         }).join('') + '</div></div>';
@@ -435,11 +469,10 @@
     const q = window.LearningQuiz.dailyQuestion();
     if (!q) return '<div class="page"><div class="empty">学习状态异常，请返回首页重新开始。</div></div>';
     const term = T(q.termId);
-    const answered = session.responses.length;
-    const currentScore = answered ? Math.round(session.responses.filter(function (x) { return x.correct; }).length / answered * 100) : 0;
+    const progress = Math.round(session.responses.length / session.questions.length * 100);
     let html = '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (session.index + 1) + ' / ' + session.questions.length + ' 题</span><b>' + esc(term.name) + '</b></div>' +
-      '<div class="assessment-progress"><i style="width:' + Math.round(session.index / session.questions.length * 100) + '%"></i></div></div>' +
-      '<div class="daily-score-line"><span>今日掌握度</span><b>' + (answered ? currentScore + '%' : '答题后生成') + '</b></div>' +
+      '<div class="assessment-progress" role="progressbar" aria-label="答题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
+      '<div class="daily-progress-line" aria-live="polite"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>今日学习</span>' + (q.review ? '<span class="review">变式复测</span>' : '<span>新知识</span>') + '</div>' +
       '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
     q.options.forEach(function (o, i) {
@@ -457,6 +490,35 @@
         '<div class="assessment-open-actions"><button class="btn primary" data-learn-next="1">' + (session.index + 1 >= session.questions.length ? '查看今日掌握度' : '下一题 →') + '</button></div>';
     }
     return html + '</div></div>';
+  }
+
+  function viewReinforce() {
+    const session = window.LearningQuiz.practice();
+    if (!session || !session.questions.length) return '<div class="page"><h1>巩固复习</h1><p class="lead">完成今日学习后，可从成绩页启动针对性练习。</p><button class="btn" data-route="learn">返回今日学习</button></div>';
+    if (session.completedAt && session.result) {
+      return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
+        '<div><h1>巩固练习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。本轮成绩单独记录，不改变今日掌握度。</p>' +
+        '<button class="btn" data-route="learn">返回今日成绩</button></div></div>' +
+        learningAdviceHTML(session.responses, session.focusIds, true) + '</div>';
+    }
+    const q = window.LearningQuiz.practiceQuestion();
+    if (!q) return '<div class="page"><div class="empty">练习题暂时无法读取。<br><br><button class="btn" data-route="learn">返回今日成绩</button></div></div>';
+    const term = T(q.termId);
+    const progress = Math.round(session.responses.length / session.questions.length * 100);
+    let html = '<div class="page assessment-page"><div class="assessment-top"><div><span>第 ' + (session.index + 1) + ' / ' + session.questions.length + ' 题</span><b>' + esc(term.name) + '</b></div>' +
+      '<div class="assessment-progress" role="progressbar" aria-label="巩固练习进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
+      '<div class="daily-progress-line"><span>答题进度</span><b>' + progress + '%</b></div>' +
+      '<div class="assessment-card"><div class="assessment-question-meta"><span>针对性巩固</span><span class="review">变式复测</span></div>' +
+      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
+    q.options.forEach(function (o, i) {
+      const feedback = session.feedback;
+      const cls = feedback ? (o.id === feedback.correctOptionId ? ' correct' : o.id === feedback.selectedOptionId ? ' wrong' : '') : '';
+      html += '<button class="' + cls + '" data-review-answer="' + escAttr(o.id) + '"' + (feedback ? ' disabled' : '') + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
+    });
+    html += '</div>' + (session.feedback ? answerExplanationHTML(session.feedback) +
+      '<div class="assessment-open-actions"><button class="btn primary" data-review-next="1">' +
+      (session.index + 1 >= session.questions.length ? '查看巩固结果' : '下一题 →') + '</button></div>' : '') + '</div></div>';
+    return html;
   }
 
   function statBox(n, unit, label) {
@@ -1451,7 +1513,7 @@
 
     let html = '';
     const titles = {
-      home: '今日学习', learn: '今日学习', plan: '学习计划', path: '学习路径', dict: '术语词典',
+      home: '今日学习', learn: '今日学习', reinforce: '巩固复习', plan: '学习计划', path: '学习路径', dict: '术语词典',
       practice: '实战练习', 'practice-detail': '实战练习', interview: '面试测评',
       kb: '专题知识库', 'kb-topic': '专题知识库',
       my: '我的学习', review: '我的学习', mastery: '我的学习', settings: '我的学习'
@@ -1459,6 +1521,7 @@
     try {
       if (r.route === 'term') html = viewTerm(r.id);
       else if (r.route === 'learn') html = viewLearn();
+      else if (r.route === 'reinforce') html = viewReinforce();
       else if (r.route === 'plan') html = viewPlan();
       else if (r.route === 'path') html = viewPath();
       else if (r.route === 'kb') html = viewKnowledgeBase();
@@ -1499,7 +1562,7 @@
     // 侧栏高亮
     document.querySelectorAll('.nav-item').forEach(function (el) {
       el.classList.toggle('active', el.dataset.route === r.route ||
-        (r.route === 'learn' && el.dataset.route === 'home') ||
+        (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (r.route === 'kb-topic' && el.dataset.route === 'kb') ||
         (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
@@ -1507,7 +1570,7 @@
     });
     document.querySelectorAll('.mobile-nav [data-route]').forEach(function (el) {
       el.classList.toggle('active', el.dataset.route === r.route ||
-        (r.route === 'learn' && el.dataset.route === 'home') ||
+        (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
         (['review', 'mastery', 'settings', 'my'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
@@ -1572,7 +1635,7 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center]');
     if (!el) return;
 
     if (el.dataset.kbPan !== undefined || el.dataset.kbCenter !== undefined) {
@@ -1675,6 +1738,22 @@
     }
     if (el.dataset.learnNext) {
       window.LearningQuiz.nextDaily();
+      render(); return;
+    }
+    if (el.dataset.reviewStart) {
+      const ongoing = window.LearningQuiz.practice();
+      const base = parseHash().route === 'reinforce' && ongoing ? ongoing : window.LearningQuiz.daily();
+      const wrong = (base && base.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; });
+      const ids = wrong.length ? wrong : (base && base.focusIds || (base && base.questions || []).map(function (q) { return q.termId; }));
+      window.LearningQuiz.startPractice(ids);
+      go('reinforce'); return;
+    }
+    if (el.dataset.reviewAnswer !== undefined) {
+      window.LearningQuiz.answerPractice(el.dataset.reviewAnswer);
+      render(); return;
+    }
+    if (el.dataset.reviewNext) {
+      window.LearningQuiz.nextPractice();
       render(); return;
     }
     if (el.dataset.planDay) {

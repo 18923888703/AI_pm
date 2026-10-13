@@ -259,7 +259,7 @@ h3{font-size:16px;font-weight:600;margin:22px 0 6px}
   border-radius:var(--radius);margin-bottom:7px;cursor:pointer;font-size:14.5px;background:#fff;
   width:100%;text-align:left;line-height:1.6;
 }
-.opt:hover{background:var(--bg-soft)}
+.opt:hover:not(.disabled),.opt:focus-visible{background:rgba(35,131,226,.07);border-color:var(--blue)}
 .opt .k{
   width:19px;height:19px;flex:0 0 19px;border-radius:50%;border:1px solid var(--border-2);
   display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-3);margin-top:2px;
@@ -412,7 +412,7 @@ h3{font-size:16px;font-weight:600;margin:22px 0 6px}
 .kb-check h2{font-size:16px;line-height:1.55;margin:4px 0 12px}
 .kb-check-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .kb-check-options button{display:flex;gap:9px;align-items:flex-start;text-align:left;border:1px solid var(--border);border-radius:9px;background:#fff;padding:10px 11px;cursor:pointer;font-size:12.5px;line-height:1.6}
-.kb-check-options button:hover:not(:disabled){border-color:var(--border-2);background:rgba(255,255,255,.55)}
+.kb-check-options button:hover:not(:disabled),.kb-check-options button:focus-visible{border-color:var(--blue);background:rgba(35,131,226,.07)}
 .kb-check-options button > span{display:inline-flex;width:19px;height:19px;flex:0 0 19px;border:1px solid var(--border-2);border-radius:50%;align-items:center;justify-content:center;font-size:10px;color:var(--text-3);margin-top:1px}
 .kb-check-options button.correct{border-color:var(--green);background:rgba(15,123,108,.06)}
 .kb-check-options button.wrong{border-color:var(--red);background:rgba(224,62,62,.06)}
@@ -563,7 +563,7 @@ body.simple-mode .simple-only{display:block}
   width:100%;display:flex;align-items:flex-start;gap:10px;text-align:left;padding:11px 12px;margin:7px 0;
   border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;
 }
-.practice-option:hover:not(:disabled){background:var(--bg-soft);border-color:var(--border-2)}
+.practice-option:hover:not(:disabled),.practice-option:focus-visible{background:rgba(35,131,226,.07);border-color:var(--blue)}
 .practice-option > span{width:20px;height:20px;border:1px solid var(--border-2);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 20px}
 .practice-option.correct{border-color:rgba(15,123,108,.45);background:rgba(15,123,108,.06)}
 .practice-option.correct > span{background:var(--green);border-color:var(--green);color:#fff}
@@ -615,15 +615,28 @@ body.simple-mode .simple-only{display:block}
   min-height:74px;display:flex;align-items:flex-start;gap:12px;text-align:left;padding:14px;
   background:#fff;border:1px solid var(--border);border-radius:10px;cursor:pointer;line-height:1.5;
 }
-.assessment-options button:hover{background:var(--bg-soft);border-color:var(--blue)}
+.assessment-options button:hover:not(:disabled),.assessment-options button:focus-visible{background:rgba(35,131,226,.07);border-color:var(--blue)}
 .assessment-options button span{width:22px;height:22px;border-radius:50%;border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;flex:0 0 22px;font-size:11px}
 .assessment-options button.correct{border-color:rgba(15,123,108,.45);background:rgba(15,123,108,.06)}
 .assessment-options button.correct span{background:var(--green);border-color:var(--green);color:#fff}
 .assessment-options button.wrong{border-color:rgba(224,62,62,.4);background:rgba(224,62,62,.05)}
 .assessment-options button:disabled{cursor:default;color:var(--text)}
 .assessment-note{font-size:12px;color:var(--text-3);margin-top:14px}
-.daily-score-line{display:flex;justify-content:space-between;align-items:baseline;margin:-22px 0 18px;color:var(--text-2);font-size:13px}
-.daily-score-line b{font-size:17px;color:var(--text);font-variant-numeric:tabular-nums}
+.daily-progress-line{display:flex;justify-content:space-between;align-items:baseline;margin:-8px 0 18px;color:var(--text-2);font-size:13px}
+.daily-progress-line b{font-size:17px;color:var(--text);font-variant-numeric:tabular-nums}
+.daily-advice{border-top:1px solid var(--border);padding-top:14px;margin:22px 0 34px}
+.daily-advice > h2{margin:0 0 6px}
+.daily-advice > .lead{margin:0 0 18px;font-size:13.5px;line-height:1.7}
+.daily-advice-group{border-top:1px solid var(--border);padding:12px 0}
+.daily-advice-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:4px}
+.daily-advice-heading b{font-size:14px}
+.daily-advice-heading span{font-size:11.5px;color:var(--text-3)}
+.daily-advice-row{display:flex;align-items:baseline;gap:12px;padding:7px 0}
+.daily-advice-row button{flex:0 0 170px;text-align:left;border:0;background:transparent;color:var(--blue);font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.daily-advice-row button:hover{text-decoration:underline;text-underline-offset:3px}
+.daily-advice-row span{font-size:12px;color:var(--text-2);line-height:1.6}
+.daily-advice-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0 4px}
+.daily-advice-actions span{font-size:11.5px;color:var(--text-3)}
 .assessment-open-answer{width:100%;min-height:210px;resize:vertical;border:1px solid var(--border-2);border-radius:12px;padding:16px;line-height:1.7;background:#fff}
 .assessment-open-answer:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(35,131,226,.12)}
 .assessment-open-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px}
@@ -1040,6 +1053,9 @@ body.simple-mode .simple-only{display:block}
   .assessment-open-actions .btn{width:100%;justify-content:center;height:42px}
   .answer-verdict{align-items:flex-start;flex-direction:column;gap:2px}
   .answer-compare{grid-template-columns:1fr}
+  .daily-advice-row{align-items:flex-start;flex-direction:column;gap:2px}
+  .daily-advice-row button{flex:initial}
+  .daily-advice-actions .btn{width:100%;justify-content:center;height:42px}
   .result-head{align-items:flex-start;gap:12px}
   .score-disc{flex-basis:86px;padding:8px 10px 8px 0}
   .score-disc b{font-size:38px}

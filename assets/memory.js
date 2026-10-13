@@ -46,7 +46,8 @@
       plan: null,       // 今天这份清单：{date, items:[...]}
       planLog: {},      // date -> {total, done, min, lessonNo}
       quizVariants: {}, // termId -> 变式题历史
-      dailyLearning: null
+      dailyLearning: null,
+      learningPractice: null
     };
   };
 
@@ -70,6 +71,7 @@
     filled.plan = (o && o.plan && Array.isArray(o.plan.items)) ? o.plan : null;
     filled.quizVariants = (o && o.quizVariants && typeof o.quizVariants === 'object') ? o.quizVariants : {};
     filled.dailyLearning = (o && o.dailyLearning && typeof o.dailyLearning === 'object') ? o.dailyLearning : null;
+    filled.learningPractice = (o && o.learningPractice && typeof o.learningPractice === 'object') ? o.learningPractice : null;
     return filled;
   }
 
