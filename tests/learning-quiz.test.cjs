@@ -41,12 +41,24 @@ assert.equal(daily.questions.length, 2);
 while (!context.window.LearningQuiz.daily().completedAt) {
   const q = context.window.LearningQuiz.dailyQuestion();
   const order = q.options.map((o) => o.id);
+  const lastQuestion = context.window.LearningQuiz.daily().responses.length + 1 === context.window.LearningQuiz.daily().questions.length;
   context.window.LearningQuiz.answerDaily(q.correctOptionId);
   assert.ok(context.window.LearningQuiz.daily().feedback);
+  if (lastQuestion) {
+    assert.ok(context.window.LearningQuiz.daily().completedAt, '最后一题答完应立即完成测评');
+    assert.equal(context.window.LearningQuiz.dailyResult().score, 100, '无需额外点击即可显示评分');
+  } else {
+    assert.equal(context.window.LearningQuiz.dailyResult(), null, '全部答完前不应出现评分');
+  }
   assert.deepEqual(context.window.LearningQuiz.dailyQuestion().options.map((o) => o.id), order, '反馈态不应打乱选项位置');
   context.window.LearningQuiz.nextDaily();
 }
 assert.equal(context.window.LearningQuiz.dailyResult().score, 100);
+state.dailyLearning.completedAt = 0;
+state.dailyLearning.result = null;
+state.dailyLearning.feedback = { termId: 'rerank', questionId: state.dailyLearning.questions[1].questionId };
+assert.equal(context.window.LearningQuiz.dailyResult().score, 100, '旧版停在最后一题解析时，升级后应直接完成评分');
+state.dailyLearning.feedback = null;
 
 const practice = context.window.LearningQuiz.startPractice(['rag', 'rerank']);
 assert.equal(practice.questions.length, 4, '两个知识点应各抽两道不同变式题');
@@ -59,8 +71,13 @@ let practiceAnswered = 0;
 while (!context.window.LearningQuiz.practice().completedAt) {
   const q = context.window.LearningQuiz.practiceQuestion();
   const chosen = practiceAnswered === 0 ? q.options.find((o) => o.id !== q.correctOptionId).id : q.correctOptionId;
+  const lastQuestion = context.window.LearningQuiz.practice().responses.length + 1 === context.window.LearningQuiz.practice().questions.length;
   const feedback = context.window.LearningQuiz.answerPractice(chosen);
   assert.ok(feedback && feedback.explanation && feedback.correctOptionText);
+  if (lastQuestion) {
+    assert.ok(context.window.LearningQuiz.practice().completedAt, '巩固练习最后一题应立即出分');
+    assert.equal(context.window.LearningQuiz.practice().result.score, 75);
+  }
   assert.equal(context.window.LearningQuiz.practiceQuestion().id, q.id, '解析时不应跳到下一题');
   context.window.LearningQuiz.nextPractice();
   practiceAnswered++;

@@ -447,6 +447,15 @@
     return html + '</section>';
   }
 
+  function finalAnswerReviewHTML(session) {
+    if (!session.feedback) return '';
+    const last = session.questions[session.questions.length - 1];
+    const question = window.LearningQuiz.bank(last.termId).find(function (q) { return q.id === last.questionId; });
+    return '<details class="final-answer-review" open><summary>最后一题解析' +
+      (question ? ' · ' + esc(question.prompt) : '') + '</summary>' +
+      answerExplanationHTML(session.feedback) + '</details>';
+  }
+
   function viewLearn() {
     let session = window.LearningQuiz.daily();
     if (!session) {
@@ -464,7 +473,7 @@
         '<h2>今日知识点</h2><div class="knowledge-tags">' +
         session.responses.map(function (r) {
           const term = T(r.termId); return '<span class="knowledge-tag ' + (r.correct ? 'done' : 'pending') + '">' + (r.correct ? '✓ ' : '需复习 · ') + esc(term ? term.name : r.termId) + '</span>';
-        }).join('') + '</div></div>';
+        }).join('') + '</div>' + finalAnswerReviewHTML(session) + '</div>';
     }
     const q = window.LearningQuiz.dailyQuestion();
     if (!q) return '<div class="page"><div class="empty">学习状态异常，请返回首页重新开始。</div></div>';
@@ -499,7 +508,7 @@
       return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
         '<div><h1>巩固练习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。本轮成绩单独记录，不改变今日掌握度。</p>' +
         '<button class="btn" data-route="learn">返回今日成绩</button></div></div>' +
-        learningAdviceHTML(session.responses, session.focusIds, true) + '</div>';
+        learningAdviceHTML(session.responses, session.focusIds, true) + finalAnswerReviewHTML(session) + '</div>';
     }
     const q = window.LearningQuiz.practiceQuestion();
     if (!q) return '<div class="page"><div class="empty">练习题暂时无法读取。<br><br><button class="btn" data-route="learn">返回今日成绩</button></div></div>';

@@ -637,6 +637,10 @@ body.simple-mode .simple-only{display:block}
 .daily-advice-row span{font-size:12px;color:var(--text-2);line-height:1.6}
 .daily-advice-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0 4px}
 .daily-advice-actions span{font-size:11.5px;color:var(--text-3)}
+.final-answer-review{border-top:1px solid var(--border);margin:22px 0;padding-top:8px}
+.final-answer-review > summary{cursor:pointer;font-size:13px;font-weight:600;line-height:1.55;padding:10px 0}
+.final-answer-review > summary:hover{color:var(--blue)}
+.final-answer-review .answer-explanation{margin-top:8px}
 .assessment-open-answer{width:100%;min-height:210px;resize:vertical;border:1px solid var(--border-2);border-radius:12px;padding:16px;line-height:1.7;background:#fff}
 .assessment-open-answer:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(35,131,226,.12)}
 .assessment-open-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px}

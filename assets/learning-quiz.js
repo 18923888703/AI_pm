@@ -193,13 +193,27 @@
 
   function daily() {
     const s = window.Mem.state.dailyLearning;
-    return s && s.date === dayKey() ? s : null;
+    if (!s || s.date !== dayKey()) return null;
+    if (!s.completedAt && s.feedback && s.responses.length === s.questions.length) {
+      finishSession(s);
+      window.Mem.save();
+    }
+    return s;
   }
 
   function dailyQuestion() {
     const s = daily();
-    if (!s || s.completedAt || !s.questions[s.index]) return null;
+    if (!s || (s.completedAt && !s.feedback) || !s.questions[s.index]) return null;
     return resolveQuestion(s.questions[s.index]);
+  }
+
+  function finishSession(s) {
+    if (!s || s.completedAt || !s.questions.length || s.responses.length !== s.questions.length) return s;
+    const correct = s.responses.filter(function (x) { return x.correct; }).length;
+    s.completedAt = Date.now();
+    s.result = { correct: correct, total: s.responses.length,
+      score: Math.round(correct / s.responses.length * 100), at: s.completedAt };
+    return s;
   }
 
   function resolveQuestion(ref) {
@@ -225,8 +239,9 @@
     const response = { termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() };
     s.responses.push(response);
     s.feedback = Object.assign({
-      termId: q.termId, selectedOptionId: String(optionId)
+      termId: q.termId, questionId: q.id, selectedOptionId: String(optionId)
     }, result);
+    finishSession(s);
     window.Mem.save(); return s.feedback;
   }
 
@@ -234,12 +249,9 @@
     const s = daily();
     if (!s || !s.feedback) return s;
     s.feedback = null;
+    if (s.completedAt) { window.Mem.save(); return s; }
     s.index++;
-    if (s.index >= s.questions.length) {
-      const correct = s.responses.filter(function (x) { return x.correct; }).length;
-      s.completedAt = Date.now();
-      s.result = { correct: correct, total: s.responses.length, score: s.responses.length ? Math.round(correct / s.responses.length * 100) : 0, at: Date.now() };
-    }
+    finishSession(s);
     window.Mem.save(); return s;
   }
 
@@ -247,7 +259,14 @@
     const s = daily(); return s && s.result ? s.result : null;
   }
 
-  function practice() { return window.Mem.state.learningPractice || null; }
+  function practice() {
+    const s = window.Mem.state.learningPractice || null;
+    if (s && !s.completedAt && s.feedback && s.responses.length === s.questions.length) {
+      finishSession(s);
+      window.Mem.save();
+    }
+    return s;
+  }
 
   function startPractice(termIds) {
     const unique = Array.from(new Set((termIds || []).filter(function (id) { return BANK[id]; })));
@@ -280,7 +299,7 @@
 
   function practiceQuestion() {
     const s = practice();
-    return s && !s.completedAt ? resolveQuestion(s.questions[s.index]) : null;
+    return s && (!s.completedAt || s.feedback) ? resolveQuestion(s.questions[s.index]) : null;
   }
 
   function answerPractice(optionId) {
@@ -292,6 +311,7 @@
     if (window.Mem.quiz && term) window.Mem.quiz(q.termId, term.cat, result.correct);
     s.responses.push({ termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() });
     s.feedback = Object.assign({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId) }, result);
+    finishSession(s);
     window.Mem.save(); return s.feedback;
   }
 
@@ -299,13 +319,9 @@
     const s = practice();
     if (!s || !s.feedback) return s;
     s.feedback = null;
+    if (s.completedAt) { window.Mem.save(); return s; }
     s.index++;
-    if (s.index >= s.questions.length) {
-      const correct = s.responses.filter(function (x) { return x.correct; }).length;
-      s.completedAt = Date.now();
-      s.result = { correct: correct, total: s.responses.length,
-        score: s.responses.length ? Math.round(correct / s.responses.length * 100) : 0, at: Date.now() };
-    }
+    finishSession(s);
     window.Mem.save(); return s;
   }
 
