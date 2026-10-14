@@ -348,7 +348,30 @@
     const overall = Math.round(sy.learnedCount / sy.totalTerms * 100);
     const dailySession = window.LearningQuiz.daily();
     const dailyResult = window.LearningQuiz.dailyResult();
-    const longTerm = window.SpacedReview.summary();
+    const dailyWrongIds = dailyResult ? Array.from(new Set((dailySession.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; }))) : [];
+    const dailyWrongNames = dailyWrongIds.map(T).filter(Boolean).map(function (term) { return term.name; });
+    const reviewSession = window.LearningQuiz.practice();
+    const reviewMatches = !!(reviewSession && reviewSession.focusIds && reviewSession.focusIds.length === dailyWrongIds.length &&
+      reviewSession.focusIds.every(function (id) { return dailyWrongIds.indexOf(id) >= 0; }));
+
+    let focusHTML;
+    if (dailyResult) {
+      const reviewButton = dailyWrongIds.length
+        ? (reviewMatches
+          ? '<button class="btn primary" data-route="reinforce">' + (reviewSession.completedAt ? '查看错题复测结果' : '继续错题复测') + ' →</button>'
+          : '<button class="btn primary" data-review-start="1">开始错题复测 →</button>')
+        : '<button class="btn" data-route="learn">查看今日成绩</button>';
+      focusHTML = '<section class="home-next home-review-state"><div><span class="tag green">今日学习完成</span>' +
+        '<h2>' + (dailyWrongIds.length ? '错题复测 · ' + dailyWrongIds.length + ' 个知识点' : '今天没有错题') + '</h2><p>' +
+        (dailyWrongIds.length ? '主要知识点：' + esc(dailyWrongNames.join('、')) + '。每个知识点会换 2 道题巩固。' :
+          '本轮全部答对，可以在成绩页查看解析和变式复测建议。') + '</p></div>' + reviewButton + '</section>';
+    } else {
+      focusHTML = '<section class="home-next"><div><span class="tag">' + (pd.lessonKind === 'checkpoint' ? '阶段检查' : '第 ' + sy.realNo + ' 课') + '</span>' +
+        '<h2>' + esc(pd.lessonTitle) + '</h2><p>' + esc(pd.lessonGoal) + '</p></div>' +
+        (dailySession && !dailySession.completedAt ? '<button class="btn primary" data-route="learn">继续答题 →</button>' :
+          firstUndone ? '<button class="btn primary" data-learn-start="1">' + (completed.length ? '继续学习' : '开始学习') + ' →</button>' :
+          '<button class="btn" data-route="path">查看学习路径</button>') + '</section>';
+    }
 
     let html = '<div class="page home-focus"><h1>' + (pd.allDone ? '今天完成了' : '今天继续向前') + '</h1>' +
       '<p class="lead">' + esc(pd.lessonTitle) + '</p>' +
@@ -357,16 +380,7 @@
       '<div><b>' + displayRemainMin + '</b><span>剩余分钟</span></div>' +
       '<div><b>' + Math.max(1, hp.streak) + '</b><span>连续天数</span></div>' +
       '<div><b>' + overall + '%</b><span>课程进度</span></div>' +
-      '<div><b>' + (dailyResult ? dailyResult.score + '%' : '—') + '</b><span>今日答对率</span></div></div>' +
-      '<section class="home-next"><div><span class="tag">' + (pd.lessonKind === 'checkpoint' ? '阶段检查' : '第 ' + sy.realNo + ' 课') + '</span>' +
-      '<h2>' + esc(pd.lessonTitle) + '</h2><p>' + esc(pd.lessonGoal) + '</p></div>' +
-      (dailySession && !dailySession.completedAt ? '<button class="btn primary" data-route="learn">继续答题 →</button>' :
-        firstUndone ? '<button class="btn primary" data-learn-start="1">' + (completed.length ? '继续学习' : '开始学习') + ' →</button>' :
-        '<button class="btn" data-route="path">查看学习路径</button>') + '</section>' +
-      '<div class="home-spaced"><span>长期掌握度 <b>' + (longTerm.score == null ? '待复测' : longTerm.score + '%') + '</b>' +
-      ' · 跨日掌握 ' + longTerm.mastered + '/' + longTerm.total + ' 个知识点</span>' +
-      (longTerm.due ? '<button type="button" data-spaced-start="1">到期复测 ' + longTerm.due + ' 个 →</button>' :
-        '<button type="button" data-route="review">查看复习安排 →</button>') + '</div>';
+      '<div><b>' + (dailyResult ? dailyResult.score + '%' : '—') + '</b><span>今日答对率</span></div></div>' + focusHTML;
 
     if (pending.length) {
       html += '<div class="home-tag-section"><h2>待学习</h2><div class="knowledge-tags">' + pending.map(function (it) {
