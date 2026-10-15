@@ -197,7 +197,7 @@
     const correct = q.options.find(function (o) { return o.id === q.correctOptionId; });
     const rows = q.options.map(function (o) {
       const peer = (window.TERMS || []).find(function (p) { return p.id !== term.id && (plain(p.one) === plain(o.text) || plain(p.pm) === plain(o.text)); });
-      let reason = o.id === q.correctOptionId ? q.explanation : '';
+      let reason = o.id === q.correctOptionId ? q.explanation : (o.reason || '');
       if (!reason && peer) reason = '这项讲的是「' + peer.name + '」：' + peer.one + '。本题考的是「' + term.name + '」：' + term.one + '。两个概念的作用不同，不能替换。';
       if (!reason) reason = '本题的判断依据是：' + q.explanation + ' 正确选项将这个判断落实为「' + correct.text + '」。下面结合原理和场景逐步理解这项判断。';
       if (o.id !== q.correctOptionId && learningNotes[term.id] && learningNotes[term.id][o.text]) reason = learningNotes[term.id][o.text];

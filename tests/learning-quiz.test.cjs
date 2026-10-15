@@ -9,22 +9,39 @@ seededMath.random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 0x100000
 const state = {};
 const context = { window: {}, Math: seededMath, Date, Set, Map, console };
 vm.createContext(context);
-['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js'].forEach((file) => {
+['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/interview-core50.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
 const reviewEvents = [];
 context.window.Mem = { state, save() {}, completeDailyQuiz() {}, quiz(id, cat, correct) { reviewEvents.push({ id, cat, correct }); } };
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/explanations.js'), 'utf8'), context, { filename: 'assets/explanations.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/learning-quiz.js'), 'utf8'), context, { filename: 'assets/learning-quiz.js' });
 
 context.window.TERMS.forEach((term) => {
   const bank = context.window.LearningQuiz.bank(term.id);
-  assert.equal(bank.length, 5, `${term.id} 应有五道变式题`);
+  assert.ok(bank.length >= 5, `${term.id} 应保留至少五道变式题`);
+  assert.equal(new Set(bank.map((q) => q.id)).size, bank.length, `${term.id} 题目 ID 不应重复`);
   bank.forEach((q) => {
     assert.ok(q.options.length >= 3 && q.options.length <= 5);
     assert.equal(new Set(q.options.map((o) => o.id)).size, q.options.length);
     assert.ok(q.options.some((o) => o.id === q.correctOptionId));
   });
 });
+
+assert.equal(context.window.CORE50_DAILY.length, 29, '应有 29 道日常场景变式');
+context.window.CORE50_DAILY.forEach((q) => {
+  assert.ok(context.window.TERMS.some((term) => term.id === q.termId), `${q.id} 必须关联现有知识点`);
+  assert.ok(context.window.LearningQuiz.bank(q.termId).some((item) => item.id === q.id), `${q.id} 应进入随机题池`);
+  assert.ok(q.options.every((option) => option.id === q.correctOptionId || option.reason), `${q.id} 错误选项需要逐项解释`);
+});
+
+const coreQuestion = context.window.CORE50_DAILY[0];
+const coreWrong = coreQuestion.options.find((option) => option.id !== coreQuestion.correctOptionId);
+const coreFeedback = context.window.LearningQuiz.answer(coreQuestion.termId, coreQuestion.id, coreWrong.id);
+assert.equal(coreFeedback.correct, false);
+assert.equal(coreFeedback.selectedOptionText, coreWrong.text);
+assert.ok(coreFeedback.explanation);
+assert.equal(coreFeedback.selectedReason, coreWrong.reason, '错选项应给出针对性原因');
 
 const first = context.window.LearningQuiz.pick('rerank');
 assert.ok(first);

@@ -92,14 +92,14 @@
       explanation: pitfall
     });
 
-    // 保留旧题 ID 和历史；每个知识点新增不同角度的变式，供错题巩固抽取。
+    // 保留旧题 ID 和历史；核心 50 题的场景题进入同一知识点随机池。
     const picked = [];
     ['definition', 'scenario', 'boundary', 'tradeoff', 'mechanism', 'pitfall'].forEach(function (kind) {
       const q = out.find(function (x) { return x.variantType === kind && picked.indexOf(x) < 0; });
       if (q && picked.length < 5) picked.push(q);
     });
     out.forEach(function (q) { if (picked.length < 5 && picked.indexOf(q) < 0) picked.push(q); });
-    return picked;
+    return picked.concat((window.CORE50_DAILY || []).filter(function (q) { return q.termId === term.id; }));
   }
 
   const BANK = {};
@@ -136,7 +136,7 @@
     if (!base) return null;
     active[termId] = Object.assign({}, base, {
       review: rec.correct > 0,
-      options: shuffled(base.options.map(function (o) { return { id: o.id, text: o.text }; }))
+      options: shuffled(base.options.map(function (o) { return { id: o.id, text: o.text, reason: o.reason || '' }; }))
     });
     return active[termId];
   }
@@ -222,7 +222,7 @@
     const base = (BANK[ref.termId] || []).find(function (q) { return q.id === ref.questionId; });
     if (!base) return null;
     const byId = {};
-    base.options.forEach(function (o) { byId[o.id] = { id: o.id, text: o.text }; });
+    base.options.forEach(function (o) { byId[o.id] = { id: o.id, text: o.text, reason: o.reason || '' }; });
     return Object.assign({}, base, {
       review: !!ref.review,
       options: (ref.optionIds || base.options.map(function (o) { return o.id; })).map(function (id) { return byId[id]; }).filter(Boolean)

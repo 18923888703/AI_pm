@@ -14,7 +14,7 @@ seededMath.random = random;
 const state = {};
 const context = { window: { Mem: { state, save() {} } }, Math: seededMath, Date, Set, Map, console };
 vm.createContext(context);
-['assets/practice.js', 'assets/interview-bank.js'].forEach((file) => {
+['assets/practice.js', 'assets/interview-core50.js', 'assets/interview-bank.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
 
@@ -22,6 +22,17 @@ const { Lab, INTERVIEW_DIMS, INTERVIEW_BANK } = context.window;
 assert.equal(Object.keys(INTERVIEW_DIMS).length, 8, '应包含八个面试能力维度');
 assert.ok(INTERVIEW_BANK.length >= 90, '精选题库应至少包含 90 道客观与开放题');
 assert.equal(new Set(INTERVIEW_BANK.map((q) => q.id)).size, INTERVIEW_BANK.length, '题目 ID 不应重复');
+const core50 = INTERVIEW_BANK.filter((q) => q.id.startsWith('core50-open-'));
+assert.equal(core50.length, 50, '新增核心 50 个考查角度应全部进入面试题库');
+assert.equal(new Set(core50.map((q) => q.prompt)).size, 50, '新增核心题不应有完全重复的题干');
+core50.forEach((q) => {
+  assert.ok(INTERVIEW_DIMS[q.dimension], `${q.id} 应归属现有能力维度`);
+  assert.ok([1, 2, 3].includes(q.difficulty));
+  assert.ok(['scenario', 'project', 'strategy'].includes(q.subtype));
+  assert.ok(q.rubric.length >= 3 && q.rubric.length <= 5);
+  assert.ok(q.rubric.every((point) => point.label && point.weight > 0));
+  assert.ok(q.answerOutline && q.sourceRef.includes('核心 50 题'));
+});
 assert.equal(Lab.interviewSessionSize(), 20, '每次测评应抽取 20 题');
 
 function assertSession(session) {
@@ -97,7 +108,7 @@ const refreshQuestion = Lab.interviewQuestions()[0];
 if (refreshQuestion.type === 'mcq') Lab.answerInterview(refreshQuestion.correctOptionId);
 const reloadContext = { window: { Mem: { state, save() {} } }, Math: seededMath, Date, Set, Map, console };
 vm.createContext(reloadContext);
-['assets/practice.js', 'assets/interview-bank.js'].forEach((file) => {
+['assets/practice.js', 'assets/interview-core50.js', 'assets/interview-bank.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), reloadContext, { filename: file });
 });
 const refreshed = reloadContext.window.Lab.interview();

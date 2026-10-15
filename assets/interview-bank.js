@@ -115,6 +115,12 @@
     open('open-industry-4', 'industry-growth', 'industry_soft', 3, 'strategy', '你认为高阶产品经理与低阶产品经理的核心差异是什么？', ['从接需求升级为定义问题', '能做价值、风险与资源取舍', '能建立机制而非只交付一次', '能影响跨团队共同决策', '用结果和复盘形成可迁移方法'], '差异不在文档数量，而在问题定义、决策质量和组织影响力。', '个人规划类')
   ];
 
+  const core50 = (window.CORE50_OPEN || []).map(function (row) {
+    const number = row[0];
+    return open('core50-open-' + String(number).padStart(2, '0'), row[1], row[2], row[3], row[4],
+      row[5], row[6].split('|'), row[7], '新增核心 50 题 · 第 ' + number + ' 题（改写）');
+  });
+
   window.INTERVIEW_DIMS = DIMS;
-  window.INTERVIEW_BANK = legacy.concat(addedMcq, openQuestions);
+  window.INTERVIEW_BANK = legacy.concat(addedMcq, openQuestions, core50);
 })();
