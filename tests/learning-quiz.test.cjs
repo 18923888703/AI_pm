@@ -105,4 +105,55 @@ assert.equal(reviewEvents.length, 4, '追加练习应计入知识点记忆');
 const sevenWeak = context.window.LearningQuiz.startPractice(['ai', 'model', 'llm', 'token', 'prompt', 'context', 'hallucination']);
 assert.equal(sevenWeak.questions.length, 14, '每个薄弱知识点都应获得两道新练习题');
 
+const focusedDaily = context.window.LearningQuiz.startDaily(['ai', 'model']);
+while (!context.window.LearningQuiz.daily().completedAt) {
+  const q = context.window.LearningQuiz.dailyQuestion();
+  const selected = q.termId === 'ai' ? q.options.find((o) => o.id !== q.correctOptionId).id : q.correctOptionId;
+  context.window.LearningQuiz.answerDaily(selected);
+  context.window.LearningQuiz.nextDaily();
+}
+let progress = context.window.LearningQuiz.reinforcementProgress();
+assert.deepEqual(Array.from(progress.wrongIds), ['ai']);
+assert.equal(progress.completedRounds, 0);
+assert.equal(progress.verified, false);
+
+const firstRound = context.window.LearningQuiz.startPractice(['ai'], { sourceDailyDate: focusedDaily.date });
+while (!context.window.LearningQuiz.practice().completedAt) {
+  const q = context.window.LearningQuiz.practiceQuestion();
+  context.window.LearningQuiz.answerPractice(q.correctOptionId);
+  context.window.LearningQuiz.nextPractice();
+}
+progress = context.window.LearningQuiz.reinforcementProgress();
+assert.equal(progress.completedRounds, 1);
+assert.equal(progress.verified, false, '只做一轮不应产生两轮巩固分');
+
+const secondRound = context.window.LearningQuiz.startPractice(['ai'], { sourceDailyDate: focusedDaily.date });
+assert.notEqual(secondRound.id, firstRound.id);
+assert.equal(new Set(firstRound.questions.concat(secondRound.questions).map((q) => q.questionId)).size, 4,
+  '第二轮应优先抽不同变式');
+let answered = 0;
+while (!context.window.LearningQuiz.practice().completedAt) {
+  const q = context.window.LearningQuiz.practiceQuestion();
+  context.window.LearningQuiz.answerPractice(answered++ ? q.correctOptionId : q.options.find((o) => o.id !== q.correctOptionId).id);
+  context.window.LearningQuiz.nextPractice();
+}
+progress = context.window.LearningQuiz.reinforcementProgress();
+assert.equal(progress.completedRounds, 2);
+assert.equal(progress.verified, true);
+assert.equal(progress.score, 75);
+assert.deepEqual(Array.from(progress.needsWork), ['ai']);
+assert.equal(state.practiceRounds.length, 3, '已完成轮次应单独保存且不重复写入');
+
+state.practiceRounds = [];
+state.learningPractice = JSON.parse(JSON.stringify(firstRound));
+delete state.learningPractice.id;
+delete state.learningPractice.sourceDailyDate;
+assert.equal(context.window.LearningQuiz.reinforcementProgress().completedRounds, 1,
+  '旧版已完成的当天错题巩固应迁移为第一轮');
+context.window.LearningQuiz.reinforcementProgress();
+assert.equal(state.practiceRounds.length, 1, '反复读取旧记录不能重复计算巩固轮次');
+state.practiceRounds[0].date = '2000-1-1';
+assert.equal(context.window.LearningQuiz.reinforcementProgress().completedRounds, 0,
+  '其他日期的巩固记录不能计入今天');
+
 console.log('learning quiz tests passed');

@@ -446,6 +446,8 @@ body.simple-mode .simple-only{display:block}
 .home-next{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:4px 0 28px;border-bottom:1px solid var(--border)}
 .home-review-state h2{margin-bottom:4px}
 .home-review-state p{max-width:52ch}
+.home-progress-state h2{margin-bottom:4px}
+.home-progress-state p{max-width:58ch}
 .spaced-overview{display:flex;align-items:center;gap:24px;flex-wrap:wrap;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 0;margin:18px 0}
 .spaced-overview > div{display:flex;align-items:baseline;gap:6px}
 .spaced-overview > div b{font-size:22px;font-variant-numeric:tabular-nums}
@@ -456,7 +458,7 @@ body.simple-mode .simple-only{display:block}
 .spaced-due-list b{font-size:13.5px;min-width:130px}
 .spaced-due-list span{font-size:12px;color:var(--text-2)}
 .spaced-result-note{font-size:13px;line-height:1.75;color:var(--text-2);padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.mastery-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px 0;margin:18px 0 6px}
+.mastery-compare{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px 0;margin:18px 0 6px}
 .mastery-compare > div{display:flex;flex-direction:column;gap:3px}
 .mastery-compare span{font-size:12px;color:var(--text-2)}
 .mastery-compare b{font-size:25px;font-variant-numeric:tabular-nums}
@@ -655,6 +657,27 @@ body.simple-mode .simple-only{display:block}
 .daily-advice-row span{font-size:12px;color:var(--text-2);line-height:1.6}
 .daily-advice-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0 4px}
 .daily-advice-actions span{font-size:11.5px;color:var(--text-3)}
+.reinforcement-evidence{padding:17px 18px;margin:18px 0 28px;border:1px solid rgba(35,131,226,.2);border-radius:10px;background:rgba(35,131,226,.035)}
+.reinforcement-evidence-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.reinforcement-evidence-head h2{font-size:17px;margin:5px 0 0}
+.reinforcement-evidence-head strong{font-size:26px;line-height:1.1;letter-spacing:-.025em;font-variant-numeric:tabular-nums;color:var(--blue)}
+.reinforcement-evidence > p{font-size:12.5px;color:var(--text-2);line-height:1.7;margin:9px 0 13px}
+.reinforcement-terms{border-top:1px solid rgba(35,131,226,.13)}
+.reinforcement-terms > div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(35,131,226,.1);font-size:13px}
+.reinforcement-terms > div:last-child{border-bottom:0}
+.reinforcement-terms b{font-variant-numeric:tabular-nums;font-weight:600}
+.reinforcement-evidence .reinforcement-next{margin-bottom:0;color:var(--orange)}
+.daily-wrong-review{margin:24px 0 30px}
+.daily-wrong-review > h2{margin-bottom:3px}
+.daily-wrong-review > .tiny{margin:0 0 12px}
+.daily-wrong-item{border-top:1px solid var(--border)}
+.daily-wrong-item:last-child{border-bottom:1px solid var(--border)}
+.daily-wrong-item > summary{display:flex;align-items:baseline;gap:12px;padding:14px 2px;cursor:pointer;line-height:1.5}
+.daily-wrong-item > summary:hover{color:var(--blue)}
+.daily-wrong-item > summary b{flex:0 0 115px;font-size:13px}
+.daily-wrong-item > summary span{font-size:13px;color:var(--text-2)}
+.daily-wrong-item > .answer-explanation{margin:0 0 10px}
+.daily-wrong-item > .btn{margin:0 0 16px}
 .final-answer-review{border-top:1px solid var(--border);margin:22px 0;padding-top:8px}
 .final-answer-review > summary{cursor:pointer;font-size:13px;font-weight:600;line-height:1.55;padding:10px 0}
 .final-answer-review > summary:hover{color:var(--blue)}
@@ -1129,6 +1152,11 @@ body.simple-mode .simple-only{display:block}
   .daily-advice-row{align-items:flex-start;flex-direction:column;gap:2px}
   .daily-advice-row button{flex:initial}
   .daily-advice-actions .btn{width:100%;justify-content:center;height:42px}
+  .mastery-compare{grid-template-columns:1fr 1fr}
+  .mastery-compare > div:last-child{grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px}
+  .daily-wrong-item > summary{display:block}
+  .daily-wrong-item > summary b{display:block;margin-bottom:3px}
+  .reinforcement-evidence{padding:15px 14px}
   .result-head{align-items:flex-start;gap:12px}
   .score-disc{flex-basis:86px;padding:8px 10px 8px 0}
   .score-disc b{font-size:38px}

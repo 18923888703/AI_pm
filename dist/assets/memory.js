@@ -49,6 +49,7 @@
       mentor: { signals: [], summary: null, supplements: {} },
       dailyLearning: null,
       learningPractice: null,
+      practiceRounds: [],
       spacedReview: {},
       spacedSession: null
     };
@@ -76,6 +77,7 @@
     filled.mentor = (o && o.mentor && typeof o.mentor === 'object') ? o.mentor : { signals: [], summary: null, supplements: {} };
     filled.dailyLearning = (o && o.dailyLearning && typeof o.dailyLearning === 'object') ? o.dailyLearning : null;
     filled.learningPractice = (o && o.learningPractice && typeof o.learningPractice === 'object') ? o.learningPractice : null;
+    filled.practiceRounds = Array.isArray(o && o.practiceRounds) ? o.practiceRounds : [];
     filled.spacedReview = (o && o.spacedReview && typeof o.spacedReview === 'object') ? o.spacedReview : {};
     filled.spacedSession = (o && o.spacedSession && typeof o.spacedSession === 'object') ? o.spacedSession : null;
     return filled;

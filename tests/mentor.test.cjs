@@ -110,9 +110,11 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
     '不支持结构化格式的供应商应降级并记住可用模式');
 
   const localDoc = { updatedAt: 100, createdAt: 1, events: [], chat: [], terms: {}, cats: {},
+    practiceRounds: [{ id: 'round-local', completedAt: 80, date: '2026-10-21' }],
     mentor: { signals: [{ id: 's-local', at: 10, termId: 'rag' }],
       summary: { text: '旧归纳', at: 20 }, supplements: { 'rag|a': { text: '旧重讲', at: 21 } } } };
   const remoteDoc = { updatedAt: 120, createdAt: 1, events: [], chat: [], terms: {}, cats: {},
+    practiceRounds: [{ id: 'round-remote', completedAt: 90, date: '2026-10-21' }],
     mentor: { signals: [{ id: 's-remote', at: 30, termId: 'model' }],
       summary: { text: '新归纳', at: 40 }, supplements: { 'rag|a': { text: '新重讲', at: 41 } } } };
   const syncStorage = new Map([['aipm.memory.v1', JSON.stringify(localDoc)]]);
@@ -124,6 +126,7 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
   assert.equal(await syncContext.window.Store.pull(), true);
   const merged = JSON.parse(syncStorage.get('aipm.memory.v1'));
   assert.equal(merged.mentor.signals.length, 2, '文件同步应合并两台设备的学习信号');
+  assert.equal(merged.practiceRounds.length, 2, '文件同步应保留两台设备的巩固轮次');
   assert.equal(merged.mentor.summary.text, '新归纳');
   assert.equal(merged.mentor.supplements['rag|a'].text, '新重讲');
 

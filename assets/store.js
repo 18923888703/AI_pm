@@ -250,6 +250,9 @@
     out.quizVariants = mergedQuiz;
 
     out.learningPractice = newest.learningPractice || (base === a ? b.learningPractice : a.learningPractice) || null;
+    out.practiceRounds = unionBy([].concat(a.practiceRounds || [], b.practiceRounds || []), function (round) {
+      return round.id || String(round.startedAt);
+    }).sort(function (x, y) { return (x.completedAt || 0) - (y.completedAt || 0); }).slice(-100);
     out.spacedSession = newest.spacedSession || (base === a ? b.spacedSession : a.spacedSession) || null;
     const mergedSpaced = JSON.parse(JSON.stringify(a.spacedReview || {}));
     Object.keys(b.spacedReview || {}).forEach(function (id) {

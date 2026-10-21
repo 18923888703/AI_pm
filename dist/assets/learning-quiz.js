@@ -238,7 +238,7 @@
     if (!result) return null;
     const term = window.TERMS.find(function (x) { return x.id === q.termId; });
     window.Mem.completeDailyQuiz(q.termId, term.cat, result.correct);
-    const response = { termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() };
+    const response = { termId: q.termId, questionId: q.id, selectedOptionId: String(optionId), correct: result.correct, at: Date.now() };
     s.responses.push(response);
     s.feedback = Object.assign({
       termId: q.termId, questionId: q.id, selectedOptionId: String(optionId)
@@ -267,11 +267,34 @@
       finishSession(s);
       window.Mem.save();
     }
+    if (s && s.completedAt && s.result) recordPracticeRound(s);
     return s;
   }
 
-  function startPractice(termIds) {
+  function recordPracticeRound(s) {
+    const mem = window.Mem.state;
+    if (!Array.isArray(mem.practiceRounds)) mem.practiceRounds = [];
+    const id = s.id || ('legacy-' + s.startedAt);
+    if (mem.practiceRounds.some(function (round) { return round.id === id; })) return;
+    const round = {
+      id: id, date: s.date, sourceDailyDate: s.sourceDailyDate || '',
+      startedAt: s.startedAt, completedAt: s.completedAt,
+      focusIds: (s.focusIds || []).slice(),
+      responses: (s.responses || []).map(function (r) { return {
+        termId: r.termId, questionId: r.questionId, selectedOptionId: r.selectedOptionId || '',
+        correct: !!r.correct, at: r.at
+      }; }),
+      result: { correct: s.result.correct, total: s.result.total, score: s.result.score }
+    };
+    mem.practiceRounds.push(round);
+    mem.practiceRounds = mem.practiceRounds.slice(-100);
+    window.Mem.save();
+  }
+
+  function startPractice(termIds, options) {
     const unique = Array.from(new Set((termIds || []).filter(function (id) { return BANK[id]; })));
+    if (!unique.length) return null;
+    options = options || {};
     const existing = practice();
     if (existing && !existing.completedAt && existing.date === dayKey() &&
         existing.focusIds.length === unique.length &&
@@ -293,7 +316,8 @@
       });
     });
     window.Mem.state.learningPractice = {
-      date: dayKey(), startedAt: Date.now(), completedAt: 0, index: 0,
+      id: 'practice-' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
+      date: dayKey(), sourceDailyDate: options.sourceDailyDate || '', startedAt: Date.now(), completedAt: 0, index: 0,
       focusIds: unique, questions: shuffled(questions), responses: [], feedback: null, result: null
     };
     window.Mem.save(); return practice();
@@ -311,9 +335,10 @@
     if (!result) return null;
     const term = window.TERMS.find(function (x) { return x.id === q.termId; });
     if (window.Mem.quiz && term) window.Mem.quiz(q.termId, term.cat, result.correct);
-    s.responses.push({ termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() });
+    s.responses.push({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId), correct: result.correct, at: Date.now() });
     s.feedback = Object.assign({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId) }, result);
     finishSession(s);
+    if (s.completedAt) recordPracticeRound(s);
     window.Mem.save(); return s.feedback;
   }
 
@@ -324,7 +349,42 @@
     if (s.completedAt) { window.Mem.save(); return s; }
     s.index++;
     finishSession(s);
+    if (s.completedAt) recordPracticeRound(s);
     window.Mem.save(); return s;
+  }
+
+  function reinforcementProgress() {
+    const today = daily();
+    if (!today || !today.result) return null;
+    practice(); // 旧版停在最后一题解析时补记已完成轮次。
+    const wrongIds = Array.from(new Set((today.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; })));
+    const rounds = (window.Mem.state.practiceRounds || []).filter(function (round) {
+      if (round.date !== today.date || !round.completedAt) return false;
+      if (round.sourceDailyDate === today.date) return true;
+      // 兼容升级前已完成、且刚好针对当天全部错题的巩固记录。
+      return !round.sourceDailyDate && String(round.id || '').indexOf('legacy-') === 0 && wrongIds.length > 0 &&
+        round.focusIds && round.focusIds.length === wrongIds.length &&
+        round.focusIds.every(function (id) { return wrongIds.indexOf(id) >= 0; });
+    });
+    const perTerm = wrongIds.map(function (id) {
+      const attempts = rounds.map(function (round) {
+        const answers = (round.responses || []).filter(function (r) { return r.termId === id; });
+        return answers.length ? { correct: answers.filter(function (r) { return r.correct; }).length, total: answers.length, at: round.completedAt } : null;
+      }).filter(Boolean);
+      const correct = attempts.reduce(function (n, x) { return n + x.correct; }, 0);
+      const total = attempts.reduce(function (n, x) { return n + x.total; }, 0);
+      return { termId: id, rounds: attempts.length, correct: correct, total: total,
+        score: total ? Math.round(correct / total * 100) : null,
+        lastRoundCorrect: attempts.length ? attempts[attempts.length - 1].correct === attempts[attempts.length - 1].total : false };
+    });
+    const completedRounds = perTerm.length ? Math.min.apply(null, perTerm.map(function (x) { return x.rounds; })) : 0;
+    const correct = perTerm.reduce(function (n, x) { return n + x.correct; }, 0);
+    const total = perTerm.reduce(function (n, x) { return n + x.total; }, 0);
+    return { wrongIds: wrongIds, perTerm: perTerm, completedRounds: completedRounds,
+      verified: !!perTerm.length && perTerm.every(function (x) { return x.rounds >= 2; }),
+      score: total ? Math.round(correct / total * 100) : null,
+      needsWork: perTerm.filter(function (x) { return x.rounds < 2 || !x.lastRoundCorrect || x.score < 80; }).map(function (x) { return x.termId; }),
+      latestRound: rounds.slice().sort(function (a, b) { return b.completedAt - a.completedAt; })[0] || null };
   }
 
   function spaced() { return window.Mem.state.spacedSession || null; }
@@ -399,6 +459,7 @@
     answerDaily: answerDaily, nextDaily: nextDaily, dailyResult: dailyResult,
     startPractice: startPractice, practice: practice, practiceQuestion: practiceQuestion,
     answerPractice: answerPractice, nextPractice: nextPractice,
+    reinforcementProgress: reinforcementProgress,
     startSpaced: startSpaced, spaced: spaced, spacedQuestion: spacedQuestion,
     answerSpaced: answerSpaced, nextSpaced: nextSpaced
   };

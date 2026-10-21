@@ -350,21 +350,29 @@
     const dailyResult = window.LearningQuiz.dailyResult();
     const dailyWrongIds = dailyResult ? Array.from(new Set((dailySession.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; }))) : [];
     const dailyWrongNames = dailyWrongIds.map(T).filter(Boolean).map(function (term) { return term.name; });
+    const reinforcement = dailyResult ? window.LearningQuiz.reinforcementProgress() : null;
     const reviewSession = window.LearningQuiz.practice();
-    const reviewMatches = !!(reviewSession && reviewSession.focusIds && reviewSession.focusIds.length === dailyWrongIds.length &&
-      reviewSession.focusIds.every(function (id) { return dailyWrongIds.indexOf(id) >= 0; }));
+    const reviewOngoing = !!(dailySession && reviewSession && !reviewSession.completedAt && reviewSession.date === dailySession.date &&
+      (reviewSession.sourceDailyDate === dailySession.date || (!reviewSession.sourceDailyDate && dailyWrongIds.length &&
+        reviewSession.focusIds.length === dailyWrongIds.length && reviewSession.focusIds.every(function (id) { return dailyWrongIds.includes(id); }))));
 
     let focusHTML;
     if (dailyResult) {
-      const reviewButton = dailyWrongIds.length
-        ? (reviewMatches
-          ? '<button class="btn primary" data-route="reinforce">' + (reviewSession.completedAt ? '查看错题复测结果' : '继续错题复测') + ' →</button>'
-          : '<button class="btn primary" data-review-start="1">开始错题复测 →</button>')
-        : '<button class="btn" data-route="learn">查看今日成绩</button>';
-      focusHTML = '<section class="home-next home-review-state"><div><span class="tag green">今日学习完成</span>' +
-        '<h2>' + (dailyWrongIds.length ? '错题复测 · ' + dailyWrongIds.length + ' 个知识点' : '今天没有错题') + '</h2><p>' +
-        (dailyWrongIds.length ? '主要知识点：' + esc(dailyWrongNames.join('、')) + '。每个知识点会换 2 道题巩固。' :
-          '本轮全部答对，可以在成绩页查看解析和变式复测建议。') + '</p></div>' + reviewButton + '</section>';
+      if (dailyWrongIds.length && !reinforcement.completedRounds) {
+        focusHTML = '<section class="home-next home-review-state"><div><span class="tag orange">等待巩固</span>' +
+          '<h2>' + dailyWrongIds.length + ' 个知识点需要巩固</h2><p>主要知识点：' + esc(dailyWrongNames.join('、')) +
+          '。先看每道错题的解析，再进入两轮变式练习。</p></div>' +
+          (reviewOngoing ? '<button class="btn primary" data-route="reinforce">继续巩固 →</button>' :
+            '<button class="btn primary" data-route="learn">查看错题与巩固 →</button>') + '</section>';
+      } else {
+        const reviewText = !dailyWrongIds.length ? '本轮全部答对。首次答对率 100%，长期掌握仍由跨日复测确认。' :
+          reinforcement.verified ? '首次答对率 ' + dailyResult.score + '%；完成至少两轮变式巩固，巩固正确率 ' + reinforcement.score + '%。' :
+            '首次答对率 ' + dailyResult.score + '%；已完成 ' + reinforcement.completedRounds + '/2 轮变式巩固，继续练习入口在今日报告中。';
+        focusHTML = '<section class="home-next home-progress-state"><div><span class="tag green">今日学习完成</span>' +
+          '<h2>今天的学习进度</h2><p>' + reviewText + '</p></div>' +
+          (reviewOngoing ? '<button class="btn primary" data-route="reinforce">继续巩固 →</button>' :
+            '<button class="btn" data-route="learn">查看今日报告 →</button>') + '</section>';
+      }
     } else {
       focusHTML = '<section class="home-next"><div><span class="tag">' + (pd.lessonKind === 'checkpoint' ? '阶段检查' : '第 ' + sy.realNo + ' 课') + '</span>' +
         '<h2>' + esc(pd.lessonTitle) + '</h2><p>' + esc(pd.lessonGoal) + '</p></div>' +
@@ -373,14 +381,18 @@
           '<button class="btn" data-route="path">查看学习路径</button>') + '</section>';
     }
 
-    let html = '<div class="page home-focus"><h1>' + (pd.allDone ? '今天完成了' : '今天继续向前') + '</h1>' +
+    const finalMetric = dailyResult && dailyWrongIds.length && reinforcement.completedRounds
+      ? { value: reinforcement.verified ? reinforcement.score + '%' : reinforcement.completedRounds + '/2',
+        label: reinforcement.verified ? '巩固正确率' : '巩固进度' }
+      : { value: dailyResult ? dailyResult.score + '%' : '—', label: '首次答对率' };
+    let html = '<div class="page home-focus"><h1>' + (dailyResult ? '今日学习进度' : pd.allDone ? '今天完成了' : '今天继续向前') + '</h1>' +
       '<p class="lead">' + esc(pd.lessonTitle) + '</p>' +
       '<div class="home-data-strip">' +
       '<div><b>' + completed.length + '/' + todayItems.length + '</b><span>今日完成</span></div>' +
       '<div><b>' + displayRemainMin + '</b><span>剩余分钟</span></div>' +
       '<div><b>' + Math.max(1, hp.streak) + '</b><span>连续天数</span></div>' +
       '<div><b>' + overall + '%</b><span>课程进度</span></div>' +
-      '<div><b>' + (dailyResult ? dailyResult.score + '%' : '—') + '</b><span>今日答对率</span></div></div>' + focusHTML;
+      '<div><b>' + finalMetric.value + '</b><span>' + finalMetric.label + '</span></div></div>' + focusHTML;
 
     if (pending.length) {
       html += '<div class="home-tag-section"><h2>待学习</h2><div class="knowledge-tags">' + pending.map(function (it) {
@@ -434,7 +446,7 @@
     return html + '</div>';
   }
 
-  function learningAdviceHTML(responses, allIds, practiceMode) {
+  function learningAdviceHTML(responses, allIds, practiceMode, ctaLabel) {
     const wrongIds = Array.from(new Set((responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; })));
     const focusIds = wrongIds.length ? wrongIds : (allIds || []).slice();
     const grouped = {};
@@ -460,9 +472,47 @@
     } else {
       html += '<p class="lead">本轮题目全部答对。可以继续用不同问法和边界场景复测，确认自己能把概念用到实际问题里。</p>';
     }
-    if (focusIds.length) html += '<div class="daily-advice-actions"><button type="button" class="btn primary" data-review-start="1">' +
-      (practiceMode && wrongIds.length ? '针对本轮错题再练一组' : '开始针对性巩固练习') + ' →</button>' +
+    if (focusIds.length && ctaLabel !== false) html += '<div class="daily-advice-actions"><button type="button" class="btn primary" data-review-start="1">' +
+      (ctaLabel || (practiceMode && wrongIds.length ? '针对本轮错题再练一组' : '开始针对性巩固练习')) + ' →</button>' +
       '<span>每个重点知识点抽 2 道变式题，共 ' + (focusIds.length * 2) + ' 题；单独记录练习结果。</span></div>';
+    return html + '</section>';
+  }
+
+  function reinforcementSummaryHTML(progress) {
+    if (!progress || !progress.wrongIds.length) return '';
+    let html = '<section class="reinforcement-evidence"><div class="reinforcement-evidence-head"><div><span class="tag blue">变式巩固</span>' +
+      '<h2>巩固进度与证据</h2></div><strong>' + (progress.verified ? progress.score + '%' : progress.completedRounds + '/2 轮') + '</strong></div>' +
+      '<p>' + (progress.verified ? '每个原错题知识点已完成至少两轮；这里统计巩固题的正确率，仍需跨日复测确认长期掌握。' :
+        '每个原错题知识点至少完成两轮后，才显示巩固正确率。首次答题成绩不被覆盖。') + '</p><div class="reinforcement-terms">';
+    progress.perTerm.forEach(function (item) {
+      const term = T(item.termId);
+      html += '<div><span>' + esc(term ? term.name : item.termId) + '</span><b>' +
+        (item.rounds >= 2 ? item.score + '% · ' + item.rounds + ' 轮' : Math.min(item.rounds, 2) + '/2 轮') +
+        '</b></div>';
+    });
+    return html + '</div>' + (progress.verified && progress.needsWork.length
+      ? '<p class="reinforcement-next">建议继续补强：' + esc(progress.needsWork.map(function (id) { const t = T(id); return t ? t.name : id; }).join('、')) + '。</p>' : '') + '</section>';
+  }
+
+  function wrongAnswerReviewHTML(session) {
+    const wrong = (session.responses || []).filter(function (response) { return !response.correct; });
+    if (!wrong.length) return '';
+    let html = '<section class="daily-wrong-review"><h2>错题逐题查看</h2><p class="tiny">展开可看当时选项、判断依据和具体场景；点知识点可重新学习。</p>';
+    wrong.forEach(function (response) {
+      const term = T(response.termId);
+      const q = window.LearningQuiz.bank(response.termId).find(function (item) { return item.id === response.questionId; });
+      if (!term || !q) return;
+      const selected = q.options.find(function (option) { return option.id === response.selectedOptionId; });
+      const correct = q.options.find(function (option) { return option.id === q.correctOptionId; });
+      const details = window.Explanations.learning(q, term, response.selectedOptionId);
+      html += '<details class="daily-wrong-item"><summary><b>' + esc(term.name) + '</b><span>' + esc(q.prompt) + '</span></summary>' +
+        answerExplanationHTML(Object.assign({ correct: false, termId: term.id, questionId: q.id,
+          selectedOptionId: response.selectedOptionId || '',
+          selectedOptionText: selected ? selected.text : '旧记录未保存所选选项',
+          correctOptionText: correct ? correct.text : '', explanation: q.explanation,
+          pitfall: term.pitfalls && term.pitfalls[0] || '' }, details)) +
+        '<button type="button" class="btn sm" data-goto="term:' + escAttr(term.id) + '">重新理解「' + esc(term.name) + '」 →</button></details>';
+    });
     return html + '</section>';
   }
 
@@ -485,10 +535,16 @@
       return '<div class="page assessment-page"><div class="empty">今天没有待完成的知识点。<br><br><button class="btn" data-route="home">返回今日学习</button></div></div>';
     }
     if (session.completedAt && session.result) {
+      const progress = window.LearningQuiz.reinforcementProgress();
+      const ongoing = window.LearningQuiz.practice();
+      const reviewOngoing = !!(ongoing && !ongoing.completedAt && ongoing.sourceDailyDate === session.date);
+      const cta = !progress || !progress.wrongIds.length ? false :
+        reviewOngoing ? '继续当前巩固' : progress.verified ? '再练一轮（可选）' : '开始第 ' + (progress.completedRounds + 1) + ' 轮巩固';
       return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
-        '<div><h1>今日学习完成</h1><p class="lead">今日答对率 ' + session.result.score + ' 分，答对 ' + session.result.correct + '/' + session.result.total + ' 题；长期掌握度以跨日复测为准。</p>' +
+        '<div><h1>今日学习报告</h1><p class="lead">首次答对率 ' + session.result.score + '%，答对 ' + session.result.correct + '/' + session.result.total + ' 题；它不等于稳定掌握。</p>' +
         '<button class="btn" data-route="home">查看今日数据</button></div></div>' +
-        learningAdviceHTML(session.responses, session.questions.map(function (q) { return q.termId; }), false) +
+        reinforcementSummaryHTML(progress) + wrongAnswerReviewHTML(session) +
+        learningAdviceHTML(session.responses, session.questions.map(function (q) { return q.termId; }), false, cta) +
         '<h2>今日知识点</h2><div class="knowledge-tags">' +
         session.responses.map(function (r) {
           const term = T(r.termId); return '<span class="knowledge-tag ' + (r.correct ? 'done' : 'pending') + '">' + (r.correct ? '✓ ' : '需复习 · ') + esc(term ? term.name : r.termId) + '</span>';
@@ -524,10 +580,17 @@
     const session = window.LearningQuiz.practice();
     if (!session || !session.questions.length) return '<div class="page"><h1>巩固复习</h1><p class="lead">完成今日学习后，可从成绩页启动针对性练习。</p><button class="btn" data-route="learn">返回今日学习</button></div>';
     if (session.completedAt && session.result) {
+      const progress = window.LearningQuiz.reinforcementProgress();
       return '<div class="page daily-result"><div class="result-head"><div class="score-disc" style="--score:' + session.result.score + ';--score-color:' + scoreTone(session.result.score) + '"><b>' + session.result.score + '</b><span>/100</span></div>' +
-        '<div><h1>巩固练习完成</h1><p class="lead">答对 ' + session.result.correct + '/' + session.result.total + ' 题。本轮成绩单独记录，不改变今日答对率。</p>' +
-        '<button class="btn" data-route="learn">返回今日成绩</button></div></div>' +
-        learningAdviceHTML(session.responses, session.focusIds, true) + finalAnswerReviewHTML(session) + '</div>';
+        '<div><h1>巩固练习完成</h1><p class="lead">本轮答对 ' + session.result.correct + '/' + session.result.total + ' 题。' +
+        (progress && progress.wrongIds.length ? (progress.verified ? '原错题知识点已完成至少两轮；首次答题成绩保持不变。' :
+          '原错题知识点已完成 ' + progress.completedRounds + '/2 轮；首次答题成绩保持不变。') : '本轮成绩单独记录。') + '</p>' +
+        '<button class="btn primary" data-route="home">查看今日进度</button></div></div>' +
+        reinforcementSummaryHTML(progress) +
+        learningAdviceHTML(session.responses, session.focusIds, true, false) +
+        (progress && progress.wrongIds.length && (!progress.verified || progress.needsWork.length) ?
+          '<button type="button" class="btn" data-review-start="1">' + (progress.verified ? '继续补强薄弱点' : '继续下一轮巩固') + ' →</button>' : '') +
+        finalAnswerReviewHTML(session) + '</div>';
     }
     const q = window.LearningQuiz.practiceQuestion();
     if (!q) return '<div class="page"><div class="empty">练习题暂时无法读取。<br><br><button class="btn" data-route="learn">返回今日成绩</button></div></div>';
@@ -1166,7 +1229,10 @@
       '<p class="lead">这里是我对你的长期记忆。它会跨会话保留，并决定我怎么给你讲新东西。</p>';
     const longTerm = window.SpacedReview.summary();
     const today = window.LearningQuiz.dailyResult();
+    const reinforcement = window.LearningQuiz.reinforcementProgress();
     html += '<div class="mastery-compare"><div><span>今日答对率</span><b>' + (today ? today.score + '%' : '待答题') + '</b><small>只统计今天的题目</small></div>' +
+      '<div><span>巩固正确率</span><b>' + (reinforcement && reinforcement.verified ? reinforcement.score + '%' : reinforcement && reinforcement.wrongIds.length ? '待两轮' : '—') +
+      '</b><small>' + (reinforcement && reinforcement.wrongIds.length ? '每个原错题知识点至少两轮后统计' : today ? '今天没有待巩固错题' : '完成今日答题后安排') + '</small></div>' +
       '<div><span>长期掌握度</span><b>' + (longTerm.score == null ? '待复测' : longTerm.score + '%') +
       '</b><small>跨日掌握 ' + longTerm.mastered + '/' + longTerm.total + ' 个知识点</small></div></div>' +
       '<p class="tiny mastery-definition">一个知识点需在两个不同日期的到期复测中答对，才计入长期掌握；答错后重新安排复测。</p>' +
@@ -1931,12 +1997,15 @@
     }
     if (el.dataset.reviewStart) {
       const ongoing = window.LearningQuiz.practice();
-      const route = parseHash().route;
-      const base = route === 'reinforce' && ongoing ? ongoing :
-        route === 'spaced' ? window.LearningQuiz.spaced() : window.LearningQuiz.daily();
-      const wrong = (base && base.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; });
-      const ids = wrong.length ? wrong : (base && base.focusIds || (base && base.questions || []).map(function (q) { return q.termId; }));
-      window.LearningQuiz.startPractice(ids);
+      const daily = window.LearningQuiz.daily();
+      if (ongoing && !ongoing.completedAt && daily && ongoing.date === daily.date) { go('reinforce'); return; }
+      const dailyWrong = daily && daily.result ? Array.from(new Set(daily.responses.filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; }))) : [];
+      const base = parseHash().route === 'spaced' ? window.LearningQuiz.spaced() : daily;
+      const baseWrong = (base && base.responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; });
+      const ids = dailyWrong.length ? dailyWrong : baseWrong.length ? baseWrong :
+        (base && base.focusIds || (base && base.questions || []).map(function (q) { return q.termId; }));
+      if (!ids.length) { toast('当前没有需要巩固的知识点'); return; }
+      window.LearningQuiz.startPractice(ids, { sourceDailyDate: dailyWrong.length ? daily.date : '' });
       go('reinforce'); return;
     }
     if (el.dataset.reviewAnswer !== undefined) {
