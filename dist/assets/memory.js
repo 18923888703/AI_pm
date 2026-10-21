@@ -46,6 +46,7 @@
       plan: null,       // 今天这份清单：{date, items:[...]}
       planLog: {},      // date -> {total, done, min, lessonNo}
       quizVariants: {}, // termId -> 变式题历史
+      mentor: { signals: [], summary: null, supplements: {} },
       dailyLearning: null,
       learningPractice: null,
       spacedReview: {},
@@ -72,6 +73,7 @@
     filled.planLog = (o && o.planLog && typeof o.planLog === 'object') ? o.planLog : {};
     filled.plan = (o && o.plan && Array.isArray(o.plan.items)) ? o.plan : null;
     filled.quizVariants = (o && o.quizVariants && typeof o.quizVariants === 'object') ? o.quizVariants : {};
+    filled.mentor = (o && o.mentor && typeof o.mentor === 'object') ? o.mentor : { signals: [], summary: null, supplements: {} };
     filled.dailyLearning = (o && o.dailyLearning && typeof o.dailyLearning === 'object') ? o.dailyLearning : null;
     filled.learningPractice = (o && o.learningPractice && typeof o.learningPractice === 'object') ? o.learningPractice : null;
     filled.spacedReview = (o && o.spacedReview && typeof o.spacedReview === 'object') ? o.spacedReview : {};
@@ -247,22 +249,23 @@
 
   function progressRaw() {
     const t = S.terms;
+    const coreTerms = window.TERMS.filter(function (x) { return !x.optional; });
     let started = 0, mastered = 0;
-    window.TERMS.forEach(function (x) {
+    coreTerms.forEach(function (x) {
       const r = t[x.id];
       if (r && r.seen) started++;
       if (r && r.mastery >= 3.5) mastered++;
     });
     const stageStat = window.STAGES.map(function (s) {
-      const list = window.TERMS.filter(function (x) { return x.stage === s.id; });
+      const list = coreTerms.filter(function (x) { return x.stage === s.id; });
       const pct = list.length ? Math.round(list.filter(function (x) {
         const r = t[x.id]; return r && r.mastery >= 3.5;
       }).length / list.length * 100) : 0;
       return { stage: s, total: list.length, pct: pct };
     });
     return {
-      total: window.TERMS.length, started: started, mastered: mastered,
-      pct: Math.round(mastered / window.TERMS.length * 100),
+      total: coreTerms.length, started: started, mastered: mastered,
+      pct: Math.round(mastered / coreTerms.length * 100),
       quizAcc: S.meta.totalQuiz ? Math.round(S.meta.totalRight / S.meta.totalQuiz * 100) : null,
       stageStat: stageStat
     };
@@ -458,7 +461,7 @@
 
     /* 2) 热身复习：复习队列里优先级最高的 */
     const nReview = att.key === 'short' ? 2 : 3;
-    reviewQueueRaw(99).forEach(function (x) {
+    reviewQueueRaw(99).filter(function (x) { return !x.term.optional; }).forEach(function (x) {
       if (seq.filter(function (i) { return i.type !== 'checkpoint'; }).length >= nReview + carried) return;
       if (taken[x.term.id]) return;
       add({
@@ -602,14 +605,15 @@
     });
     const real = list.filter(function (l) { return l.kind === 'lesson'; });
     const realDone = real.filter(function (l) { return l.done; }).length;
-    const learnedCount = window.TERMS.filter(function (t) { return graduated(t.id); }).length;
-    const remainTerms = window.TERMS.length - learnedCount;
+    const coreTerms = window.TERMS.filter(function (t) { return !t.optional; });
+    const learnedCount = coreTerms.filter(function (t) { return graduated(t.id); }).length;
+    const remainTerms = coreTerms.length - learnedCount;
     const pace = paceToday();
     const etaDays = remainTerms === 0 ? 0 : Math.max(1, Math.ceil(remainTerms / Math.max(1, pace)));
 
     const byStage = window.STAGES.map(function (s) {
       const ls = list.filter(function (l) { return l.stage === s.id; });
-      const terms = window.TERMS.filter(function (t) { return t.stage === s.id; });
+      const terms = coreTerms.filter(function (t) { return t.stage === s.id; });
       return {
         stage: s, lessons: ls,
         totalTerms: terms.length,
@@ -639,7 +643,7 @@
       lessons: list, curNo: no, cur: no ? C.get(no) : null,
       realTotal: real.length, realDone: realDone,
       realNo: Math.min(realDone + 1, real.length),
-      totalTerms: window.TERMS.length, learnedCount: learnedCount, remainTerms: remainTerms,
+      totalTerms: coreTerms.length, learnedCount: learnedCount, remainTerms: remainTerms,
       totalMin: C.lessons.reduce(function (a, l) { return a + l.min; }, 0),
       pace: pace, etaDays: etaDays,
       byStage: byStage, week: week,
@@ -1047,16 +1051,20 @@
       return L.join('\n');
     },
 
-    pushChat(role, content, termId) {
+    pushChat(role, content, termId, signalId) {
       const c = S.chat;
-      c.push({ role: role, content: content, termId: termId || null, t: Date.now() });
+      c.push({ role: role, content: content, termId: termId || null, signalId: signalId || null, t: Date.now() });
       if (c.length > 120) c.splice(0, c.length - 120);
       save();
     },
     chatHistory(termId) {
-      return S.chat.filter(function (m) { return !termId || m.termId === termId; }).slice(-12);
+      return S.chat.filter(function (m) { return (m.termId || null) === (termId || null); }).slice(-40);
     },
-    clearChat() { S.chat = []; save(); },
+    clearChat(termId) {
+      if (arguments.length) S.chat = S.chat.filter(function (m) { return (m.termId || null) !== (termId || null); });
+      else S.chat = [];
+      save();
+    },
 
     detectSignal(text, termId) {
       if (!termId) return null;

@@ -8,6 +8,7 @@
 
 (function () {
   const CFG_KEY = 'aipm.llm.v1';
+  const structuredMode = {};
 
   const DEFAULT_CFG = {
     enabled: false,
@@ -27,6 +28,7 @@
   /* ---------- 系统提示词：注入长期记忆 ---------- */
   function buildSystem(term) {
     const brief = window.Mem.memoryBrief(term || null);
+    const mentorBrief = window.Mentor ? window.Mentor.profileText() : '';
     const adapt = term ? window.Mem.adaptFor(term) : null;
     const styleMap = {
       analogy: '这一轮请**先用类比**开场，再落到定义。',
@@ -57,6 +59,7 @@
       '6. 结尾可以反问一句「要不要我举个 XX 的例子？」来确认理解，但不要啰嗦。',
       '',
       brief,
+      mentorBrief ? ('【可见的学习信号】\n' + mentorBrief + '\n请据此改变讲法，不要把标签原样复述给学员。') : '',
       '',
       adaptNote,
       term ? ('【当前概念卡片】\n' + term.name + '（' + term.en + '）\n一句话：' + term.one + '\n类比：' + term.analogy) : '',
@@ -108,6 +111,119 @@
         } catch (e) { /* ignore keepalive */ }
       }
     }
+  }
+
+  async function complete(messages, signal, maxTokens, schema) {
+    const cfg = getCfg();
+    const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    const key = url + '|' + cfg.model;
+    const reasoner = /reasoner|thinking|(?:^|[-/])o[1-9](?:$|[-/])/.test(String(cfg.model).toLowerCase());
+    const modes = schema ? ['json_schema', 'json_object', 'plain'] : ['plain'];
+    const start = schema ? (structuredMode[key] || (reasoner ? 'plain' : 'json_schema')) : 'plain';
+    for (let i = Math.max(0, modes.indexOf(start)); i < modes.length; i++) {
+      const mode = modes[i];
+      const body = { model: cfg.model, messages: messages, stream: false,
+        max_tokens: reasoner ? Math.max(maxTokens || 1000, 4096) : maxTokens || 1000 };
+      if (!reasoner) body.temperature = Number(cfg.temperature);
+      if (mode === 'json_schema') body.response_format = { type: 'json_schema', json_schema: {
+        name: 'mentor_output', strict: true, schema: schema } };
+      if (mode === 'json_object') body.response_format = { type: 'json_object' };
+      const resp = await fetch(url, {
+        method: 'POST', signal: signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+        body: JSON.stringify(body)
+      });
+      if (!resp.ok) {
+        let message = '';
+        try { const data = await resp.json(); message = (data.error && data.error.message) || ''; }
+        catch (e) { /* HTTP 状态已经足够用于诊断 */ }
+        if (schema && (resp.status === 400 || resp.status === 422) && mode !== 'plain') {
+          structuredMode[key] = modes[i + 1];
+          continue;
+        }
+        throw new Error('HTTP ' + resp.status + (message ? ' ' + message : ''));
+      }
+      const data = await resp.json();
+      const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      const text = typeof content === 'string' ? content : Array.isArray(content)
+        ? content.map(function (part) { return typeof part === 'string' ? part : part.text || ''; }).join('') : '';
+      if (!text.trim()) {
+        if (schema && mode !== 'plain') { structuredMode[key] = modes[i + 1]; continue; }
+        throw new Error('模型没有返回可读内容');
+      }
+      if (schema && mode !== 'plain' && !parseObject(text)) {
+        structuredMode[key] = modes[i + 1];
+        continue;
+      }
+      if (schema) structuredMode[key] = mode;
+      return text.trim();
+    }
+    throw new Error('模型没有返回可用的结构化内容');
+  }
+
+  function parseObject(text) {
+    const raw = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    try { return JSON.parse(raw); } catch (e) { /* 部分兼容端点会在 JSON 前后增加说明 */ }
+    const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try { return JSON.parse(raw.slice(start, end + 1)); } catch (e) { /* 降级到纯文本 */ }
+    }
+    return null;
+  }
+
+  async function mentorTurn(messages, term, userText, signal) {
+    const diff = window.Mentor.DIFFICULTIES, styles = window.Mentor.STYLES;
+    const taxonomy = '请只输出 JSON 对象：{"reply":"给学员的回答","signals":{"difficulty":[],"style_worked":[],"understood":"partly","note":"具体卡点"}}。' +
+      'reply 用中文解释当前问题，先结论再说明，最多一个比喻；signals 同一轮完成判断，不另起评估调用。' +
+      'difficulty 只能从 ' + Object.keys(diff).join(',') + ' 中选；style_worked 只能从 ' + Object.keys(styles).join(',') +
+      ' 中选，没把握就空数组；understood 只能为 yes、partly、no；note 不超过 40 字。' +
+      '仅凭用户提问不能断定某种讲法已经有效，也不要把对方问了什么直接当成已经理解。';
+    const request = messages.slice();
+    request[0] = { role: 'system', content: request[0].content + '\n\n' + taxonomy };
+    const schema = { type: 'object', properties: {
+      reply: { type: 'string' }, signals: { type: 'object', properties: {
+        difficulty: { type: 'array', items: { type: 'string', enum: Object.keys(diff) } },
+        style_worked: { type: 'array', items: { type: 'string', enum: Object.keys(styles) } },
+        understood: { type: 'string', enum: ['yes', 'partly', 'no'] }, note: { type: 'string' }
+      }, required: ['difficulty', 'style_worked', 'understood', 'note'], additionalProperties: false }
+    }, required: ['reply', 'signals'], additionalProperties: false };
+    const raw = await complete(request, signal, 1300, schema);
+    const parsed = parseObject(raw);
+    if (parsed && (typeof parsed.reply !== 'string' || !parsed.reply.trim())) throw new Error('模型没有返回讲解内容');
+    if (!parsed && /^\s*[\[{]/.test(raw)) throw new Error('模型返回的结构化内容无法解析');
+    const reply = parsed && typeof parsed.reply === 'string' ? parsed.reply.trim() : raw;
+    const signals = parsed && parsed.signals && typeof parsed.signals === 'object'
+      ? parsed.signals : window.Mentor.infer(userText, term.id);
+    return { reply: reply, signals: signals };
+  }
+
+  async function summarizeLearner(profile, signals) {
+    const latest = (signals || []).slice(-20).map(function (s) {
+      return { termId: s.termId, difficulty: s.difficulty, styleWorked: s.styleWorked,
+        understood: s.understood, note: s.note };
+    });
+    const raw = await complete([
+      { role: 'system', content: '你在维护 AI PM 学习者画像。只输出 JSON：{"memory":"..."}。第三人称，120 字以内；只写对下一次讲解有用的反复困难、有效讲法和进步。只依据提供的信号，不补造经历。' },
+      { role: 'user', content: JSON.stringify({ previous: profile.summary && profile.summary.text || '',
+        difficulty: profile.topDifficulty, styles: profile.topStyle, signals: latest }) }
+    ], undefined, 450, { type: 'object', properties: { memory: { type: 'string' } },
+      required: ['memory'], additionalProperties: false });
+    const data = parseObject(raw);
+    return data && typeof data.memory === 'string' ? data.memory.trim().slice(0, 120) : '';
+  }
+
+  async function reteach(term, profile) {
+    const raw = await complete([
+      { role: 'system', content: buildSystem(term) + '\n\n学员已经看过标准讲解。请根据可见的学习信号换一种方式重讲，避免复述原有比喻和例子。最多 250 字。只输出 JSON：{"title":"10 字以内的讲法标题","text":"重讲正文"}。没有充分证据时不要声称某种讲法一定有效。' },
+      { role: 'user', content: JSON.stringify({ concept: { name: term.name, one: term.one, steps: term.steps,
+        analogy: term.analogy, example: term.example, pitfall: term.pitfalls, pm: term.pm },
+        difficulty: profile.topDifficulty, styles: profile.topStyle,
+        previous: profile.summary && profile.summary.text || '' }) }
+    ], undefined, 1000, { type: 'object', properties: { title: { type: 'string' }, text: { type: 'string' } },
+      required: ['title', 'text'], additionalProperties: false });
+    const data = parseObject(raw);
+    if (!data || typeof data.text !== 'string' || !data.text.trim()) return null;
+    return { title: String(data.title || '换个讲法').trim().slice(0, 24), text: data.text.trim(), mode: 'model' };
   }
 
   /* ---------- 离线兜底：基于内置知识库作答 ---------- */
@@ -233,6 +349,11 @@
 
     if (cfg.enabled && cfg.apiKey) {
       try {
+        if (term && window.Mentor) {
+          const result = await mentorTurn(messages, term, userText, signal);
+          onDelta(result.reply);
+          return { mode: 'llm', reply: result.reply, signals: result.signals };
+        }
         await stream(messages, onDelta, signal);
         return { mode: 'llm' };
       } catch (e) {
@@ -250,5 +371,5 @@
     return { mode: 'offline' };
   }
 
-  window.LLM = { getCfg, setCfg, ask, buildSystem, offlineAnswer };
+  window.LLM = { getCfg, setCfg, ask, buildSystem, offlineAnswer, summarizeLearner, reteach };
 })();

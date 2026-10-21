@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI PM 学院 · 从小白到独立交付</title>
-<link rel="stylesheet" href="assets/styles.css?v=24">
+<link rel="stylesheet" href="assets/styles.css?v=26">
 </head>
 <body>
 
@@ -50,12 +50,13 @@
     <div class="chat-head">
       <span>AI 追问</span>
       <span class="sub" id="chatCtx">未选择概念</span>
+      <button class="btn ghost sm" id="chatClear" aria-label="清空当前知识点的对话" title="清空当前对话">清空</button>
       <button class="btn ghost sm" style="margin-left:auto" id="chatClose">✕</button>
     </div>
     <div class="chat-body" id="chatBody"></div>
     <div class="chat-quick" id="chatQuick"></div>
     <div class="chat-foot">
-      <textarea class="chat-input" id="chatInput" placeholder="哪里没懂？直接问，比如「用一个餐厅的例子讲一下」"></textarea>
+      <textarea class="chat-input" id="chatInput" maxlength="2000" placeholder="哪里没懂？直接问，比如「用一个餐厅的例子讲一下」"></textarea>
       <div class="row">
         <span class="hint">Enter 发送 · Shift+Enter 换行</span>
         <span class="mode-pill" id="modePill">离线讲解</span>
@@ -80,18 +81,20 @@
 <script src="assets/data-adv.js?v=18"></script>
 <script src="assets/data-pro.js?v=6"></script>
 <script src="assets/data-pm.js?v=6"></script>
-<script src="assets/curriculum.js?v=8"></script>
+<script src="assets/data-extension.js?v=26"></script>
+<script src="assets/curriculum.js?v=26"></script>
 <script src="assets/knowledge-base.js?v=18"></script>
 <script src="assets/knowledge-relations.js?v=15"></script>
 <script src="assets/explanations.js?v=25"></script>
-<script src="assets/store.js?v=23"></script>
-<script src="assets/memory.js?v=23"></script>
+<script src="assets/store.js?v=26"></script>
+<script src="assets/memory.js?v=26"></script>
+<script src="assets/mentor.js?v=26"></script>
 <script src="assets/spaced-review.js?v=23"></script>
 <script src="assets/interview-core50.js?v=25"></script>
-<script src="assets/learning-quiz.js?v=25"></script>
+<script src="assets/learning-quiz.js?v=26"></script>
 <script src="assets/practice.js?v=20"></script>
 <script src="assets/interview-bank.js?v=25"></script>
-<script src="assets/llm.js?v=6"></script>
-<script src="assets/app.js?v=24"></script>
+<script src="assets/llm.js?v=26"></script>
+<script src="assets/app.js?v=26"></script>
 </body>
 </html>

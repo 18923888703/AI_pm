@@ -10,13 +10,16 @@ vm.createContext(context);
   'assets/data-adv.js',
   'assets/data-pro.js',
   'assets/data-pm.js',
+  'assets/data-extension.js',
   'assets/curriculum.js'
 ].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
 
 const terms = context.window.TERMS;
-assert.equal(terms.length, 61, '课程应包含 61 个知识点');
+assert.equal(terms.length, 76, '应包含 61 个主课知识点与 15 个延伸知识点');
+assert.equal(terms.filter((t) => !t.optional).length, 61);
+assert.equal(context.window.Curriculum.extension.length, 15);
 assert.equal(new Set(terms.map((t) => t.id)).size, terms.length, '知识点 ID 不应重复');
 
 const rerank = terms.find((t) => t.id === 'rerank');
@@ -30,8 +33,16 @@ assert.ok(evaluation.steps.length >= 6 && evaluation.pitfalls.length >= 4, 'Eval
 assert.ok(evaluation.related.includes('goldenset') && evaluation.related.includes('llmjudge') && evaluation.related.includes('rollout'));
 
 const ids = new Set(terms.map((t) => t.id));
+terms.forEach((term) => {
+  (term.related || []).forEach((id) => assert.ok(ids.has(id), `${term.id} 关联了不存在的概念：${id}`));
+  assert.ok(term.one && term.analogy && term.example && term.pm && term.steps.length >= 2 && term.quiz.length,
+    `${term.id} 的讲解或自测不完整`);
+});
 context.window.Curriculum.lessons.forEach((lesson) => {
-  lesson.ids.forEach((id) => assert.ok(ids.has(id), `课程引用了不存在的知识点：${id}`));
+  lesson.ids.forEach((id) => {
+    assert.ok(ids.has(id), `课程引用了不存在的知识点：${id}`);
+    assert.ok(!terms.find((t) => t.id === id).optional, `延伸知识不应改变既有主课：${id}`);
+  });
 });
 assert.ok(context.window.Curriculum.lessons.some((lesson) => lesson.kind === 'lesson' && lesson.ids.includes('rerank')));
 assert.ok(context.window.Curriculum.lessons.some((lesson) => lesson.kind === 'checkpoint' && lesson.ids.includes('rerank')));

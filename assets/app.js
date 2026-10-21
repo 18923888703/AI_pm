@@ -604,13 +604,14 @@
   function viewPath() {
     const sy = window.Mem.syllabus();
     const currentStage = sy.cur ? sy.cur.stage : 0;
+    const extensions = window.Curriculum.extension;
     let html = '<div class="page"><h1>学习路径</h1>' +
-      '<p class="lead"><b>' + window.TERMS.length + ' 个概念，' + window.STAGES.length + ' 个阶段</b>，' +
+      '<p class="lead"><b>' + sy.totalTerms + ' 个主课概念，' + extensions.length + ' 个延伸概念，' + window.STAGES.length + ' 个阶段</b>，' +
       '从「AI 到底是什么」一路走到「独立交付一份能上线、可评测、可回滚的 AI 产品方案」。' +
       '建议按顺序学；已经有基础，也可以直接挑工作里卡住的概念。</p>';
 
     window.STAGES.forEach(function (s) {
-      const items = window.TERMS.filter(function (t) { return t.stage === s.id; });
+      const items = window.TERMS.filter(function (t) { return !t.optional && t.stage === s.id; });
       const done = items.filter(function (t) { return window.Mem.graduated(t.id); }).length;
       html += '<details class="stage-block" id="stage-' + s.id + '"' + (s.id === currentStage ? ' open' : '') + '>' +
         '<summary><span class="stage-index">阶段 ' + (s.id + 1) + '</span>' +
@@ -627,6 +628,13 @@
       });
       html += '</div></div></details>';
     });
+    html += '<section class="extension-path"><h2>延伸知识 · ' + extensions.length + ' 个</h2>' +
+      '<p class="lead">这些概念可按工作需要单独学习，不改变主课程的完成进度。每个概念都能追问、测验和加入复习。</p>' +
+      '<div class="extension-grid">' + extensions.map(function (t) {
+        return '<button type="button" data-goto="term:' + escAttr(t.id) + '"><span>' + masteryDot(t.id) +
+          '<b>' + esc(t.name) + '</b><small>' + esc(window.STAGES[t.stage].name) + '</small></span>' +
+          '<em>' + esc(t.one) + '</em></button>';
+      }).join('') + '</div></section>';
     return html + '</div>';
   }
 
@@ -780,7 +788,7 @@
     });
 
     let html = '<div class="page"><h1>知识搜索</h1>' +
-      '<p class="lead">搜索课程术语与专题知识库。当前包含 <b>' + window.TERMS.length + '</b> 个核心概念和 <b>' +
+      '<p class="lead">搜索课程术语与专题知识库。当前包含 <b>' + window.Mem.syllabus().totalTerms + '</b> 个主课概念、<b>' + window.Curriculum.extension.length + '</b> 个延伸概念和 <b>' +
       window.KNOWLEDGE_BASE.length + '</b> 个延伸专题' +
       (q ? '，共匹配 <b>' + (list.length + kbList.length) + '</b> 项' : '') + '。</p>';
 
@@ -1052,8 +1060,58 @@
   function myTabs(active) {
     return '<div class="my-tabs" aria-label="我的学习分区">' +
       '<button class="' + (active === 'progress' ? 'active' : '') + '" data-route="my">学习进度</button>' +
+      '<button class="' + (active === 'profile' ? 'active' : '') + '" data-route="profile">导师画像</button>' +
       '<button class="' + (active === 'review' ? 'active' : '') + '" data-route="review">复习队列</button>' +
       '<button class="' + (active === 'settings' ? 'active' : '') + '" data-route="settings">设置与记忆</button></div>';
+  }
+
+  function viewMentorProfile() {
+    const p = window.Mentor.profile();
+    const recommendations = window.Mentor.recommend(6);
+    const names = function (id) { const term = T(id); return term ? term.name : id; };
+    let html = '<div class="page mentor-profile"><h1>我的学习</h1>' + myTabs('profile') +
+      '<h2>导师画像</h2><p class="lead">这里展示导师记下的具体信号。它会影响追问讲法和补充讲解；每次归纳都能回到原始记录核对。</p>' +
+      '<div class="mentor-profile-stats"><div><b>' + p.signalCount + '</b><span>学习信号</span></div>' +
+      '<div><b>' + p.status.got + '</b><span>已掌握概念</span></div>' +
+      '<div><b>' + p.status.confused + '</b><span>当前卡住</span></div>' +
+      '<div><b>' + p.quizRight + '/' + (p.quizRight + p.quizWrong) + '</b><span>答题正确</span></div></div>';
+    html += '<section class="mentor-summary"><div class="mentor-section-label">当前画像</div>' +
+      (p.summary && p.summary.text
+        ? '<p>' + esc(p.summary.text) + '</p><div class="tiny">' +
+          (p.summary.mode === 'model' ? '在线模型归纳' : '依据学习信号整理') + ' · ' + new Date(p.summary.at).toLocaleString('zh-CN') + '</div>'
+        : '<p class="muted">还没有足够记录。追问或做题累积 6 条信号后，这里会形成一份简短画像。</p>') +
+      '</section>';
+    function bars(title, rows, empty) {
+      const max = Math.max(1, ...rows.map(function (x) { return x.score; }));
+      return '<section class="mentor-bars"><h2>' + title + '</h2>' +
+        (rows.some(function (x) { return x.score > 0; })
+          ? rows.map(function (x) {
+            return '<div class="mentor-bar-row"><span>' + esc(x.label) + '</span><div class="bar"><i style="width:' +
+              Math.round(x.score / max * 100) + '%"></i></div><b>' + x.score + '</b></div>';
+          }).join('') : '<p class="tiny">' + empty + '</p>') + '</section>';
+    }
+    html += bars('常见困难', p.difficulty, '暂无足够信号；可以在任一知识点追问哪里没懂。') +
+      bars('有效讲法', p.style, '只有能判断讲法确实有帮助时才会记录。');
+    html += '<section class="mentor-next"><h2>接下来学什么</h2><p class="tiny">卡住的概念优先；其余按先修、薄弱类别和刚学会的内容排序。今日课程计划仍按当天进度执行。</p>' +
+      '<div class="mentor-next-list">' + recommendations.map(function (x) {
+        return '<button type="button" data-goto="term:' + escAttr(x.id) + '"><span><b>' + esc(x.name) + '</b>' +
+          '<small>' + esc(x.why) + (x.missing.length ? ' · 先补 ' + esc(x.missing.map(names).join('、')) : '') +
+          '</small></span><span aria-hidden="true">→</span></button>';
+      }).join('') + '</div></section>';
+    html += '<section class="mentor-evidence"><h2>最近的学习信号</h2>' +
+      (p.recent.length ? '<div class="mentor-signal-list">' + p.recent.map(function (s) {
+        const diff = (s.difficulty || []).map(function (key) { return window.Mentor.DIFFICULTIES[key]; }).filter(Boolean);
+        const style = (s.styleWorked || []).map(function (key) { return window.Mentor.STYLES[key]; }).filter(Boolean);
+        const understood = { yes: '已理解', partly: '仍在理解', no: '还没懂' }[s.understood] || '仍在理解';
+        return '<div class="mentor-signal-row"><div><button type="button" data-goto="term:' + escAttr(s.termId) + '">' +
+          esc(names(s.termId)) + '</button><span>' + new Date(s.at).toLocaleDateString('zh-CN') + '</span></div>' +
+          '<p>' + esc(s.note || '未记录具体备注') + '</p><small>' + esc(understood) +
+          (diff.length ? ' · 困难：' + esc(diff.join('、')) : '') +
+          (style.length ? ' · 有效讲法：' + esc(style.join('、')) : '') +
+          ' · ' + (s.source === 'quiz' ? '来自答题' : s.source === 'chat-model' ? '在线导师判断' : '依据追问整理') + '</small></div>';
+      }).join('') + '</div>' : '<div class="empty">还没有学习信号。打开知识点提问或答题后会显示在这里。</div>') +
+      '</section><p class="tiny">学习信号随现有记忆文件同步；在「设置与记忆」可导出或清空全部记录。</p></div>';
+    return html;
   }
 
   function viewReview() {
@@ -1200,7 +1258,7 @@
       '<div class="callout"><span class="emo">🧠</span><div class="ct"><b>记忆是怎么影响你的体验的</b><br>' +
       '· 某类内容健康度低于 55% → 打开该类术语时自动进入<b>小白模式</b><br>' +
       '· 标记不懂 / 答错 → 该术语进入复习队列顶部<br>' +
-      '· 在 AI 追问里说「没懂」→ 我会自动记一笔，并调整之后的讲法<br>' +
+      '· 追问与答题会形成可见学习信号；积累后归纳画像，在「导师画像」里逐条核对<br>' +
       '· 这些数据只存在你自己的浏览器里，可以在「设置与记忆」里导出或清空。</div></div>';
 
     return html + '</div>';
@@ -1331,7 +1389,7 @@
       '<div class="term-en">' + esc(t.en) + '</div>' +
       '<div class="term-meta">' +
       '<span class="tag" style="background:' + cat.color + '14;color:' + cat.color + '">' + cat.name + '</span>' +
-      '<span class="tag">第 ' + (window.Curriculum.lessonNoOf(t.id) || '?') + ' 课 · ' + esc(window.STAGES[t.stage].name) + '</span>' +
+      '<span class="tag">' + (t.optional ? '延伸知识' : '第 ' + window.Curriculum.lessonNoOf(t.id) + ' 课') + ' · ' + esc(window.STAGES[t.stage].name) + '</span>' +
       '<span class="tag">难度 ' + '●'.repeat(t.level) + '○'.repeat(5 - t.level) + '</span>' +
       '</div></div>';
 
@@ -1383,6 +1441,8 @@
         t.pitfalls.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul></div>';
     }
 
+    html += mentorSupplementHTML(t);
+
     // 测验
     html += '<div class="divider"></div><h2>小测验</h2>' +
       '<p class="tiny" style="margin-top:-4px">每次只抽一道；答对后下次会换一种问法复测，选项数量和顺序不固定。</p>';
@@ -1409,6 +1469,40 @@
 
     html += '<div style="height:40px"></div></div>';
     return html;
+  }
+
+  function mentorSupplementHTML(t) {
+    const saved = window.Mentor.getSupplement(t.id);
+    const p = window.Mentor.profile();
+    const hint = p.topDifficulty[0] ? '最近常卡在「' + p.topDifficulty[0].label + '」；这次会换一个角度。'
+      : '可以先读完标准讲解，再让导师结合你的学习记录换一种方式说明。';
+    return '<section class="mentor-reteach"><div class="mentor-reteach-head"><div><span class="mentor-section-label">个性化讲解</span>' +
+      '<h2>换个讲法</h2></div><span class="tiny">' + (saved ? '已保存 · 相同画像直接复用' : '根据当前学习画像') + '</span></div>' +
+      '<div id="mentorSupplement">' + (saved ? mentorSupplementResultHTML(saved) : '<p class="muted">' + esc(hint) + '</p>' +
+        '<button type="button" class="btn primary" data-supplement="1">按我的方式讲一遍</button>') + '</div></section>';
+  }
+
+  function mentorSupplementResultHTML(saved) {
+    return '<div class="mentor-reteach-result"><b>' + esc(saved.title) + '</b><div>' + md(saved.text) + '</div></div>' +
+      '<div class="mentor-reteach-actions"><span class="tiny">' + (saved.mode === 'model' ? '在线模型重讲' : '根据课程内容整理') +
+      '</span><button type="button" class="btn sm ghost" data-supplement="force">重新生成</button></div>';
+  }
+
+  async function showSupplement(termId, force) {
+    const box = $('#mentorSupplement');
+    if (!box || !currentTerm || currentTerm.id !== termId) return;
+    box.innerHTML = '<p class="muted" role="status">正在结合你的学习记录整理讲解…</p>';
+    try {
+      const result = await window.Mentor.supplement(termId, force);
+      if (currentTerm && currentTerm.id === termId && $('#mentorSupplement')) {
+        $('#mentorSupplement').innerHTML = mentorSupplementResultHTML(result);
+      }
+    } catch (e) {
+      if (currentTerm && currentTerm.id === termId && $('#mentorSupplement')) {
+        $('#mentorSupplement').innerHTML = '<p class="muted">暂时没能生成讲解，请稍后再试。</p>' +
+          '<button type="button" class="btn" data-supplement="1">重试</button>';
+      }
+    }
   }
 
   /* ============================================================
@@ -1477,7 +1571,7 @@
       '<div class="card"><div class="field">' +
       '<div class="switch' + (cfg.enabled ? ' on' : '') + '" id="swEnable"><div class="track"><i></i></div>' +
       '<div><div style="font-size:13.5px;font-weight:500">启用在线大模型</div>' +
-      '<div class="desc">不开启也能用——会用内置知识库离线讲解。开启后支持真正的自由追问。</div></div></div></div>' +
+      '<div class="desc">不开启也能用内置知识库讲解。开启后，追问会同时给出回答和学习信号，并支持按画像重讲。</div></div></div></div>' +
       '<div class="field"><label>API Base URL</label>' +
       '<input type="text" id="cfgUrl" value="' + esc(cfg.baseUrl) + '" placeholder="https://api.openai.com/v1">' +
       '<div class="desc">任意 OpenAI 兼容端点。例如 DeepSeek: https://api.deepseek.com/v1 ；Moonshot: https://api.moonshot.cn/v1 ；本地 Ollama: http://localhost:11434/v1</div></div>' +
@@ -1548,9 +1642,9 @@
 
     html += '<div class="divider"></div>' +
       '<div class="callout"><span class="emo">🔒</span><div class="ct"><b>关于隐私</b><br>' +
-      '· 学习记录、练习答案、面试分数、对话历史、API Key 全部存在本机，不上传给任何第三方。<br>' +
+      '· 学习记录、练习答案、面试分数、对话历史和 API Key 保存在本机浏览器，可自行导出或清空。<br>' +
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
-      '· 启用在线模型后，你发送的问题和当前概念的讲解材料才会发给你配置的模型厂商。<br>' +
+      '· 启用在线模型后，问题、当前概念、相关对话与学习画像摘要会发送给你配置的模型厂商，用于回答、归纳和重讲。<br>' +
       '· 随时可以导出、回滚、清空。</div></div>';
 
     return html + '</div>';
@@ -1604,7 +1698,7 @@
       home: '今日学习', learn: '今日学习', reinforce: '巩固复习', spaced: '到期复测', plan: '学习计划', path: '学习路径', dict: '术语词典',
       practice: '实战练习', 'practice-detail': '实战练习', interview: '面试测评',
       kb: '专题知识库', 'kb-topic': '专题知识库',
-      my: '我的学习', review: '我的学习', mastery: '我的学习', settings: '我的学习'
+      my: '我的学习', profile: '导师画像', review: '我的学习', mastery: '我的学习', settings: '我的学习'
     };
     try {
       if (r.route === 'term') html = viewTerm(r.id);
@@ -1620,6 +1714,7 @@
       else if (r.route === 'practice-detail') html = viewPracticeDetail(r.id);
       else if (r.route === 'interview') html = viewInterview();
       else if (r.route === 'review') html = viewReview();
+      else if (r.route === 'profile') html = viewMentorProfile();
       else if (r.route === 'mastery' || r.route === 'my') html = viewMastery();
       else if (r.route === 'settings') html = viewSettings();
       else html = viewHome();
@@ -1654,7 +1749,7 @@
         (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (r.route === 'kb-topic' && el.dataset.route === 'kb') ||
-        (['review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
+        (['profile', 'review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.mobile-nav [data-route]').forEach(function (el) {
@@ -1662,7 +1757,7 @@
         (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
-        (['review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
+        (['profile', 'review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.tree-item').forEach(function (el) {
@@ -1724,8 +1819,13 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement]');
     if (!el) return;
+
+    if (el.dataset.supplement !== undefined && currentTerm) {
+      void showSupplement(currentTerm.id, el.dataset.supplement === 'force');
+      return;
+    }
 
     if (el.dataset.kbPan !== undefined || el.dataset.kbCenter !== undefined) {
       const map = document.querySelector('.kb-overview-map-scroll');
@@ -1882,7 +1982,12 @@
     if (el.dataset.fb && currentTerm) {
       const kind = el.dataset.fb;
       if (kind === 'cleared') { window.Mem.cleared(currentTerm.id, currentTerm.cat, 'button'); toast('已记录：' + currentTerm.name + ' 已掌握 ✅'); }
-      else { window.Mem.confused(currentTerm.id, currentTerm.cat, 'button'); toast('已记录：你对这个概念还有困难，我会多提醒你复习 📌'); }
+      else {
+        window.Mem.confused(currentTerm.id, currentTerm.cat, 'button');
+        window.Mentor.record(currentTerm.id, { difficulty: [], style_worked: [], understood: 'no', note: '主动标记这个概念仍没弄懂' }, 'button');
+        if (!window.Mentor.getSupplement(currentTerm.id)) void showSupplement(currentTerm.id, false);
+        toast('已记录：你对这个概念还有困难，我会多提醒你复习 📌');
+      }
       checkPlanDone(currentTerm.id);
       updatePlanUI();
       return;
@@ -2037,8 +2142,6 @@
     $('#chat').setAttribute('aria-hidden', 'false');
     $('#toggleChat').setAttribute('aria-expanded', 'true');
     updateChatCtx();
-    const b = $('#chatBody');
-    if (!b.children.length) welcomeMsg();
     setTimeout(function () { $('#chatInput').focus(); }, 50);
   }
   function closeChat() {
@@ -2062,6 +2165,39 @@
       ? ['举个生活例子', '为什么需要它', '用一个 8 岁小孩能懂的比喻', '它和别的方案比有什么代价']
       : ['我该从哪开始学', 'Agent 和 Chatbot 有什么区别', '给我一个学习路线'];
     q.innerHTML = qs.map(function (x) { return '<span class="q">' + x + '</span>'; }).join('');
+    const history = window.Mem.chatHistory(currentTerm ? currentTerm.id : null);
+    const clear = $('#chatClear');
+    clear.disabled = !history.length || streaming;
+    clear.title = currentTerm ? '清空「' + currentTerm.name + '」的对话' : '清空未选择概念时的对话';
+    if (!streaming && !$('#chat').classList.contains('hidden') && renderedChatContext !== (currentTerm ? currentTerm.id : null)) renderChatHistory();
+  }
+
+  let renderedChatContext = undefined;
+
+  function signalHTML(sig) {
+    if (!sig) return '';
+    const diff = (sig.difficulty || []).map(function (key) { return window.Mentor.DIFFICULTIES[key]; }).filter(Boolean);
+    const styles = (sig.styleWorked || []).map(function (key) { return window.Mentor.STYLES[key]; }).filter(Boolean);
+    const parts = [];
+    if (diff.length) parts.push('困难：' + diff.join('、'));
+    if (styles.length) parts.push('有效讲法：' + styles.join('、'));
+    if (!parts.length) parts.push('理解状态：' + ({ yes: '已理解', partly: '继续观察', no: '还没懂' }[sig.understood] || '继续观察'));
+    return '<div class="signal">🧠 导师记录 · ' + esc(parts.join(' · ')) + '</div>';
+  }
+
+  function renderChatHistory() {
+    const b = $('#chatBody');
+    b.innerHTML = '';
+    renderedChatContext = currentTerm ? currentTerm.id : null;
+    const history = window.Mem.chatHistory(currentTerm ? currentTerm.id : null);
+    if (!history.length) { welcomeMsg(); return; }
+    const signals = window.Mentor.state().signals;
+    history.forEach(function (m) {
+      const bubble = addMsg(m.role === 'user' ? 'user' : 'ai', m.role === 'user' ? m.content : md(m.content));
+      const sig = m.signalId ? signals.find(function (s) { return s.id === m.signalId; }) : null;
+      if (sig) bubble.parentNode.insertAdjacentHTML('beforeend', signalHTML(sig));
+    });
+    b.scrollTop = b.scrollHeight;
   }
 
   function welcomeMsg() {
@@ -2087,6 +2223,9 @@
 
   async function send(text) {
     if (streaming || !text.trim()) return;
+    if (text.length > 2000) { toast('一次提问请控制在 2000 字以内'); return; }
+    const termAtSend = currentTerm;
+    const termId = termAtSend ? termAtSend.id : null;
     streaming = true;
     $('#chatSend').disabled = true;
     addMsg('user', text);
@@ -2100,36 +2239,32 @@
     // 记录追问偏好（习惯画像的输入）
     window.Mem.logAsk(text);
 
-    const res = await window.LLM.ask(text, currentTerm, function (delta) {
+    const res = await window.LLM.ask(text, termAtSend, function (delta) {
       acc += delta;
       bubble.innerHTML = md(acc) + '<span class="cursor"></span>';
       const b = $('#chatBody'); b.scrollTop = b.scrollHeight;
     }, abortCtl.signal);
 
-    bubble.innerHTML = md(acc);
+    const answerText = acc || res.fallback || '';
+    bubble.innerHTML = md(answerText);
     $('#chatSend').disabled = false;
     streaming = false;
 
     if (res.mode === 'error') {
-      bubble.innerHTML = md(acc || res.fallback || '') +
+      bubble.innerHTML = md(answerText) +
         '<div class="signal">⚠️ 在线调用失败：' + esc(res.error) + '。已切换为离线讲解，可到设置检查 API 配置。</div>';
     }
     if (res.mode !== 'abort') {
-      window.Mem.pushChat('user', text, currentTerm ? currentTerm.id : null);
-      window.Mem.pushChat('assistant', acc, currentTerm ? currentTerm.id : null);
-      // 从对话里抽取学习信号
-      const sig = window.Mem.detectSignal(text, currentTerm ? currentTerm.id : null);
-      if (sig) {
-        const s = document.createElement('div');
-        s.className = 'signal';
-        s.innerHTML = sig === 'confused'
-          ? '🧠 已记入记忆：你对「' + esc(currentTerm.name) + '」还有困难，之后会进入复习队列并自动简化讲法'
-          : '🧠 已记入记忆：「' + esc(currentTerm.name) + '」标记为已理解';
-        bubble.parentNode.appendChild(s);
-        renderSidebar();
-        updateChatCtx();
-      }
+      const signal = termId ? window.Mentor.record(termId,
+        res.signals || window.Mentor.infer(text, termId), res.signals ? 'chat-model' : 'chat-rule') : null;
+      window.Mem.pushChat('user', text, termId);
+      window.Mem.pushChat('assistant', answerText, termId, signal ? signal.id : null);
+      if (termId) window.Mem.detectSignal(text, termId);
+      if (signal && bubble.isConnected) bubble.parentNode.insertAdjacentHTML('beforeend', signalHTML(signal));
+      renderSidebar();
+      if ((currentTerm ? currentTerm.id : null) !== termId) renderChatHistory();
     }
+    updateChatCtx();
     $('#chatBody').scrollTop = $('#chatBody').scrollHeight;
   }
 
@@ -2145,6 +2280,15 @@
   $('#toggleChat').onclick = function () {
     const c = $('#chat');
     if (c.classList.contains('hidden')) openChat(); else closeChat();
+  };
+  $('#chatClear').onclick = function () {
+    const id = currentTerm ? currentTerm.id : null;
+    const label = currentTerm ? '「' + currentTerm.name + '」' : '当前全局';
+    if (!window.Mem.chatHistory(id).length || !confirm('清空' + label + '对话？导师画像里的学习信号会保留。')) return;
+    window.Mem.clearChat(id);
+    renderChatHistory();
+    updateChatCtx();
+    toast('当前对话已清空');
   };
   $('#chatClose').onclick = closeChat;
 

@@ -743,7 +743,7 @@ body.simple-mode .simple-only{display:block}
 .wrong-list summary{padding:11px 2px;cursor:pointer;font-size:13.5px;font-weight:550}
 .wrong-list p{font-size:13px;color:var(--text-2);margin:5px 0 10px;padding-left:16px}
 
-.my-tabs{display:flex;gap:4px;margin:10px 0 30px;border-bottom:1px solid var(--border)}
+.my-tabs{display:flex;gap:4px;margin:10px 0 30px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:thin}
 .my-tabs button{border:0;background:transparent;padding:9px 12px;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .my-tabs button:hover{color:var(--text);background:var(--bg-soft)}
 .my-tabs button.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
@@ -986,6 +986,54 @@ body.simple-mode .simple-only{display:block}
 
 .mobile-nav{display:none}
 
+/* 导师画像：沿用阅读页的墨色与蓝色，用信号证据形成层级。 */
+.mentor-section-label{display:block;font-size:11px;font-weight:650;letter-spacing:.06em;color:var(--blue);margin-bottom:3px}
+.mentor-reteach{border:1px solid rgba(35,131,226,.19);background:rgba(35,131,226,.035);border-radius:10px;padding:18px 20px;margin:30px 0}
+.mentor-reteach-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+.mentor-reteach h2{font-size:18px;margin:0}
+.mentor-reteach p{margin:0 0 15px;font-size:14px;line-height:1.75}
+.mentor-reteach-result{font-size:14px;line-height:1.8;color:var(--text-2)}
+.mentor-reteach-result > b{display:block;color:var(--text);font-size:15px;margin-bottom:7px}
+.mentor-reteach-result > div{white-space:pre-line;overflow-wrap:anywhere}
+.mentor-reteach-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:10px;border-top:1px solid rgba(35,131,226,.12)}
+.mentor-profile-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:23px 0 30px}
+.mentor-profile-stats > div{display:flex;flex-direction:column;padding:13px 18px;border-right:1px solid var(--border);font-variant-numeric:tabular-nums}
+.mentor-profile-stats > div:first-child{padding-left:0}
+.mentor-profile-stats > div:last-child{border-right:0}
+.mentor-profile-stats b{font-size:24px;line-height:1.2;font-weight:650;letter-spacing:-.03em}
+.mentor-profile-stats span{font-size:12px;color:var(--text-3);margin-top:4px}
+.mentor-summary{background:var(--bg-soft);border-left:3px solid var(--blue);padding:18px 20px;border-radius:0 8px 8px 0}
+.mentor-summary p{font-size:15px;line-height:1.8;margin:6px 0 8px}
+.mentor-bars h2,.mentor-next h2,.mentor-evidence h2{margin-top:34px}
+.mentor-bar-row{display:grid;grid-template-columns:165px minmax(0,1fr) 32px;align-items:center;gap:12px;min-height:34px;font-size:13px;color:var(--text-2)}
+.mentor-bar-row .bar{margin:0;height:7px}
+.mentor-bar-row .bar i{background:var(--blue)}
+.mentor-bars:nth-of-type(3) .mentor-bar-row .bar i{background:var(--green)}
+.mentor-bar-row b{font-size:12px;text-align:right;color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.mentor-next-list{border-top:1px solid var(--border);margin-top:14px}
+.mentor-next-list button{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:56px;padding:9px 4px;text-align:left;border:0;border-bottom:1px solid var(--border);background:transparent;cursor:pointer;color:var(--text)}
+.mentor-next-list button:hover{background:rgba(35,131,226,.055)}
+.mentor-next-list button > span:first-child{min-width:0}
+.mentor-next-list b{display:block;font-size:14px;font-weight:600}
+.mentor-next-list small{display:block;font-size:12px;line-height:1.5;color:var(--text-3)}
+.mentor-next-list button > span:last-child{color:var(--blue);font-size:18px}
+.mentor-signal-list{border-top:1px solid var(--border);margin-top:14px}
+.mentor-signal-row{padding:13px 0;border-bottom:1px solid var(--border)}
+.mentor-signal-row > div{display:flex;align-items:baseline;gap:12px}
+.mentor-signal-row button{border:0;background:transparent;color:var(--blue);padding:0;font-weight:600;cursor:pointer;font-size:13px}
+.mentor-signal-row button:hover{text-decoration:underline}
+.mentor-signal-row span,.mentor-signal-row small{color:var(--text-3);font-size:11.5px}
+.mentor-signal-row p{font-size:13px;margin:5px 0 2px;line-height:1.6;overflow-wrap:anywhere}
+.extension-path{margin-top:42px;padding-top:8px;border-top:1px solid var(--border)}
+.extension-path .lead{font-size:14px;margin-bottom:16px}
+.extension-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.extension-grid button{min-height:88px;padding:12px 14px;text-align:left;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer}
+.extension-grid button:hover,.extension-grid button:focus-visible{border-color:var(--blue);background:rgba(35,131,226,.055)}
+.extension-grid button > span{display:flex;align-items:center;gap:7px;min-width:0}
+.extension-grid b{font-size:13.5px;font-weight:600}
+.extension-grid small{font-size:11px;color:var(--text-3);margin-left:auto}
+.extension-grid em{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px;font-style:normal;color:var(--text-2);line-height:1.5;margin-top:5px}
+
 /* ---------- responsive ---------- */
 @media (max-width:1180px){
   :root{--chat-w:340px}
@@ -1089,6 +1137,17 @@ body.simple-mode .simple-only{display:block}
   .interview-plan-strip{align-items:flex-start;flex-direction:column}
   .interview-plan-strip .btn{width:100%;height:38px;justify-content:center}
   .grid2,.rec-grid{grid-template-columns:1fr}
+  .my-tabs{margin-bottom:22px}
+  .my-tabs button{flex:0 0 auto;padding:10px 9px;font-size:13px}
+  .mentor-profile-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mentor-profile-stats > div{padding:12px 10px;border-bottom:1px solid var(--border)}
+  .mentor-profile-stats > div:nth-child(2){border-right:0}
+  .mentor-profile-stats > div:nth-child(n+3){border-bottom:0}
+  .mentor-profile-stats > div:nth-child(3){padding-left:0}
+  .mentor-bar-row{grid-template-columns:120px minmax(0,1fr) 24px;gap:8px;font-size:12px}
+  .mentor-reteach{padding:15px 14px}
+  .mentor-reteach-head{flex-direction:column;gap:4px}
+  .extension-grid{grid-template-columns:1fr}
 }
 
 @media (prefers-reduced-motion:reduce){

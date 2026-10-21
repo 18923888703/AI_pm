@@ -177,6 +177,20 @@
       function (c) { return c.t + '|' + c.role; }
     ).sort(function (x, y) { return x.t - y.t; }).slice(-120);
 
+    const mentorA = a.mentor || {}, mentorB = b.mentor || {};
+    const summaries = [mentorA.summary, mentorB.summary].filter(Boolean).sort(function (x, y) { return (y.at || 0) - (x.at || 0); });
+    const supplements = Object.assign({}, mentorA.supplements || {});
+    Object.keys(mentorB.supplements || {}).forEach(function (key) {
+      const incoming = mentorB.supplements[key];
+      if (!supplements[key] || (incoming.at || 0) >= (supplements[key].at || 0)) supplements[key] = incoming;
+    });
+    out.mentor = {
+      signals: unionBy([].concat(mentorA.signals || [], mentorB.signals || []), function (s) { return s.id; })
+        .sort(function (x, y) { return x.at - y.at; }).slice(-300),
+      summary: summaries[0] || null,
+      supplements: supplements
+    };
+
     const mergedTerms = JSON.parse(JSON.stringify(a.terms || {}));
     Object.keys(b.terms || {}).forEach(function (id) {
       const x = b.terms[id];

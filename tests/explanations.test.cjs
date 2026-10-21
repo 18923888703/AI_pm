@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ctx = { window: { Mem: { state: {}, save() {}, completeDailyQuiz() {} } }, console };
 vm.createContext(ctx);
-['data-core', 'data-adv', 'data-pro', 'data-pm', 'explanations', 'learning-quiz', 'practice', 'interview-bank'].forEach(file => {
+['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'explanations', 'interview-core50', 'learning-quiz', 'practice', 'interview-bank'].forEach(file => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets/' + file + '.js'), 'utf8'), ctx);
 });
 const { Explanations, LearningQuiz, TERMS, INTERVIEW_BANK } = ctx.window;

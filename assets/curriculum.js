@@ -98,6 +98,7 @@
     lessons: lessons,
     /** 非检查点的正式课，用于「第几课 / 共几课」这种人类可读的计数 */
     real: lessons.filter(function (l) { return l.kind === 'lesson'; }),
+    extension: window.TERMS.filter(function (t) { return !!t.optional; }),
     total: lessons.length,
     get: function (no) { return lessons.find(function (l) { return l.no === no; }); },
     stageList: function (stage) { return lessons.filter(function (l) { return l.stage === stage; }); },
