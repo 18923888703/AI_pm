@@ -897,8 +897,9 @@
   function practiceStatus(id) {
     const r = window.Lab.practiceRec(id);
     if (window.Lab.practiceDone(id)) return { label: '已完成', cls: 'green' };
+    if (window.Lab.practicePhase(id) === 'learn') return { label: '先学案例', cls: '' };
     if ((r.answer || '').trim() || r.decision != null || r.rating != null) return { label: '进行中', cls: 'orange' };
-    return { label: '未开始', cls: '' };
+    return { label: '待作答', cls: 'orange' };
   }
 
   function viewPractice() {
@@ -906,7 +907,7 @@
     const tracks = [];
     window.PRACTICES.forEach(function (p) { if (tracks.indexOf(p.track) < 0) tracks.push(p.track); });
     let html = '<div class="page"><h1>实战练习</h1>' +
-      '<p class="lead">把课件里的方法变成可以真正动手的任务。每题都要求你写方案、做关键判断，再按检查表自评。</p>' +
+      '<p class="lead">先看两个相邻案例，理解方法后独立写方案；提交后再看针对你原文的分析、检查点和参考拆解。</p>' +
       '<div class="practice-overview"><div><b>' + pg.done + ' / ' + pg.total + '</b><span>已完成</span></div>' +
       '<div class="practice-overview-bar"><i style="width:' + pg.pct + '%"></i></div>' +
       '<button class="btn sm" data-route="interview">去做面试测评 →</button></div>';
@@ -931,18 +932,55 @@
     const p = window.Lab.exercise(id);
     if (!p) return '<div class="page"><div class="empty">找不到这个练习<br><br><button class="btn" data-route="practice">返回练习列表</button></div></div>';
     const r = window.Lab.practiceRec(id);
+    const phase = window.Lab.practicePhase(id);
     let html = '<div class="page practice-page"><div class="practice-head">' +
       '<div><h1>' + esc(p.title) + '</h1><p class="lead">' + esc(p.source) + ' · 约 ' + p.min + ' 分钟</p></div>' +
       '<button class="btn sm ghost" data-route="practice">返回练习列表</button></div>' +
-      '<div class="case-block"><b>场景</b><p>' + esc(p.scenario) + '</p></div>' +
-      '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p></div>' +
+      '<nav class="practice-steps" aria-label="练习步骤">' +
+      '<span class="' + (phase === 'learn' ? 'active' : 'done') + '">1 · 学案例</span>' +
+      '<span class="' + (phase === 'write' ? 'active' : phase === 'review' ? 'done' : '') + '">2 · 自己写</span>' +
+      '<span class="' + (phase === 'review' ? 'active' : '') + '">3 · 看分析</span></nav>';
+
+    const examples = window.PracticeCoach.examples(id);
+    if (phase === 'learn') {
+      html += '<section class="practice-learn"><h2>先看两个案例</h2><p class="muted small">案例讲判断方法，和你要完成的任务是不同场景。</p>' +
+        examples.map(function (x, i) { return '<article class="practice-example"><div class="practice-example-index">案例 0' + (i + 1) + '</div>' +
+          '<h3>' + esc(x.title) + '</h3><p class="practice-example-scene">' + esc(x.scene) + '</p>' +
+          '<div class="practice-example-worked"><b>怎么想、怎么做</b><p>' + esc(x.worked) + '</p></div>' +
+          '<p class="practice-example-takeaway">记住：' + esc(x.lesson) + '</p></article>'; }).join('') +
+        '<button type="button" class="btn primary practice-main-action" data-practice-begin="' + escAttr(id) + '">看完案例，开始自己写 →</button></section>';
+      return html + '</div>';
+    }
+
+    if (phase === 'write') {
+      html += '<details class="practice-example-review"><summary>回看刚才的两个案例</summary>' + examples.map(function (x) {
+        return '<p><b>' + esc(x.title) + '</b> · ' + esc(x.lesson) + '</p>';
+      }).join('') + '</details>' +
+        '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
+        '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p></div>' +
       '<label class="practice-label" for="practiceAnswer">写下你的方案</label>' +
-      '<textarea id="practiceAnswer" class="practice-answer" placeholder="先独立作答，再查看参考拆解。建议写出判断依据，不只写结论。">' + esc(r.answer || '') + '</textarea>' +
-      '<div class="practice-save-row"><span class="tiny">答案只保存在当前浏览器。</span>' +
-      '<button class="btn primary" data-practice-save="' + p.id + '">保存答案</button></div>' +
-      '<h2>交付前检查</h2><div class="check-list">' + p.checkpoints.map(function (x) {
-        return '<div><span>□</span>' + esc(x) + '</div>';
-      }).join('') + '</div>' +
+        '<textarea id="practiceAnswer" class="practice-answer" maxlength="6000" placeholder="先写你的判断依据、具体做法和失败时怎么办。提交前不会显示参考拆解。">' + esc(r.answer || '') + '</textarea>' +
+        '<div class="practice-save-row"><span class="tiny">草稿保存在当前浏览器；至少写 40 字才能提交。</span>' +
+        '<div><button class="btn" data-practice-save="' + escAttr(id) + '">保存草稿</button> ' +
+        '<button class="btn primary" data-practice-submit="' + escAttr(id) + '">提交并分析 →</button></div></div>' +
+        '<p class="tiny practice-privacy">启用在线模型时，提交的答案会发送给你已配置的供应商用于具体点评；未启用时提供本地结构检查。</p>';
+      return html + '</div>';
+    }
+
+    const answer = r.submittedAnswer || r.answer || '';
+    html += '<div class="case-block"><b>练习场景</b><p>' + esc(p.scenario) + '</p></div>' +
+      '<div class="practice-submitted"><div><h2>你提交的方案</h2><button type="button" class="btn sm" data-practice-revise="' + escAttr(id) + '">修改后重新提交</button></div>' +
+      '<p>' + esc(answer) + '</p></div>';
+    const analysis = r.analysis && r.analysis.submissionId === r.submissionId ? r.analysis :
+      !r.phase && answer.length >= 20 ? window.PracticeCoach.localAnalysis(p, answer) : null;
+    if (analysis) html += practiceAnalysisHTML(analysis, id);
+    else html += '<div class="practice-analysis-pending" role="status">' +
+      (r.phase ? '正在分析你提交的内容…' : '旧版练习记录已保留。点击“修改后重新提交”即可获得逐项分析。') + '</div>';
+
+    if (!analysis) return html + '</div>';
+    html += '<h2>交付前检查</h2><div class="check-list">' + p.checkpoints.map(function (x) {
+      return '<div><span>□</span>' + esc(x) + '</div>';
+    }).join('') + '</div>' +
       '<h2>关键判断</h2><div class="practice-decision" data-id="' + p.id + '"><div class="practice-question">' + esc(p.decision.q) + '</div>';
 
     p.decision.options.forEach(function (o, i) {
@@ -976,6 +1014,53 @@
         const t = T(id); return t ? '<button class="chip" data-goto="term:' + id + '">' + esc(t.name) + '</button>' : '';
       }).join('') + '</div>';
     return html + '</div>';
+  }
+
+  function practiceAnalysisHTML(a, id) {
+    let html = '<section class="practice-analysis"><div class="practice-analysis-head"><div><span class="tag ' +
+      (a.mode === 'model' ? 'green' : 'orange') + '">' + (a.mode === 'model' ? '在线模型具体点评' : '本地结构检查') +
+      '</span><h2>这份答案，哪里有效、哪里要补</h2></div>' +
+      (a.mode === 'local' && window.LLM.getCfg().enabled && window.LLM.getCfg().apiKey
+        ? '<button type="button" class="btn sm" data-practice-analyze="' + escAttr(id) + '">重新获取模型点评</button>' : '') +
+      '</div><p class="practice-analysis-summary">' + esc(a.summary || '') + '</p>' +
+      (a.notice ? '<p class="practice-analysis-notice">' + esc(a.notice) + '</p>' : '') +
+      '<h3>已经写到的有效内容</h3>';
+    html += a.strengths && a.strengths.length ? a.strengths.map(function (x) {
+      return '<div class="practice-feedback-row positive"><blockquote>“' + esc(x.quote) + '”</blockquote><p>' + esc(x.why) + '</p></div>';
+    }).join('') : '<p class="tiny">当前没有足够具体、能直接标记为优势的原文；先把一个判断写成可执行动作。</p>';
+    html += '<h3>需要补强的地方</h3>';
+    html += a.gaps && a.gaps.length ? a.gaps.map(function (x) {
+      return '<div class="practice-feedback-row gap"><b>' + esc(x.criterion) + '</b>' +
+        (x.quote ? '<blockquote>你写的是：“' + esc(x.quote) + '”</blockquote>' : '') +
+        '<p>' + esc(x.why) + '</p><p class="practice-revision"><strong>可以这样补：</strong>' + esc(x.revision) + '</p></div>';
+    }).join('') : '<p class="tiny">没有明确遗漏项；请继续核对方案中的数字、权限和异常是否有真实依据。</p>';
+    return html + '<div class="practice-next-step"><b>下一版先改什么</b><p>' + esc(a.nextStep || '') + '</p></div></section>';
+  }
+
+  async function analyzeSubmittedPractice(id, submissionId, answer) {
+    const p = window.Lab.exercise(id);
+    if (!p || !submissionId || !answer) return;
+    const local = window.PracticeCoach.localAnalysis(p, answer);
+    window.Lab.savePracticeAnalysis(id, submissionId, local);
+    if (parseHash().route === 'practice-detail' && parseHash().id === id) render();
+    const cfg = window.LLM.getCfg();
+    if (!cfg.enabled || !cfg.apiKey) { renderSidebar(); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(function () { controller.abort(); }, 30000);
+    try {
+      const raw = await window.LLM.analyzePractice(p, answer, controller.signal);
+      const specific = window.PracticeCoach.normalizeModelAnalysis(raw, answer);
+      if (!specific) throw new Error('模型未返回可核对的具体点评');
+      window.Lab.savePracticeAnalysis(id, submissionId, specific);
+    } catch (error) {
+      window.Lab.savePracticeAnalysis(id, submissionId, Object.assign({}, local, {
+        notice: '在线点评暂未成功，当前显示本地结构检查。你可以稍后重试。'
+      }));
+    } finally {
+      clearTimeout(timer);
+      renderSidebar();
+      if (parseHash().route === 'practice-detail' && parseHash().id === id) render();
+    }
   }
 
   /* ============================================================
@@ -1722,7 +1807,7 @@
       '<div class="callout"><span class="emo">🔒</span><div class="ct"><b>关于隐私</b><br>' +
       '· 学习记录、练习答案、面试分数、对话历史和 API Key 保存在本机浏览器，可自行导出或清空。<br>' +
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
-      '· 启用在线模型后，问题、当前概念、相关对话与学习画像摘要会发送给你配置的模型厂商，用于回答、归纳和重讲。<br>' +
+      '· 启用在线模型后，问题、当前概念、相关对话、学习画像摘要，以及你提交的实战练习答案会发送给你配置的模型厂商，用于回答、归纳、重讲和具体点评。<br>' +
       '· 随时可以导出、回滚、清空。</div></div>';
 
     return html + '</div>';
@@ -1896,7 +1981,7 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-save],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
+      '[data-practice-begin],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement]');
     if (!el) return;
 
@@ -1940,11 +2025,37 @@
       return;
     }
 
+    if (el.dataset.practiceBegin) {
+      window.Lab.startPractice(el.dataset.practiceBegin);
+      render();
+      return;
+    }
     if (el.dataset.practiceSave) {
       const answer = $('#practiceAnswer');
       window.Lab.savePractice(el.dataset.practiceSave, answer ? answer.value : '');
       renderSidebar();
       toast('练习答案已保存在当前浏览器');
+      return;
+    }
+    if (el.dataset.practiceSubmit) {
+      const answer = $('#practiceAnswer');
+      const result = window.Lab.submitPractice(el.dataset.practiceSubmit, answer ? answer.value : '');
+      if (result.error) { toast(result.error); return; }
+      void analyzeSubmittedPractice(el.dataset.practiceSubmit, result.submissionId, result.answer);
+      renderSidebar();
+      render();
+      return;
+    }
+    if (el.dataset.practiceRevise) {
+      window.Lab.revisePractice(el.dataset.practiceRevise);
+      render();
+      return;
+    }
+    if (el.dataset.practiceAnalyze) {
+      const r = window.Lab.practiceRec(el.dataset.practiceAnalyze);
+      if (!window.LLM.getCfg().enabled || !window.LLM.getCfg().apiKey) { toast('请先在设置中启用并配置在线模型'); return; }
+      void analyzeSubmittedPractice(el.dataset.practiceAnalyze, r.submissionId, r.submittedAnswer);
+      toast('正在重新获取具体点评…');
       return;
     }
     if (el.dataset.practiceChoice !== undefined) {

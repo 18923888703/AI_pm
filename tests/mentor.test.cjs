@@ -109,11 +109,32 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
   assert.deepEqual(formatAttempts, ['json_schema', 'json_object', 'plain', 'plain'],
     '不支持结构化格式的供应商应降级并记住可用模式');
 
+  const practiceAnswer = '我会先写清目标用户和输入字段，再定义缺参提示与验收步骤。';
+  let practicePayload;
+  context.fetch = async (_url, options) => {
+    practicePayload = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({
+      summary: '方案已有基本结构，但验收对象不够明确。',
+      strengths: [{ quote: '先写清目标用户和输入字段', why: '先锁定对象与契约' }],
+      gaps: [{ criterion: '验收', quote: '', why: '尚无可观察的结果', revision: '给出一条输入变化后的预期结果。' }],
+      nextStep: '补一条实际测试用例。'
+    }) } }] }) };
+  };
+  context.window.LLM.setCfg({ enabled: true, apiKey: 'fake-test-key', baseUrl: 'https://provider-mock.test/v1' });
+  const review = await context.window.LLM.analyzePractice({ title: '练习', scenario: '场景', task: '写任务卡',
+    checkpoints: ['输入输出'], rubric: ['验收'], reference: ['明确条件'] }, practiceAnswer);
+  assert.equal(review.strengths[0].quote, '先写清目标用户和输入字段');
+  assert.ok(practicePayload.messages[1].content.includes(practiceAnswer), '在线模型应收到已提交的原文');
+  assert.equal(practicePayload.stream, false);
+
   const localDoc = { updatedAt: 100, createdAt: 1, events: [], chat: [], terms: {}, cats: {},
+    lab: { practices: { 'brief-to-task': { answer: '较新的本地草稿', updatedAt: 200 } } },
     practiceRounds: [{ id: 'round-local', completedAt: 80, date: '2026-10-21' }],
     mentor: { signals: [{ id: 's-local', at: 10, termId: 'rag' }],
       summary: { text: '旧归纳', at: 20 }, supplements: { 'rag|a': { text: '旧重讲', at: 21 } } } };
   const remoteDoc = { updatedAt: 120, createdAt: 1, events: [], chat: [], terms: {}, cats: {},
+    lab: { practices: { 'brief-to-task': { answer: '较旧远程草稿', updatedAt: 150 },
+      'mvp-slice': { answer: '另一设备的草稿', updatedAt: 160 } } },
     practiceRounds: [{ id: 'round-remote', completedAt: 90, date: '2026-10-21' }],
     mentor: { signals: [{ id: 's-remote', at: 30, termId: 'model' }],
       summary: { text: '新归纳', at: 40 }, supplements: { 'rag|a': { text: '新重讲', at: 41 } } } };
@@ -129,6 +150,8 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
   assert.equal(merged.practiceRounds.length, 2, '文件同步应保留两台设备的巩固轮次');
   assert.equal(merged.mentor.summary.text, '新归纳');
   assert.equal(merged.mentor.supplements['rag|a'].text, '新重讲');
+  assert.equal(merged.lab.practices['brief-to-task'].answer, '较新的本地草稿');
+  assert.equal(merged.lab.practices['mvp-slice'].answer, '另一设备的草稿');
 
   console.log('mentor profile, recommendation, cache, and configured-provider tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

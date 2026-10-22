@@ -226,6 +226,34 @@
     return { title: String(data.title || '换个讲法').trim().slice(0, 24), text: data.text.trim(), mode: 'model' };
   }
 
+  async function analyzePractice(practice, answer, signal) {
+    const cfg = getCfg();
+    if (!cfg.enabled || !cfg.apiKey) return null;
+    const item = { type: 'object', properties: { quote: { type: 'string' }, why: { type: 'string' } },
+      required: ['quote', 'why'], additionalProperties: false };
+    const gap = { type: 'object', properties: {
+      criterion: { type: 'string' }, quote: { type: 'string' }, why: { type: 'string' }, revision: { type: 'string' }
+    }, required: ['criterion', 'quote', 'why', 'revision'], additionalProperties: false };
+    const schema = { type: 'object', properties: {
+      summary: { type: 'string' }, strengths: { type: 'array', items: item },
+      gaps: { type: 'array', items: gap }, nextStep: { type: 'string' }
+    }, required: ['summary', 'strengths', 'gaps', 'nextStep'], additionalProperties: false };
+    const messages = [
+      { role: 'system', content: '你是 AI 产品经理实战练习教练。只分析学员已提交的答案，不把参考拆解当作学员写过的内容。' +
+        '输出 JSON：summary、strengths、gaps、nextStep。做得好的地方必须引用答案中的原句（quote 要完全一致），再解释为什么有价值。' +
+        '缺陷要具体指出缺失的字段、判断门槛、边界或证据；如果有对应原句也原样引用，没有就让 quote 为空。' +
+        'revision 给出针对本场景可直接补写的一两句话，不照抄参考答案、不捏造用户研究或业绩。' +
+        '按实际内容判断，不因为提到一个术语就判定已经完整覆盖；不要只给“继续优化”之类泛话，不给虚假的精准分数。' },
+      { role: 'user', content: JSON.stringify({ title: practice.title, scenario: practice.scenario, task: practice.task,
+        checkpoints: practice.checkpoints, rubric: practice.rubric, referenceForComparison: practice.reference,
+        submittedAnswer: answer }) }
+    ];
+    const raw = await complete(messages, signal, 2100, schema);
+    const data = parseObject(raw);
+    if (!data || !Array.isArray(data.strengths) || !Array.isArray(data.gaps)) throw new Error('模型点评格式无法解析');
+    return data;
+  }
+
   /* ---------- 离线兜底：基于内置知识库作答 ---------- */
   const STOP = ['的', '了', '是', '什么', '为什么', '怎么', '如何', '吗', '呢', '啊', '请', '我', '你', '给', '讲', '说', '解释', '一下', '意思', '意思是什么', '和', '与', '区别', '有哪些', '这个', '那个', '一个', '到底', '到底怎么'];
 
@@ -371,5 +399,5 @@
     return { mode: 'offline' };
   }
 
-  window.LLM = { getCfg, setCfg, ask, buildSystem, offlineAnswer, summarizeLearner, reteach };
+  window.LLM = { getCfg, setCfg, ask, buildSystem, offlineAnswer, summarizeLearner, reteach, analyzePractice };
 })();

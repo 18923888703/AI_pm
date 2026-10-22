@@ -362,11 +362,19 @@
   function exercise(id) { return PRACTICES.find(function (x) { return x.id === id; }) || null; }
   function practiceRec(id) {
     load();
-    if (!S.practices[id]) S.practices[id] = { answer: '', decision: null, correct: null, rating: null, updatedAt: 0 };
+    if (!S.practices[id]) S.practices[id] = { answer: '', decision: null, correct: null, rating: null,
+      phase: 'learn', submittedAnswer: '', submissionId: '', analysis: null, updatedAt: 0 };
     return S.practices[id];
+  }
+  function practicePhase(id) {
+    const r = practiceRec(id);
+    if (r.phase) return r.phase;
+    // 旧版没有阶段字段：已经自评的练习维持可查看状态，其余已有草稿直接进入作答。
+    return r.decision != null || r.rating != null ? 'review' : String(r.answer || '').trim() ? 'write' : 'learn';
   }
   function practiceDone(id) {
     const r = practiceRec(id);
+    if (r.phase) return r.phase === 'review' && !!r.analysis && r.analysis.submissionId === r.submissionId;
     return String(r.answer || '').trim().length >= 20 && r.decision != null && r.rating != null;
   }
   function practiceProgress() {
@@ -550,9 +558,37 @@
     get state() { return load(); },
     exercise: exercise,
     practiceRec: practiceRec,
+    practicePhase: practicePhase,
     practiceDone: practiceDone,
     practiceProgress: practiceProgress,
+    startPractice(id) { const r = practiceRec(id); r.phase = 'write'; r.updatedAt = Date.now(); save(); return r; },
     savePractice(id, answer) { const r = practiceRec(id); r.answer = String(answer || ''); r.updatedAt = Date.now(); save(); return r; },
+    revisePractice(id) { const r = practiceRec(id); r.phase = 'write'; r.updatedAt = Date.now(); save(); return r; },
+    submitPractice(id, answer) {
+      const p = exercise(id);
+      if (!p) return { error: '找不到这道练习。' };
+      const text = String(answer || '').trim();
+      if (text.length < 40) return { error: '请至少写 40 个字，交代你的判断和做法后再提交分析。' };
+      if (text.length > 6000) return { error: '答案超过 6000 字，请先精简后提交。' };
+      const r = practiceRec(id);
+      r.answer = text;
+      r.submittedAnswer = text;
+      r.submissionId = 'submission-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      r.analysis = null;
+      r.phase = 'review';
+      r.decision = null; r.correct = null; r.rating = null;
+      r.updatedAt = Date.now();
+      save();
+      return { submissionId: r.submissionId, answer: text };
+    },
+    savePracticeAnalysis(id, submissionId, analysis) {
+      const r = practiceRec(id);
+      if (r.phase !== 'review' || r.submissionId !== submissionId) return false;
+      r.analysis = Object.assign({}, analysis, { submissionId: submissionId, at: Date.now() });
+      r.updatedAt = Date.now();
+      save();
+      return true;
+    },
     answerPractice(id, option) { const p = exercise(id), r = practiceRec(id); if (!p) return null; r.decision = option; r.correct = option === p.decision.a; r.updatedAt = Date.now(); save(); return r; },
     ratePractice(id, rating) { const r = practiceRec(id); r.rating = Math.max(0, Math.min(3, Number(rating))); r.updatedAt = Date.now(); save(); return r; },
     startInterview() {

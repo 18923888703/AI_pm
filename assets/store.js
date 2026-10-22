@@ -249,6 +249,17 @@
     });
     out.quizVariants = mergedQuiz;
 
+    const labA = a.lab || {}, labB = b.lab || {};
+    if (a.lab || b.lab) {
+      out.lab = JSON.parse(JSON.stringify(newest.lab || (base === a ? labB : labA)));
+      out.lab.practices = Object.assign({}, labA.practices || {});
+      Object.keys(labB.practices || {}).forEach(function (id) {
+        const incoming = labB.practices[id];
+        const current = out.lab.practices[id];
+        if (!current || (incoming.updatedAt || 0) >= (current.updatedAt || 0)) out.lab.practices[id] = incoming;
+      });
+    }
+
     out.learningPractice = newest.learningPractice || (base === a ? b.learningPractice : a.learningPractice) || null;
     out.practiceRounds = unionBy([].concat(a.practiceRounds || [], b.practiceRounds || []), function (round) {
       return round.id || String(round.startedAt);
