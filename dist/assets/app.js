@@ -712,9 +712,19 @@
 
   function knowledgeBaseMapHTML(categories) {
     const ordered = [categories[0], categories[1], categories[2], categories[7], categories[3], categories[4], categories[5], categories[6]];
-    const width = 1180, height = 1100;
-    const root = { x: 500, y: 516, w: 180, h: 68 };
-    const centers = [150, 410, 670, 930];
+    const width = 1180;
+    const centers = [];
+    let cursorY = 24;
+    for (let row = 0; row < 4; row++) {
+      const count = Math.max.apply(null, [ordered[row], ordered[row + 4]].map(function (category) {
+        return window.KNOWLEDGE_BASE.filter(function (x) { return x.category === category; }).length;
+      }));
+      const rowHeight = Math.max(230, count * 44 + 24);
+      centers.push(cursorY + rowHeight / 2);
+      cursorY += rowHeight + 16;
+    }
+    const height = cursorY + 8;
+    const root = { x: 500, y: (height - 68) / 2, w: 180, h: 68 };
     let paths = '', hubs = '', leaves = '';
     ordered.forEach(function (category, index) {
       const items = window.KNOWLEDGE_BASE.filter(function (x) { return x.category === category; });
@@ -774,7 +784,7 @@
       html += '<section class="kb-section"><div class="kb-section-head"><h2>' + esc(category) + '</h2><span>' + items.length + ' 个专题</span></div>' +
         '<div class="kb-grid">' + items.map(knowledgeCardHTML).join('') + '</div></section>';
     });
-    return html + '<div class="kb-source">内容来源：用户导入的《AI产品经理--知识库》。已做去重、事实性降噪与课程结构化改写；原始文档未直接公开。</div></div>';
+    return html + '<div class="kb-source">内容来源：用户导入的知识库与课程资料，各专题注明来源。已做去重、校正与结构化改写；原始文档未直接公开。</div></div>';
   }
 
   function shuffled(items) {
@@ -831,7 +841,7 @@
         }).join('') + '</div></section>';
     }
     html += knowledgeCheckHTML(x);
-    html += '<div class="kb-source">来源：《AI产品经理--知识库》；页面内容为结构化改写，不代表原文逐字转载。</div></div>';
+    html += '<div class="kb-source">来源：' + esc(x.sourceRef || '《AI产品经理--知识库》') + '；页面内容为结构化改写，不代表原文逐字转载。</div></div>';
     return html;
   }
 
@@ -1532,6 +1542,8 @@
 
     // 知识关联地图
     html += knowledgeMapHTML(t);
+
+    if (t.sourceRef) html += '<p class="kb-source">学习资料：' + esc(t.sourceRef) + ' · 已按产品应用重新整理。</p>';
 
     html += '<div style="height:40px"></div></div>';
     return html;

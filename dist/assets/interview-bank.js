@@ -122,5 +122,5 @@
   });
 
   window.INTERVIEW_DIMS = DIMS;
-  window.INTERVIEW_BANK = legacy.concat(addedMcq, openQuestions, core50);
+  window.INTERVIEW_BANK = legacy.concat(addedMcq, openQuestions, core50, window.MATERIAL_INTERVIEW || []);
 })();

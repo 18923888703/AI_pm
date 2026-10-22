@@ -8,6 +8,7 @@ vm.createContext(context);
 [
   'assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js',
   'assets/data-extension.js',
+  'assets/data-materials.js',
   'assets/curriculum.js', 'assets/knowledge-relations.js'
 ].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });

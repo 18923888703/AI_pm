@@ -46,9 +46,11 @@
     (term.quiz || []).forEach(function (q, index) {
       const id = term.id + '-source-' + (index + 1);
       const extra = peers(term).map(function (x) { return x.one; });
-      const options = makeOptions(id, q.options[q.a], q.options.filter(function (_, oi) { return oi !== q.a; }).concat(extra));
+      const options = Array.isArray(q.reasons) ? q.options.map(function (text, oi) {
+        return { id: id + '-o' + (oi + 1), text: text, correct: oi === q.a, reason: q.reasons[oi] || q.why };
+      }) : makeOptions(id, q.options[q.a], q.options.filter(function (_, oi) { return oi !== q.a; }).concat(extra));
       out.push({
-        id: id, termId: term.id, variantGroup: term.id, variantType: index ? 'boundary' : 'scenario',
+        id: id, termId: term.id, variantGroup: term.id, variantType: q.variantType || (index ? 'boundary' : 'scenario'),
         prompt: q.q, options: options, correctOptionId: options.find(function (x) { return x.correct; }).id, explanation: q.why
       });
     });

@@ -142,6 +142,8 @@
     }
   ];
 
+  PRACTICES.push.apply(PRACTICES, window.MATERIAL_PRACTICES || []);
+
   const DIMS = {
     project_experience: { name: '项目与产品经验', desc: '项目价值、个人贡献与复盘', terms: ['problemframing', 'outcomemetric', 'flywheel'], practices: ['assumption-evidence', 'enterprise-handoff'] },
     product_value: { name: '产品方法与商业价值', desc: '需求、MVP、ROI 与产品判断', terms: ['problemframing', 'aisuitability', 'taskdecomp', 'outcomemetric'], practices: ['brief-to-task', 'mvp-slice'] },

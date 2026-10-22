@@ -219,6 +219,8 @@
     }
   ];
 
+  topics.push.apply(topics, window.MATERIAL_TOPICS || []);
+
   function get(id) { return topics.find(function (x) { return x.id === id; }) || null; }
   function forTerm(termId) {
     return topics.filter(function (x) { return x.relatedTerms.indexOf(termId) >= 0; }).slice(0, 6);

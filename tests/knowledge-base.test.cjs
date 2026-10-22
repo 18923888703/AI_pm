@@ -4,7 +4,7 @@ const vm = require('vm');
 
 const context = { window: {} };
 vm.createContext(context);
-['data-core.js', 'data-adv.js', 'data-pro.js', 'data-pm.js', 'knowledge-base.js'].forEach((file) => {
+['data-core.js', 'data-adv.js', 'data-pro.js', 'data-pm.js', 'data-extension.js', 'data-materials.js', 'knowledge-base.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync('assets/' + file, 'utf8'), context, { filename: file });
 });
 
