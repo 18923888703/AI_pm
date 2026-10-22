@@ -22,20 +22,25 @@
   }
 
   function peers(term) {
-    const same = window.TERMS.filter(function (x) { return x.id !== term.id && x.stage === term.stage && x.cat === term.cat; });
-    const stage = window.TERMS.filter(function (x) { return x.id !== term.id && x.stage === term.stage; });
-    return same.concat(stage).filter(function (x, i, arr) { return arr.findIndex(function (y) { return y.id === x.id; }) === i; });
+    const byId = new Map(window.TERMS.map(function (x) { return [x.id, x]; }));
+    const related = (term.related || []).map(function (id) { return byId.get(id); }).filter(Boolean);
+    const same = window.TERMS.filter(function (x) { return x.stage === term.stage && x.cat === term.cat; });
+    const category = window.TERMS.filter(function (x) { return x.cat === term.cat; });
+    const stage = window.TERMS.filter(function (x) { return x.stage === term.stage; });
+    return related.concat(same, category, stage).filter(function (x, i, arr) {
+      return x.id !== term.id && arr.findIndex(function (y) { return y.id === x.id; }) === i;
+    });
   }
 
   function makeOptions(questionId, correctText, distractorTexts) {
-    const count = 3 + (hash(questionId) % 3);
+    const count = Math.min(3 + (hash(questionId) % 3), distractorTexts.length + 1);
     const seen = new Set([String(correctText)]);
     const usable = distractorTexts.filter(function (text) {
       text = String(text || '').trim();
       if (!text || seen.has(text)) return false;
       seen.add(text); return true;
     }).slice(0, count - 1);
-    while (usable.length < count - 1) usable.push('仅凭模型语气判断，不检查实际任务与证据');
+    if (usable.length < 2) throw new Error('题目缺少足够的专属干扰项：' + questionId);
     const raw = [{ id: questionId + '-correct', text: correctText, correct: true }]
       .concat(usable.map(function (text, i) { return { id: questionId + '-d' + (i + 1), text: text, correct: false }; }));
     return shuffled(raw);
@@ -45,10 +50,12 @@
     const out = [];
     (term.quiz || []).forEach(function (q, index) {
       const id = term.id + '-source-' + (index + 1);
-      const extra = peers(term).map(function (x) { return x.one; });
-      const options = Array.isArray(q.reasons) ? q.options.map(function (text, oi) {
+      // 原题只使用针对本题写过的选项，不拼接其他知识点的定义凑数量。
+      const sourceOptions = q.options.length >= 3 ? q.options : q.options.concat(
+        term.id === 'model' ? ['不会，因为上线后的模型不能再读取外部资料'] : []);
+      const options = Array.isArray(q.reasons) ? sourceOptions.map(function (text, oi) {
         return { id: id + '-o' + (oi + 1), text: text, correct: oi === q.a, reason: q.reasons[oi] || q.why };
-      }) : makeOptions(id, q.options[q.a], q.options.filter(function (_, oi) { return oi !== q.a; }).concat(extra));
+      }) : makeOptions(id, sourceOptions[q.a], sourceOptions.filter(function (_, oi) { return oi !== q.a; }));
       out.push({
         id: id, termId: term.id, variantGroup: term.id, variantType: q.variantType || (index ? 'boundary' : 'scenario'),
         prompt: q.q, options: options, correctOptionId: options.find(function (x) { return x.correct; }).id, explanation: q.why
@@ -56,6 +63,10 @@
     });
 
     const related = peers(term);
+    const short = window.TERM_QUIZ_SHORT || {};
+    const display = function (item, field, fallback) {
+      return short[item.id] && short[item.id][field] || fallback;
+    };
     const definitionId = term.id + '-generated-definition';
     const definitionOptions = makeOptions(definitionId, term.one, related.map(function (x) { return x.one; }));
     out.push({
@@ -66,7 +77,7 @@
     });
 
     const pmId = term.id + '-generated-pm';
-    const pmOptions = makeOptions(pmId, term.pm, related.map(function (x) { return x.pm; }));
+    const pmOptions = makeOptions(pmId, display(term, 'pm', term.pm), related.map(function (x) { return display(x, 'pm', x.pm); }));
     out.push({
       id: pmId, termId: term.id, variantGroup: term.id, variantType: 'tradeoff',
       prompt: '从产品经理视角应用「' + term.name + '」时，哪项判断最准确？', options: pmOptions,
@@ -76,7 +87,9 @@
 
     const mechanismId = term.id + '-generated-mechanism';
     const mechanism = term.steps && term.steps[0] ? term.steps[0] : term.one;
-    const mechanismOptions = makeOptions(mechanismId, mechanism, related.map(function (x) { return x.steps && x.steps[0] || x.one; }));
+    const mechanismOptions = makeOptions(mechanismId, display(term, 'mechanism', mechanism), related.map(function (x) {
+      return display(x, 'mechanism', x.steps && x.steps[0] || x.one);
+    }));
     out.push({
       id: mechanismId, termId: term.id, variantGroup: term.id, variantType: 'mechanism',
       prompt: '下面哪项更准确地说明「' + term.name + '」如何工作？', options: mechanismOptions,

@@ -363,7 +363,7 @@
   function practiceRec(id) {
     load();
     if (!S.practices[id]) S.practices[id] = { answer: '', decision: null, correct: null, rating: null,
-      phase: 'learn', submittedAnswer: '', submissionId: '', analysis: null, updatedAt: 0 };
+      phase: 'learn', submittedAnswer: '', submissionId: '', analysis: null, choiceOrder: null, updatedAt: 0 };
     return S.practices[id];
   }
   function practicePhase(id) {
@@ -576,6 +576,11 @@
       r.submissionId = 'submission-' + Date.now() + '-' + Math.random().toString(36).slice(2);
       r.analysis = null;
       r.phase = 'review';
+      r.choiceOrder = p.decision.options.map(function (_, index) { return index; });
+      for (let i = r.choiceOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = r.choiceOrder[i]; r.choiceOrder[i] = r.choiceOrder[j]; r.choiceOrder[j] = tmp;
+      }
       r.decision = null; r.correct = null; r.rating = null;
       r.updatedAt = Date.now();
       save();

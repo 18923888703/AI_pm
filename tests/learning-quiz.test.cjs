@@ -15,7 +15,9 @@ vm.createContext(context);
 const reviewEvents = [];
 context.window.Mem = { state, save() {}, completeDailyQuiz() {}, quiz(id, cat, correct) { reviewEvents.push({ id, cat, correct }); } };
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/explanations.js'), 'utf8'), context, { filename: 'assets/explanations.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/term-quiz-short.js'), 'utf8'), context, { filename: 'assets/term-quiz-short.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/learning-quiz.js'), 'utf8'), context, { filename: 'assets/learning-quiz.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets/option-refinements.js'), 'utf8'), context, { filename: 'assets/option-refinements.js' });
 
 context.window.TERMS.forEach((term) => {
   const bank = context.window.LearningQuiz.bank(term.id);

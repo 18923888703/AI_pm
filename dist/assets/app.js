@@ -983,14 +983,19 @@
     }).join('') + '</div>' +
       '<h2>关键判断</h2><div class="practice-decision" data-id="' + p.id + '"><div class="practice-question">' + esc(p.decision.q) + '</div>';
 
-    p.decision.options.forEach(function (o, i) {
+    const order = Array.isArray(r.choiceOrder) && r.choiceOrder.length === p.decision.options.length &&
+      new Set(r.choiceOrder).size === p.decision.options.length && r.choiceOrder.every(function (i) {
+        return Number.isInteger(i) && i >= 0 && i < p.decision.options.length;
+      }) ? r.choiceOrder : p.decision.options.map(function (_, i) { return i; });
+    order.forEach(function (i, displayIndex) {
+      const o = p.decision.options[i];
       let cls = '';
       if (r.decision != null) {
         if (i === p.decision.a) cls = ' correct';
         else if (i === r.decision) cls = ' wrong';
       }
       html += '<button class="practice-option' + cls + '" data-practice-choice="' + i + '" data-practice-id="' + p.id + '"' +
-        (r.decision != null ? ' disabled' : '') + '><span>' + 'ABCD'[i] + '</span>' + esc(o) + '</button>';
+        (r.decision != null ? ' disabled' : '') + '><span>' + 'ABCDE'[displayIndex] + '</span>' + esc(o) + '</button>';
     });
     if (r.decision != null) html += answerExplanationHTML({ correct: r.correct,
       selectedOptionText: p.decision.options[r.decision], correctOptionText: p.decision.options[p.decision.a],

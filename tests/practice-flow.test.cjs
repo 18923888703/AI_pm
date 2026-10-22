@@ -26,6 +26,7 @@ assert.equal(Lab.practicePhase(id), 'write');
 const answer = '目标用户是初次接触项目管理的同事。输入预约时间和联系方式，缺少时间时提示补充。输出当天行动清单。验收时修改输入，检查提醒和取消预约后的状态。';
 const first = Lab.submitPractice(id, answer);
 assert.ok(first.submissionId);
+assert.deepEqual(Array.from(Lab.practiceRec(id).choiceOrder).sort(), [0, 1, 2, 3], '关键判断选项每次提交应生成稳定的随机顺序');
 assert.equal(Lab.practicePhase(id), 'review');
 assert.equal(Lab.practiceDone(id), false, '未完成分析前不得算已完成');
 const local = PracticeCoach.localAnalysis(Lab.exercise(id), answer);
@@ -40,6 +41,7 @@ assert.equal(Lab.practicePhase(id), 'write');
 assert.equal(Lab.practiceDone(id), false);
 const second = Lab.submitPractice(id, answer + ' 另外增加一次失败时的人工处理流程。');
 assert.notEqual(second.submissionId, first.submissionId);
+assert.deepEqual(Array.from(Lab.practiceRec(id).choiceOrder).sort(), [0, 1, 2, 3]);
 assert.equal(Lab.savePracticeAnalysis(id, first.submissionId, local), false, '旧请求不得覆盖新版本点评');
 assert.equal(PracticeCoach.normalizeModelAnalysis({ strengths: [{ quote: '不存在的原文', why: '夸奖' }], gaps: [] }, answer), null);
 const valid = PracticeCoach.normalizeModelAnalysis({ summary: '已覆盖输入，但仍缺失败状态。',

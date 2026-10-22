@@ -219,8 +219,11 @@
     const authored = notes[q.id];
     const rows = q.options.map(function (o) {
       const index = source.options.findIndex(function (x) { return x.id === o.id; });
+      const refined = window.OPTION_REFINEMENTS && window.OPTION_REFINEMENTS.interview[q.id];
       return { id: o.id, text: o.text, correct: o.id === q.correctOptionId, selected: o.id === selectedId,
-        reason: o.id === q.correctOptionId ? q.explanation : (authored && authored[index]) || q.explanation };
+        reason: o.id === q.correctOptionId ? q.explanation : refined
+          ? '这项把判断重点放在「' + o.text + '」，但还不能满足题目条件。' + q.explanation
+          : (authored && authored[index]) || q.explanation };
     });
     const teaching = guides[q.variantGroup] || lesson(termById(groupTerms[q.variantGroup]));
     return { teaching: teaching || null, optionReviews: rows, selectedReason: (rows.find(function (o) { return o.selected; }) || {}).reason || '' };

@@ -14,7 +14,7 @@ seededMath.random = random;
 const state = {};
 const context = { window: { Mem: { state, save() {} } }, Math: seededMath, Date, Set, Map, console };
 vm.createContext(context);
-['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/data-extension.js', 'assets/data-materials.js', 'assets/practice.js', 'assets/interview-core50.js', 'assets/interview-bank.js'].forEach((file) => {
+['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/data-extension.js', 'assets/data-materials.js', 'assets/practice.js', 'assets/interview-core50.js', 'assets/interview-bank.js', 'assets/option-refinements.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
 
@@ -108,7 +108,7 @@ const refreshQuestion = Lab.interviewQuestions()[0];
 if (refreshQuestion.type === 'mcq') Lab.answerInterview(refreshQuestion.correctOptionId);
 const reloadContext = { window: { Mem: { state, save() {} } }, Math: seededMath, Date, Set, Map, console };
 vm.createContext(reloadContext);
-['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/data-extension.js', 'assets/data-materials.js', 'assets/practice.js', 'assets/interview-core50.js', 'assets/interview-bank.js'].forEach((file) => {
+['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/data-extension.js', 'assets/data-materials.js', 'assets/practice.js', 'assets/interview-core50.js', 'assets/interview-bank.js', 'assets/option-refinements.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), reloadContext, { filename: file });
 });
 const refreshed = reloadContext.window.Lab.interview();
