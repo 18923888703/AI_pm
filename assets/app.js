@@ -61,13 +61,17 @@
   }
 
   function masteryDot(id) {
-    const r = window.Mem.state.terms[id];
-    const m = r ? r.mastery : 0;
-    const k = !r || !r.seen ? 'new' : (m >= 3.5 ? 'mastered' : (m >= 2 ? 'fuzzy' : 'weak'));
+    const k = window.LearnerMemory ? window.LearnerMemory.status(id).key :
+      (window.Mem.state.terms[id] && window.Mem.state.terms[id].seen ? 'learning' : 'new');
     return '<span class="dot ' + k + '" title="' + masteryLabel(id).label + '"></span>';
   }
 
   function masteryLabel(id) {
+    if (window.LearnerMemory) {
+      const status = window.LearnerMemory.status(id);
+      return { k: status.key, label: status.label,
+        color: { mastered: 'var(--green)', pending: 'var(--blue)', learning: 'var(--orange)', weak: 'var(--red)', new: 'var(--text-3)' }[status.key] };
+    }
     const r = window.Mem.state.terms[id];
     const m = r ? r.mastery : 0;
     const o = { k: 'new', label: '未学习', color: '#91918e' };
@@ -1225,7 +1229,44 @@
       '<button class="' + (active === 'progress' ? 'active' : '') + '" data-route="my">学习进度</button>' +
       '<button class="' + (active === 'profile' ? 'active' : '') + '" data-route="profile">导师画像</button>' +
       '<button class="' + (active === 'review' ? 'active' : '') + '" data-route="review">复习队列</button>' +
+      '<button class="' + (active === 'wrongbook' ? 'active' : '') + '" data-route="wrongbook">错题本</button>' +
       '<button class="' + (active === 'settings' ? 'active' : '') + '" data-route="settings">设置与记忆</button></div>';
+  }
+
+  function viewWrongBook() {
+    const memory = window.LearnerMemory;
+    const summary = memory.summary();
+    const rows = memory.entries();
+    let html = '<div class="page wrongbook-page"><h1>我的学习</h1>' + myTabs('wrongbook') +
+      '<h2>错题本</h2><p class="lead">先看当时错选了什么，再判断是不是反复出现的模式。一次答错只算线索；跨日换题答对才算稳定掌握。</p>' +
+      '<div class="wrongbook-overview"><div><b>' + summary.totalWrong + '</b><span>累计错题记录</span></div>' +
+      '<div><b>' + summary.active + '</b><span>待巩固知识点</span></div>' +
+      '<div><b>' + summary.repeatedPatterns + '</b><span>重复出现的错因线索</span></div></div>';
+    if (!rows.length) return html + '<div class="empty">还没有错题记录。做完学习测验后，这里会保留题目、你的选择与复习安排。</div>' +
+      '<button class="btn primary" data-route="home">去今日学习 →</button></div>';
+    rows.forEach(function (row) {
+      const statusCls = row.status.key === 'mastered' ? 'green' : row.status.key === 'weak' ? 'red' : 'orange';
+      const due = row.dueAt ? new Date(row.dueAt).toLocaleDateString('zh-CN') : '待安排';
+      html += '<section class="wrongbook-item"><div class="wrongbook-top"><div><button class="wrongbook-term" data-goto="term:' + escAttr(row.termId) + '">' +
+        esc(row.term.name) + ' →</button><span class="tag ' + statusCls + '">' + esc(row.status.label) + '</span></div>' +
+        '<span class="tiny">答错 ' + row.wrong + ' 次 · 下次复测 ' + due + '</span></div>' +
+        '<div class="wrongbook-patterns">' + row.patterns.filter(function (p) { return p.wrong > 0; }).map(function (p) {
+          return '<span class="wrongbook-pattern" title="' + escAttr(p.state) + '">' + esc(p.label) + ' · ' + p.wrong +
+            ' 次 <small>' + esc(p.state) + '</small></span>';
+        }).join('') + '</div>' +
+        '<div class="wrongbook-actions"><button class="btn sm primary" data-wrong-practice="' + escAttr(row.termId) + '">做两道变式巩固</button>' +
+        '<button class="btn sm" data-memory-mark="not_yet" data-memory-term="' + escAttr(row.termId) + '">标记未掌握</button>' +
+        '<button class="btn sm" data-memory-mark="mastered" data-memory-term="' + escAttr(row.termId) + '">自评已掌握</button></div>';
+      if (row.recent.length) {
+        html += '<details class="wrongbook-evidence"><summary>查看最近 ' + row.recent.length + ' 道原始错题</summary><div>' +
+          row.recent.map(function (a) { return '<article><span class="tiny">' + new Date(a.at).toLocaleString('zh-CN') +
+            ' · ' + (memory.labels[a.variantType] || '场景应用') + '</span><b>' + esc(a.prompt) + '</b>' +
+            '<p>你选：' + esc(a.selectedText) + '</p><p>正确：' + esc(a.correctText) + '</p>' +
+            '<small>' + esc(a.explanation) + '</small></article>'; }).join('') + '</div></details>';
+      } else html += '<p class="tiny wrongbook-legacy">旧记录仅保留知识点、题目 ID 与次数，升级前没有保存当时的具体选项；今后的错题会完整记录。</p>';
+      html += '</section>';
+    });
+    return html + '</div>';
   }
 
   function viewMentorProfile() {
@@ -1238,6 +1279,12 @@
       '<div><b>' + p.status.got + '</b><span>已掌握概念</span></div>' +
       '<div><b>' + p.status.confused + '</b><span>当前卡住</span></div>' +
       '<div><b>' + p.quizRight + '/' + (p.quizRight + p.quizWrong) + '</b><span>答题正确</span></div></div>';
+    const declared = window.Mem.state.learnerProfile || {};
+    html += '<section class="learner-profile-strip"><div><span class="tiny">你确认的学习信息</span><p>' +
+      (declared.goal ? '目标：' + esc(declared.goal) : '还未填写学习目标') +
+      (declared.background ? ' · 背景：' + esc(declared.background) : '') +
+      (declared.dailyMinutes ? ' · 每日 ' + declared.dailyMinutes + ' 分钟' : '') +
+      '</p></div><button class="btn sm" data-route="settings">修改画像</button></section>';
     html += '<section class="mentor-summary"><div class="mentor-section-label">当前画像</div>' +
       (p.summary && p.summary.text
         ? '<p>' + esc(p.summary.text) + '</p><div class="tiny">' +
@@ -1557,7 +1604,8 @@
       '<span class="tag" style="background:' + cat.color + '14;color:' + cat.color + '">' + cat.name + '</span>' +
       '<span class="tag">' + (t.optional ? '延伸知识' : '第 ' + window.Curriculum.lessonNoOf(t.id) + ' 课') + ' · ' + esc(window.STAGES[t.stage].name) + '</span>' +
       '<span class="tag">难度 ' + '●'.repeat(t.level) + '○'.repeat(5 - t.level) + '</span>' +
-      '</div></div>';
+      '</div><div class="term-memory-status">长期状态：' + esc(window.LearnerMemory ? window.LearnerMemory.status(t.id).label : masteryLabel(t.id).label) +
+      ' · <button type="button" class="chip-inline" data-route="wrongbook">查看错题本</button></div></div>';
 
     /* ---------- 如果它在今天的计划里：说清楚这是第几项、要做到什么才算完成 ---------- */
     html += planStripHTML(t);
@@ -1679,16 +1727,46 @@
   function viewSettings() {
     const cfg = window.LLM.getCfg();
     const pr = window.Mem.state.prefs;
+    const learner = window.Mem.state.learnerProfile || {};
     const ev = (window.Mem.state.events || []).length;
 
     let html = '<div class="page"><h1>我的学习</h1>' + myTabs('settings') + '<h2>设置与记忆</h2>' +
-      '<p class="lead">你的学习记忆会自动保存在本机，并可以按你的设置同步到自己的网盘。</p>';
+      '<p class="lead">学习记录先保存在本机。开启加密同步后，电脑和手机可用同一个同步码接续学习。</p>';
 
-    /* ---------- 记忆存储与同步（新增） ---------- */
+    const cloud = window.CloudSync;
+    html += '<h2>手机与电脑同步</h2><section class="card cloud-sync-card"><div class="cloud-sync-head"><div><b>加密同步</b>' +
+      '<p class="tiny">题目记录、错因与复测计划在本机加密后存到本站云端；同步码只留在你的设备，模型 API Key 不同步。</p></div>' +
+      '<span id="cloudStatus" class="tag ' + (cloud.status === 'synced' ? 'green' : cloud.status === 'error' ? 'red' : 'orange') + '">' +
+      (cloud.status === 'synced' ? '已同步' : cloud.status === 'syncing' ? '同步中' : cloud.status === 'error' ? '同步失败' : '未连接') + '</span></div>';
+    if (cloud.connected()) {
+      html += '<div class="cloud-sync-meta">上次同步：' + (cloud.lastSync ? new Date(cloud.lastSync).toLocaleString('zh-CN') : '等待首次完成') +
+        (cloud.lastError ? ' · ' + esc(cloud.lastError) : '') + '</div>' +
+        '<div class="cloud-sync-actions"><button class="btn sm primary" id="cloudNow">立即同步</button>' +
+        '<button class="btn sm" id="cloudReveal">显示配对码</button><button class="btn sm ghost" id="cloudDisconnect">断开此设备</button></div>' +
+        '<div id="cloudRevealBox" class="cloud-reveal" hidden><label for="cloudSavedCode">在手机上打开同一网站，输入这个配对码</label>' +
+        '<div><input id="cloudSavedCode" type="text" readonly autocomplete="off" value=""><button class="btn sm" id="cloudCopy">复制</button></div></div>';
+    } else {
+      html += '<label class="cloud-label" for="cloudCode">配对码</label><div class="cloud-entry"><input id="cloudCode" type="password" autocomplete="off" spellcheck="false" placeholder="APM1-…"' +
+        (cloud.support() ? '' : ' disabled') + '><button class="btn primary" id="cloudConnect"' +
+        (cloud.support() ? '' : ' disabled') + '>连接并合并记录</button></div>' +
+        '<p class="tiny">电脑和手机输入同一个配对码。已有本机记录会先合并再上传，不会直接覆盖。' +
+        (cloud.support() ? '' : '请通过 HTTPS 公开站点打开。') + '</p>';
+    }
+    html += '<p id="cloudError" class="cloud-error" role="status">' + esc(cloud.lastError || '') + '</p>' +
+      '<p class="tiny cloud-sync-warning">请妥善保管配对码；任何拿到它的人都可读取并改写这份学习记忆。断开只停止此设备同步，不删除云端数据。</p></section>';
+
+    html += '<h2>你确认的学习画像</h2><div class="card learner-profile-form">' +
+      '<p class="tiny">只记录与你学习有关的目标和节奏；自动归纳的错因是待验证线索，可在错题本核对。</p>' +
+      '<div class="field"><label for="learnerGoal">学习目标</label><input id="learnerGoal" maxlength="80" value="' + escAttr(learner.goal || '') + '" placeholder="例如：独立交付一个 AI PM 作品"></div>' +
+      '<div class="field"><label for="learnerBackground">目前背景</label><input id="learnerBackground" maxlength="80" value="' + escAttr(learner.background || '') + '" placeholder="例如：传统产品经理，刚开始学习 Agent"></div>' +
+      '<div class="field"><label for="learnerMinutes">每天愿意投入的时间（分钟）</label><input id="learnerMinutes" type="number" min="0" max="240" value="' + (learner.dailyMinutes || '') + '" placeholder="例如：20"></div>' +
+      '<button class="btn sm primary" id="saveLearnerProfile">保存学习画像</button></div>';
+
+    /* ---------- 原有桌面文件同步保留 ---------- */
     const st = window.Store;
     const sup = st.support();
     const snaps = st.listSnapshots();
-    html += '<h2>记忆存储与同步</h2><div class="card">' +
+    html += '<h2>桌面文件同步（可选）</h2><div class="card">' +
       '<div class="sync-state">' +
       '<span class="sync-dot ' + (st.handle ? st.status : 'local') + '"></span>' +
       '<div style="flex:1;min-width:0">' +
@@ -1715,9 +1793,9 @@
     html += '</div>';
 
     html += '<div class="hint-box">' +
-      '<b>这样就能跨设备了：</b>点「创建同步文件」，把它存进 <b>iCloud Drive / OneDrive / 坚果云 / Dropbox</b> 的文件夹。' +
+      '<b>文件备份：</b>点「创建同步文件」，把它存进 <b>iCloud Drive / OneDrive / 坚果云 / Dropbox</b> 的文件夹。' +
       '之后每次学习都会自动写回这个文件；在另一台设备等网盘同步完成后打开本页，会自动把两边的记录合并起来。<br>' +
-      '<span class="tiny">合并规则：事件流取并集、各项计数取较大值 —— 不会互相覆盖丢进度。</span>' +
+      '<span class="tiny">部分手机浏览器不支持文件访问 API，手机请优先使用上方加密同步。</span>' +
       '</div></div>';
 
     /* ---------- 快照与恢复 ---------- */
@@ -1803,7 +1881,7 @@
       '<button class="btn sm" id="expMem">导出 JSON</button>' +
       '<button class="btn sm" id="impMem">导入 JSON</button>' +
       '<button class="btn sm" id="clearChat">清空对话</button>' +
-      '<button class="btn sm" id="resetMem" style="color:var(--red);border-color:rgba(224,62,62,.35)">清空全部记忆</button>' +
+      '<button class="btn sm" id="resetMem" style="color:var(--red);border-color:rgba(224,62,62,.35)">清空本机记忆</button>' +
       '</div>' +
       '<div class="field" style="margin-top:12px"><textarea id="memBox" rows="4" placeholder="导出的内容会显示在这里，也可以把 JSON 粘贴进来后点导入" style="font-size:12px"></textarea></div>' +
       '</div>';
@@ -1812,8 +1890,9 @@
       '<div class="callout"><span class="emo">🔒</span><div class="ct"><b>关于隐私</b><br>' +
       '· 学习记录、练习答案、面试分数、对话历史和 API Key 保存在本机浏览器，可自行导出或清空。<br>' +
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
+      '· 启用手机同步时，学习数据在浏览器内加密后写入本站 Netlify 存储；配对码是解密与写入凭据，请勿公开。模型 API Key 不参与同步。<br>' +
       '· 启用在线模型后，问题、当前概念、相关对话、学习画像摘要，以及你提交的实战练习答案会发送给你配置的模型厂商，用于回答、归纳、重讲和具体点评。<br>' +
-      '· 随时可以导出、回滚、清空。</div></div>';
+      '· 可以导出、回滚或清空本机记忆；断开同步不会删除云端密文。</div></div>';
 
     return html + '</div>';
   }
@@ -1866,7 +1945,7 @@
       home: '今日学习', learn: '今日学习', reinforce: '巩固复习', spaced: '到期复测', plan: '学习计划', path: '学习路径', dict: '术语词典',
       practice: '实战练习', 'practice-detail': '实战练习', interview: '面试测评',
       kb: '专题知识库', 'kb-topic': '专题知识库',
-      my: '我的学习', profile: '导师画像', review: '我的学习', mastery: '我的学习', settings: '我的学习'
+      my: '我的学习', profile: '导师画像', review: '我的学习', wrongbook: '我的学习', mastery: '我的学习', settings: '我的学习'
     };
     try {
       if (r.route === 'term') html = viewTerm(r.id);
@@ -1882,6 +1961,7 @@
       else if (r.route === 'practice-detail') html = viewPracticeDetail(r.id);
       else if (r.route === 'interview') html = viewInterview();
       else if (r.route === 'review') html = viewReview();
+      else if (r.route === 'wrongbook') html = viewWrongBook();
       else if (r.route === 'profile') html = viewMentorProfile();
       else if (r.route === 'mastery' || r.route === 'my') html = viewMastery();
       else if (r.route === 'settings') html = viewSettings();
@@ -1917,7 +1997,7 @@
         (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (r.route === 'kb-topic' && el.dataset.route === 'kb') ||
-        (['profile', 'review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
+        (['profile', 'review', 'wrongbook', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.mobile-nav [data-route]').forEach(function (el) {
@@ -1925,7 +2005,7 @@
         (['learn', 'reinforce'].indexOf(r.route) >= 0 && el.dataset.route === 'home') ||
         (r.route === 'term' && el.dataset.route === 'path') ||
         (['kb', 'kb-topic'].indexOf(r.route) >= 0 && el.dataset.route === 'path') ||
-        (['profile', 'review', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
+        (['profile', 'review', 'wrongbook', 'mastery', 'settings', 'my', 'spaced'].indexOf(r.route) >= 0 && el.dataset.route === 'my') ||
         (r.route === 'practice-detail' && el.dataset.route === 'practice'));
     });
     document.querySelectorAll('.tree-item').forEach(function (el) {
@@ -1987,8 +2067,23 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-begin],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
+
+    if (el.dataset.memoryMark) {
+      const id = el.dataset.memoryTerm || (currentTerm && currentTerm.id);
+      const result = window.LearnerMemory.mark(id, el.dataset.memoryMark);
+      if (result) { render(); toast(result.value === 'mastered' ? '已记录自评掌握，仍会安排跨日验证' : '已标记未掌握，并加入复测'); }
+      return;
+    }
+    if (el.dataset.wrongPractice) {
+      const ongoing = window.LearningQuiz.practice();
+      if (ongoing && !ongoing.completedAt && !ongoing.focusIds.includes(el.dataset.wrongPractice) &&
+          !confirm('当前有尚未完成的巩固练习。开始新练习会替换本轮，继续吗？')) return;
+      window.LearningQuiz.startPractice([el.dataset.wrongPractice]);
+      go('reinforce');
+      return;
+    }
 
     if (el.dataset.supplement !== undefined && currentTerm) {
       void showSupplement(currentTerm.id, el.dataset.supplement === 'force');
@@ -2178,15 +2273,22 @@
 
     if (el.dataset.fb && currentTerm) {
       const kind = el.dataset.fb;
-      if (kind === 'cleared') { window.Mem.cleared(currentTerm.id, currentTerm.cat, 'button'); toast('已记录：' + currentTerm.name + ' 已掌握 ✅'); }
+      if (kind === 'cleared') {
+        window.Mem.cleared(currentTerm.id, currentTerm.cat, 'button');
+        window.LearnerMemory.mark(currentTerm.id, 'mastered');
+        toast('已记录自评掌握；长期掌握仍需跨日复测确认');
+      }
       else {
         window.Mem.confused(currentTerm.id, currentTerm.cat, 'button');
+        window.LearnerMemory.mark(currentTerm.id, 'not_yet');
         window.Mentor.record(currentTerm.id, { difficulty: [], style_worked: [], understood: 'no', note: '主动标记这个概念仍没弄懂' }, 'button');
         if (!window.Mentor.getSupplement(currentTerm.id)) void showSupplement(currentTerm.id, false);
         toast('已记录：你对这个概念还有困难，我会多提醒你复习 📌');
       }
       checkPlanDone(currentTerm.id);
       updatePlanUI();
+      const statusEl = document.querySelector('.term-memory-status');
+      if (statusEl) statusEl.firstChild.textContent = '长期状态：' + window.LearnerMemory.status(currentTerm.id).label + ' · ';
       return;
     }
 
@@ -2241,6 +2343,42 @@
 
     /* ---- 记忆存储与同步 ---- */
     const bind = function (id, fn) { const el = document.getElementById(id); if (el) el.onclick = fn; };
+
+    bind('cloudConnect', async function () {
+      const button = $('#cloudConnect'), message = $('#cloudError');
+      button.disabled = true; message.textContent = '正在加密并合并记录…';
+      try {
+        await window.CloudSync.connect($('#cloudCode').value);
+        renderSidebar(); render(); toast('手机同步已连接，学习记录已加密合并');
+      } catch (error) {
+        message.textContent = error && error.message || '连接失败';
+        button.disabled = false;
+      }
+    });
+    bind('cloudNow', async function () {
+      const ok = await window.CloudSync.sync();
+      if (ok) { renderSidebar(); render(); toast('已合并电脑与手机的学习记录'); }
+      else $('#cloudError').textContent = window.CloudSync.lastError || '暂时无法同步';
+    });
+    bind('cloudReveal', function () {
+      const box = $('#cloudRevealBox');
+      box.hidden = !box.hidden;
+      $('#cloudSavedCode').value = box.hidden ? '' : window.CloudSync.code();
+      this.textContent = box.hidden ? '显示配对码' : '隐藏配对码';
+    });
+    bind('cloudCopy', async function () {
+      try { await navigator.clipboard.writeText(window.CloudSync.code()); toast('配对码已复制，请只发到自己的设备'); }
+      catch (error) { $('#cloudSavedCode').select(); toast('复制不可用，请手动复制输入框中的配对码'); }
+    });
+    bind('cloudDisconnect', function () {
+      if (!confirm('断开后本机记录仍保留，但不再自动同步。请确认你已保存配对码，继续吗？')) return;
+      window.CloudSync.disconnect(); render(); toast('已断开此设备，云端记录未删除');
+    });
+    bind('saveLearnerProfile', function () {
+      window.Mem.setLearnerProfile({ goal: $('#learnerGoal').value, background: $('#learnerBackground').value,
+        dailyMinutes: $('#learnerMinutes').value });
+      toast('学习目标与节奏已保存，可在手机同步');
+    });
 
     bind('syncLink', async function () {
       try {
@@ -2325,7 +2463,11 @@
     };
     $('#clearChat').onclick = function () { window.Mem.clearChat(); $('#chatBody').innerHTML = ''; toast('对话已清空'); };
     $('#resetMem').onclick = function () {
-      if (confirm('确定清空全部学习记忆吗？这会重置掌握度、复习队列和对话历史。')) {
+      if (window.CloudSync.connected() || window.Store.handle) {
+        toast('请先断开云端和文件同步；否则旧记录会重新合并回来');
+        return;
+      }
+      if (confirm('确定清空此浏览器的学习记忆吗？这会重置掌握度、错题本、复习队列和对话历史，云端数据不会被删除。')) {
         window.Mem.reset(); $('#chatBody').innerHTML = ''; render(); toast('记忆已清空');
       }
     };
@@ -2534,6 +2676,19 @@
   (async function boot() {
     await window.Store.init();
     window.Store.onChange = function () { renderSidebar(); };
+    // 先把本设备旧错题转成可合并的基线，再读取另一设备的云端记录。
+    window.LearnerMemory.initialize();
+    await window.CloudSync.init();
+    window.CloudSync.onChange = function (cloud) {
+      const status = $('#cloudStatus');
+      if (status) {
+        status.textContent = cloud.status === 'synced' ? '已同步' : cloud.status === 'syncing' ? '同步中' :
+          cloud.status === 'error' ? '同步失败' : '未连接';
+        status.className = 'tag ' + (cloud.status === 'synced' ? 'green' : cloud.status === 'error' ? 'red' : 'orange');
+      }
+      const error = $('#cloudError');
+      if (error) error.textContent = cloud.lastError || '';
+    };
     window.Mem.init();
     window.SpacedReview.initialize();
     render();

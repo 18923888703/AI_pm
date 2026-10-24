@@ -26,6 +26,7 @@
       cats: {},         // cat -> { right, wrong, confused, cleared, touch }
       events: [],       // 行为流水（最近 600 条）
       prefs: { style: 'auto', mode: 'auto', autoSimple: true },
+      learnerProfile: { goal: '', background: '', dailyMinutes: 0, updatedAt: 0 },
       chat: [],         // 追问对话历史（最近 120 条）
       meta: { totalQuiz: 0, totalRight: 0, sessions: 0, entitiesViewed: 0 },
       /* --- v2 新增 --- */
@@ -51,7 +52,8 @@
       learningPractice: null,
       practiceRounds: [],
       spacedReview: {},
-      spacedSession: null
+      spacedSession: null,
+      learningMemory: { version: 1, migrated: false, attempts: [], legacyWrong: [], manual: {}, patterns: {} }
     };
   };
 
@@ -67,6 +69,7 @@
     filled.sessions = Array.isArray(filled.sessions) ? filled.sessions : [];
     filled.meta = Object.assign(base.meta, o && o.meta || {});
     filled.prefs = Object.assign(base.prefs, o && o.prefs || {});
+    filled.learnerProfile = Object.assign(base.learnerProfile, o && o.learnerProfile || {});
     /* 学习计划 */
     filled.syllabus = Object.assign({ startedAt: Date.now(), learned: [], doneAt: {} }, o && o.syllabus || {});
     if (!Array.isArray(filled.syllabus.learned)) filled.syllabus.learned = [];
@@ -80,6 +83,8 @@
     filled.practiceRounds = Array.isArray(o && o.practiceRounds) ? o.practiceRounds : [];
     filled.spacedReview = (o && o.spacedReview && typeof o.spacedReview === 'object') ? o.spacedReview : {};
     filled.spacedSession = (o && o.spacedSession && typeof o.spacedSession === 'object') ? o.spacedSession : null;
+    filled.learningMemory = (o && o.learningMemory && typeof o.learningMemory === 'object')
+      ? o.learningMemory : base.learningMemory;
     return filled;
   }
 
@@ -112,7 +117,8 @@
   }
   function log(type, termId, extra) {
     const e = load().events;
-    e.unshift(Object.assign({ t: Date.now(), type: type, termId: termId || null }, extra || {}));
+    e.unshift(Object.assign({ id: 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+      t: Date.now(), type: type, termId: termId || null }, extra || {}));
     if (e.length > 600) e.length = 600;
   }
   function touchCat(cat, field, n) {
@@ -777,6 +783,12 @@
       });
       return api;
     },
+    reload() {
+      S = null;
+      curSession = null;
+      load();
+      return S;
+    },
 
     viewTerm(id, cat) {
       const r = termRec(id);
@@ -982,6 +994,11 @@
       L.push('- 综合水平：' + lv.grade.name + '（' + lv.score + ' 分）' + (lv.trend.dir === 'new' ? '' : '，' + lv.trend.label));
       lv.parts.forEach(function (x) { L.push('  · ' + x.label + '：' + x.v + ' 分（' + x.note + '）'); });
       L.push('- 进度：' + p.mastered + '/' + p.total + ' 个概念已掌握，测验正确率 ' + (p.quizAcc === null ? '暂无' : p.quizAcc + '%'));
+      const declared = S.learnerProfile || {};
+      if (declared.goal || declared.background || declared.dailyMinutes) L.push('- 用户主动填写的学习信息：' +
+        [declared.goal ? '目标 ' + declared.goal : '', declared.background ? '背景 ' + declared.background : '',
+          declared.dailyMinutes ? '每日预算 ' + declared.dailyMinutes + ' 分钟' : ''].filter(Boolean).join('；') +
+        '。不要把未填写的信息推断成事实。');
 
       L.push('');
       L.push('【学习习惯】');
@@ -1028,6 +1045,14 @@
         }).join('、'));
         L.push('- 用户再问到这些概念时，换一个完全不同角度的类比，不要重复上一次的讲法。');
       }
+      if (window.LearnerMemory) {
+        const repeated = Object.values(window.LearnerMemory.state().patterns || {})
+          .filter(function (x) { return x.wrong >= 2 && x.state !== '已通过跨日复测'; })
+          .sort(function (a, b) { return b.lastWrongAt - a.lastWrongAt; }).slice(0, 3);
+        if (repeated.length) L.push('- 待核验的重复错因：' + repeated.map(function (x) {
+          return nm(x.termId) + '的' + x.label + '（' + x.wrong + ' 次错误记录）';
+        }).join('、') + '；这只是行为线索，回答时请用不同情境检查，不要断言能力缺陷。');
+      }
       const interview = S.lab && S.lab.interview && S.lab.interview.result;
       if (interview) {
         const dims = window.INTERVIEW_DIMS || {};
@@ -1055,7 +1080,8 @@
 
     pushChat(role, content, termId, signalId) {
       const c = S.chat;
-      c.push({ role: role, content: content, termId: termId || null, signalId: signalId || null, t: Date.now() });
+      c.push({ id: 'chat-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+        role: role, content: content, termId: termId || null, signalId: signalId || null, t: Date.now() });
       if (c.length > 120) c.splice(0, c.length - 120);
       save();
     },
@@ -1085,6 +1111,13 @@
     },
 
     setPref(k, v) { S.prefs[k] = v; save(); },
+    setLearnerProfile(input) {
+      const value = input && typeof input === 'object' ? input : {};
+      S.learnerProfile = { goal: String(value.goal || '').trim().slice(0, 80),
+        background: String(value.background || '').trim().slice(0, 80),
+        dailyMinutes: Math.max(0, Math.min(240, Math.round(Number(value.dailyMinutes) || 0))), updatedAt: Date.now() };
+      save(); return S.learnerProfile;
+    },
 
     exportJSON() { return JSON.stringify(load(), null, 2); },
     importJSON(txt) {

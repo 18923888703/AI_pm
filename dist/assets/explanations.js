@@ -72,7 +72,8 @@
     'workflow-contract': 'taskdecomp', 'workflow-missing-input': 'tool', 'workflow-prompt': 'structured', 'workflow-determinism': 'workflow',
     'product-confirmation': 'autonomy', 'product-continuity': 'aiux', 'product-evaluation': 'eval', 'product-evalset': 'goldenset',
     'delivery-problem-risk': 'riskgrading', 'delivery-idempotency': 'idempotent', 'delivery-rollout': 'rollout', 'delivery-injection': 'promptinjection',
-    'project-learning': 'problemframing', 'industry-success': 'outcomemetric', 'industry-expectation': 'calibration', 'industry-conflict': 'taskdecomp'
+    'project-product': 'problemframing', 'project-contribution': 'projectevidence', 'project-learning': 'problemframing',
+    'industry-success': 'outcomemetric', 'industry-expectation': 'calibration', 'industry-conflict': 'taskdecomp'
   };
   const guides = {
     'problem-mvp': {
@@ -208,6 +209,7 @@
         else if (/生成.*Rerank|生成之后/.test(o.text)) reason = '重排序的目的是挑选给模型看的资料，必须发生在生成之前。已经用错资料生成的答案，需要另做事实核验。';
         else if (/凭空|没召回/.test(o.text)) reason = 'Reranker 只能给现有候选排序。正确资料没有进入候选集时，需要改召回、切分或数据覆盖，不能靠排序找回。';
       }
+      if (reason.length < 16) reason += ' ' + q.explanation;
       return { id: o.id, text: o.text, correct: o.id === q.correctOptionId, selected: o.id === selectedId, reason: reason };
     });
     const teaching = lesson(term);
@@ -228,5 +230,6 @@
     const teaching = guides[q.variantGroup] || lesson(termById(groupTerms[q.variantGroup]));
     return { teaching: teaching || null, optionReviews: rows, selectedReason: (rows.find(function (o) { return o.selected; }) || {}).reason || '' };
   }
+  window.INTERVIEW_GROUP_TERMS = groupTerms;
   window.Explanations = { learning: learning, interview: interview };
 })();

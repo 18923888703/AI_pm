@@ -143,6 +143,7 @@
   ];
 
   PRACTICES.push.apply(PRACTICES, window.MATERIAL_PRACTICES || []);
+  PRACTICES.push.apply(PRACTICES, window.LONG_MEMORY_PRACTICES || []);
 
   const DIMS = {
     project_experience: { name: '项目与产品经验', desc: '项目价值、个人贡献与复盘', terms: ['problemframing', 'outcomemetric', 'flywheel'], practices: ['assumption-evidence', 'enterprise-handoff'] },
@@ -534,6 +535,13 @@
     questions.forEach(function (question, index) {
       const answer = S.interview.answers[index];
       updateQuestionStat(question, !!answer && (answer.kind === 'open' ? answer.score >= 4 : answer.correct));
+      if (answer && answer.kind === 'mcq' && window.LearnerMemory) {
+        const termId = (question.topics || []).find(function (id) { return window.TERMS.some(function (t) { return t.id === id; }); }) ||
+          (window.INTERVIEW_GROUP_TERMS || {})[question.variantGroup];
+        if (termId) window.LearnerMemory.recordAnswer(Object.assign({}, question, {
+          termId: termId, variantType: question.difficulty >= 3 ? 'tradeoff' : question.difficulty === 1 ? 'definition' : 'scenario'
+        }), answer.value, answer.correct, 'interview');
+      }
     });
     const result = scoreInterview();
     S.interview.result = result;

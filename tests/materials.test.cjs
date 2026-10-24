@@ -7,18 +7,18 @@ const rng = Object.create(Math);
 rng.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 const context = { window: { Mem: { state: {}, save() {}, completeDailyQuiz() {}, quiz() {} } }, Math: rng, Date, Set, Map, console };
 vm.createContext(context);
-for (const file of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'curriculum',
+for (const file of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory', 'curriculum',
   'knowledge-base', 'explanations', 'interview-core50', 'learning-quiz', 'practice', 'interview-bank']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets/' + file + '.js'), 'utf8'), context, { filename: file });
 }
 const w = context.window;
 assert.equal(w.MATERIAL_TERM_IDS.length, 9);
-assert.equal(w.TERMS.length, 85);
+assert.equal(w.TERMS.length, 92);
 assert.equal(w.TERMS.filter(t => !t.optional).length, 61);
 assert.equal(w.Curriculum.real.length, 30, '新增资料不改变主课顺序');
-assert.equal(w.KNOWLEDGE_BASE.length, 33);
-assert.equal(w.PRACTICES.length, 15);
-assert.equal(w.INTERVIEW_BANK.length, 150);
+assert.equal(w.KNOWLEDGE_BASE.length, 34);
+assert.equal(w.PRACTICES.length, 16);
+assert.equal(w.INTERVIEW_BANK.length, 152);
 assert.equal(new Set(w.INTERVIEW_BANK.map(q => q.id)).size, w.INTERVIEW_BANK.length);
 let authoredCount = 0;
 for (const id of w.MATERIAL_TERM_IDS) {

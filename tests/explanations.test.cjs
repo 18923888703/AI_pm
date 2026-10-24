@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ctx = { window: { Mem: { state: {}, save() {}, completeDailyQuiz() {} } }, console };
 vm.createContext(ctx);
-['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'explanations', 'interview-core50', 'term-quiz-short', 'learning-quiz', 'practice', 'interview-bank', 'option-refinements'].forEach(file => {
+['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory', 'explanations', 'interview-core50', 'term-quiz-short', 'learning-quiz', 'practice', 'interview-bank', 'option-refinements'].forEach(file => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets/' + file + '.js'), 'utf8'), ctx);
 });
 const { Explanations, LearningQuiz, TERMS, INTERVIEW_BANK } = ctx.window;
@@ -16,7 +16,7 @@ for (const term of TERMS) {
       assert(detail.teaching.steps.length >= 2, term.id + ' 缺少分步理解');
       assert.equal(detail.optionReviews.filter(x => x.selected).length, 1);
       assert.equal(detail.optionReviews.find(x => x.selected).id, option.id);
-      assert(detail.selectedReason.length > 15);
+      assert(detail.selectedReason.length > 15, term.id + '/' + q.id + '/' + option.id + ' 缺少足够具体的解释');
     }
   }
 }

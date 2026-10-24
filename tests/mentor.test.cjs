@@ -128,11 +128,19 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
   assert.equal(practicePayload.stream, false);
 
   const localDoc = { updatedAt: 100, createdAt: 1, events: [], chat: [], terms: {}, cats: {},
+    syllabus: { startedAt: 1, learned: ['rag'], doneAt: { rag: 20 } },
+    habits: { lastDay: '2026-10-21', streak: 2 },
+    learningMemory: { migrated: true, attempts: [{ id: 'wrong-local', termId: 'rag', at: 70 }],
+      legacyWrong: [], manual: { rag: { value: 'not_yet', at: 90 } } },
     lab: { practices: { 'brief-to-task': { answer: '较新的本地草稿', updatedAt: 200 } } },
     practiceRounds: [{ id: 'round-local', completedAt: 80, date: '2026-10-21' }],
     mentor: { signals: [{ id: 's-local', at: 10, termId: 'rag' }],
       summary: { text: '旧归纳', at: 20 }, supplements: { 'rag|a': { text: '旧重讲', at: 21 } } } };
   const remoteDoc = { updatedAt: 120, createdAt: 1, events: [], chat: [], terms: {}, cats: {},
+    syllabus: { startedAt: 1, learned: ['memorytaxonomy'], doneAt: { memorytaxonomy: 50 } },
+    habits: { lastDay: '2026-10-22', streak: 3 },
+    learningMemory: { migrated: true, attempts: [{ id: 'wrong-remote', termId: 'rag', at: 80 }],
+      legacyWrong: [], manual: { rag: { value: 'mastered', at: 100 } } },
     lab: { practices: { 'brief-to-task': { answer: '较旧远程草稿', updatedAt: 150 },
       'mvp-slice': { answer: '另一设备的草稿', updatedAt: 160 } } },
     practiceRounds: [{ id: 'round-remote', completedAt: 90, date: '2026-10-21' }],
@@ -152,6 +160,16 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
   assert.equal(merged.mentor.supplements['rag|a'].text, '新重讲');
   assert.equal(merged.lab.practices['brief-to-task'].answer, '较新的本地草稿');
   assert.equal(merged.lab.practices['mvp-slice'].answer, '另一设备的草稿');
+  assert.deepEqual(merged.syllabus.learned.sort(), ['memorytaxonomy', 'rag']);
+  assert.equal(merged.habits.lastDay, '2026-10-22');
+  assert.equal(merged.learningMemory.attempts.length, 2);
+  assert.equal(merged.learningMemory.manual.rag.value, 'mastered');
+  const phoneFirstOpen = syncContext.window.Store.mergeDoc({ ...localDoc, updatedAt: 300,
+    dailyLearning: null, plan: null }, { ...remoteDoc, dailyLearning: {
+    date: '2026-10-22', completedAt: 250, responses: [{ termId: 'rag', correct: true }] },
+    plan: { date: '2026-10-22', items: [{ termId: 'rag', type: 'review', lessonNo: 1, done: true }] } });
+  assert.equal(phoneFirstOpen.dailyLearning.completedAt, 250, '新手机的空白状态不能覆盖电脑的今日成绩');
+  assert.equal(phoneFirstOpen.plan.items[0].done, true, '新手机的空白计划不能覆盖电脑进度');
 
   console.log('mentor profile, recommendation, cache, and configured-provider tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

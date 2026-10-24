@@ -69,6 +69,9 @@
     } else if (!correct) {
       current.successStreak = 0;
       current.dueAt = now + DAY;
+    } else if (source === 'spaced' && now >= current.dueAt) {
+      // 同一天的立即纠正可以结束本轮，但不能计作一次跨日掌握证据。
+      current.dueAt = now + DAY;
     }
     current.lastAt = now;
     current.lastQuestionId = questionId;
@@ -93,6 +96,17 @@
       due: due(now).length, nextAt: next ? next.dueAt : 0
     };
   }
+  function reopen(id, now) {
+    if (!term(id)) return null;
+    now = now == null ? Date.now() : now;
+    const records = state();
+    const current = records[id] || seed(id, now, now);
+    current.successStreak = 0;
+    current.dueAt = now;
+    current.lastAt = now;
+    records[id] = current;
+    return current;
+  }
   window.SpacedReview = { initialize: initialize, record: record, due: due, summary: summary,
-    status: function (id) { return state()[id] || null; }, dayKey: dayKey };
+    reopen: reopen, status: function (id) { return state()[id] || null; }, dayKey: dayKey };
 })();

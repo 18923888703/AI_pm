@@ -54,5 +54,9 @@ state.syllabus.learned.push('model');
 spaced.initialize(now);
 assert(spaced.status('model') && !spaced.due(now).some((r) => r.termId === 'model'),
   '今天刚学过的旧记录应从次日开始复测');
+spaced.reopen('ai', now);
+spaced.record('ai', 'ai-source-1', 'scenario', true, 'spaced', now + 1000);
+assert.equal(spaced.status('ai').successStreak, 0, '同日立即纠正不能增加跨日掌握次数');
+assert.ok(spaced.status('ai').dueAt > now + 1000, '同日完成后不能一直留在到期队列');
 assert(saves > 0);
 console.log('spaced review tests passed');

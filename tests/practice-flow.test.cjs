@@ -6,11 +6,11 @@ const vm = require('node:vm');
 const memory = { lab: {} };
 const context = { window: { Mem: { state: memory, save() {} } }, Math, Date, Set, Map, console };
 vm.createContext(context);
-for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'practice', 'practice-coach']) {
+for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory', 'practice', 'practice-coach']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets', name + '.js'), 'utf8'), context, { filename: name });
 }
 const { Lab, PRACTICES, PracticeCoach } = context.window;
-assert.equal(PRACTICES.length, 15);
+assert.equal(PRACTICES.length, 16);
 for (const practice of PRACTICES) {
   const cases = PracticeCoach.examples(practice.id);
   assert.equal(cases.length, 2, `${practice.id}: 每题应有两个案例`);

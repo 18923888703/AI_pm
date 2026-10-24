@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const context = { window: { Mem: { state: {}, save() {} } }, Math, Date, Set, Map, console };
 vm.createContext(context);
-for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials',
+for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory',
   'interview-core50', 'term-quiz-short', 'explanations', 'learning-quiz', 'practice', 'interview-bank', 'option-refinements']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets', name + '.js'), 'utf8'), context, { filename: name });
 }
@@ -18,7 +18,7 @@ const pools = {
     correctOptionId: String(p.decision.a) }))
 };
 assert.equal(pools.interview.length, 62);
-assert.equal(pools.practice.length, 15);
+assert.equal(pools.practice.length, 16);
 for (const [name, questions] of Object.entries(pools)) {
   for (const q of questions) {
     assert.ok(q.options.length >= 3 && q.options.length <= 5, `${name}/${q.id}: 选项数`);
@@ -46,4 +46,4 @@ const contextQ = pools.interview.find(q => q.id === 'foundation-context-a');
 const wrong = contextQ.options.find(o => o.id !== contextQ.correctOptionId);
 const detail = w.Explanations.interview(contextQ, wrong.id);
 assert.ok(detail.selectedReason.includes(wrong.text), '改写后的解析必须引用新选项，不能套用旧选项理由');
-console.log('option quality: 454 learning, 62 interview and 15 practice questions validated');
+console.log('option quality: ' + pools.learning.length + ' learning, ' + pools.interview.length + ' interview and ' + pools.practice.length + ' practice questions validated');

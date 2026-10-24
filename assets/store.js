@@ -156,6 +156,39 @@
 
   const COUNT_FIELDS = ['seen', 'views', 'dwell', 'right', 'wrong', 'confused', 'cleared'];
 
+  function chooseSession(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    if (a.date && b.date && a.date !== b.date) return a.date > b.date ? a : b;
+    const progress = function (x) {
+      return (x.completedAt ? 1000000 : 0) + ((x.responses || x.answers || []).length * 1000) + (x.index || 0);
+    };
+    return progress(a) > progress(b) ? a : progress(b) > progress(a) ? b :
+      (a.completedAt || a.startedAt || 0) >= (b.completedAt || b.startedAt || 0) ? a : b;
+  }
+  function mergePlan(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    if (a.date !== b.date) return String(a.date || '') > String(b.date || '') ? a : b;
+    const done = function (x) { return (x.items || []).filter(function (item) { return item.done; }).length; };
+    const base = done(a) >= done(b) ? a : b;
+    const other = base === a ? b : a;
+    const out = JSON.parse(JSON.stringify(base));
+    const key = function (item) { return (item.termId || item.title || '') + '|' + item.type + '|' + item.lessonNo; };
+    (other.items || []).forEach(function (item) {
+      const current = (out.items || []).find(function (x) { return key(x) === key(item); });
+      if (!current) { out.items.push(item); return; }
+      current.done = !!(current.done || item.done);
+      current.doneAt = Math.max(current.doneAt || 0, item.doneAt || 0);
+      if (current.prog || item.prog) {
+        const x = current.prog || {}, y = item.prog || {};
+        current.prog = { ms: Math.max(x.ms || 0, y.ms || 0), read: !!(x.read || y.read),
+          act: !!(x.act || y.act), quiz: !!(x.quiz || y.quiz) };
+      }
+    });
+    return out;
+  }
+
   /* ---------- 合并策略 ----------
      · 整体：取 updatedAt 更新的一方
      · 事件流：按 t+type+termId+source 去重取并集（不丢另一台设备的学习记录）
@@ -169,12 +202,12 @@
 
     out.events = unionBy(
       [].concat(a.events || [], b.events || []),
-      function (e) { return e.t + '|' + e.type + '|' + (e.termId || '') + '|' + (e.source || ''); }
+      function (e) { return e.id || e.t + '|' + e.type + '|' + (e.termId || '') + '|' + (e.source || ''); }
     ).sort(function (x, y) { return y.t - x.t; }).slice(0, 600);
 
     out.chat = unionBy(
       [].concat(a.chat || [], b.chat || []),
-      function (c) { return c.t + '|' + c.role; }
+      function (c) { return c.id || c.t + '|' + c.role + '|' + (c.content || ''); }
     ).sort(function (x, y) { return x.t - y.t; }).slice(-120);
 
     const mentorA = a.mentor || {}, mentorB = b.mentor || {};
@@ -216,7 +249,11 @@
     });
     out.cats = mergedCats;
 
-    if (a.habits || b.habits) out.habits = mergeNum(a.habits || {}, b.habits || {}, ['hourHist', 'dayHist']);
+    if (a.habits || b.habits) {
+      out.habits = mergeNum(a.habits || {}, b.habits || {}, ['hourHist', 'dayHist']);
+      out.habits.lastDay = String((a.habits || {}).lastDay || '') > String((b.habits || {}).lastDay || '')
+        ? (a.habits || {}).lastDay : (b.habits || {}).lastDay || '';
+    }
     if (a.meta || b.meta) out.meta = mergeNum(a.meta || {}, b.meta || {}, []);
     out.sessions = unionBy([].concat(a.sessions || [], b.sessions || []), function (s) { return String(s.start); })
       .sort(function (x, y) { return x.start - y.start; }).slice(-400);
@@ -226,6 +263,17 @@
         function (h) { return dayKey(h.t); }
       ).sort(function (x, y) { return x.t - y.t; }).slice(-200)
     };
+    const sylA = a.syllabus || {}, sylB = b.syllabus || {};
+    const doneAt = Object.assign({}, sylA.doneAt || {});
+    Object.keys(sylB.doneAt || {}).forEach(function (id) { doneAt[id] = Math.max(doneAt[id] || 0, sylB.doneAt[id] || 0); });
+    out.syllabus = { startedAt: Math.min(sylA.startedAt || Date.now(), sylB.startedAt || Date.now()),
+      learned: Array.from(new Set([].concat(sylA.learned || [], sylB.learned || []))), doneAt: doneAt };
+    out.planLog = Object.assign({}, a.planLog || {});
+    Object.keys(b.planLog || {}).forEach(function (day) {
+      const incoming = b.planLog[day], current = out.planLog[day];
+      if (!current || (incoming.done || 0) >= (current.done || 0)) out.planLog[day] = incoming;
+    });
+    out.dailyLearning = chooseSession(a.dailyLearning, b.dailyLearning);
 
     const mergedQuiz = JSON.parse(JSON.stringify(a.quizVariants || {}));
     Object.keys(b.quizVariants || {}).forEach(function (termId) {
@@ -258,13 +306,39 @@
         const current = out.lab.practices[id];
         if (!current || (incoming.updatedAt || 0) >= (current.updatedAt || 0)) out.lab.practices[id] = incoming;
       });
+      const ia = labA.interview || {}, ib = labB.interview || {};
+      out.lab.interview = out.lab.interview || {};
+      out.lab.interview.history = unionBy([].concat(ia.history || [], ib.history || []), function (x) {
+        return x.at || x.score + '|' + (x.questionIds || []).join(',');
+      }).sort(function (x, y) { return (x.at || 0) - (y.at || 0); }).slice(-20);
+      const mergedStats = Object.assign({}, ia.questionStats || {});
+      Object.keys(ib.questionStats || {}).forEach(function (id) {
+        const x = ib.questionStats[id], current = mergedStats[id];
+        if (!current) mergedStats[id] = x;
+        else mergedStats[id] = { attempts: Math.max(current.attempts || 0, x.attempts || 0),
+          correct: Math.max(current.correct || 0, x.correct || 0), wrong: Math.max(current.wrong || 0, x.wrong || 0),
+          lastAt: Math.max(current.lastAt || 0, x.lastAt || 0),
+          lastQuestionId: (x.lastAt || 0) >= (current.lastAt || 0) ? x.lastQuestionId : current.lastQuestionId };
+      });
+      out.lab.interview.questionStats = mergedStats;
+      out.lab.interview.recentSessions = unionBy([].concat(ia.recentSessions || [], ib.recentSessions || []), function (x) {
+        return (x || []).join('|');
+      }).slice(-2);
+      if (!out.lab.interview.startedAt && (!out.lab.interview.result || (ib.completedAt || 0) > (ia.completedAt || 0))) {
+        const completed = (ia.completedAt || 0) >= (ib.completedAt || 0) ? ia : ib;
+        if (completed.result) {
+          out.lab.interview.result = completed.result;
+          out.lab.interview.completedAt = completed.completedAt;
+        }
+      }
+      out.lab.plan = newest.lab && newest.lab.plan || labA.plan || labB.plan || null;
     }
 
-    out.learningPractice = newest.learningPractice || (base === a ? b.learningPractice : a.learningPractice) || null;
+    out.learningPractice = chooseSession(a.learningPractice, b.learningPractice);
     out.practiceRounds = unionBy([].concat(a.practiceRounds || [], b.practiceRounds || []), function (round) {
       return round.id || String(round.startedAt);
     }).sort(function (x, y) { return (x.completedAt || 0) - (y.completedAt || 0); }).slice(-100);
-    out.spacedSession = newest.spacedSession || (base === a ? b.spacedSession : a.spacedSession) || null;
+    out.spacedSession = chooseSession(a.spacedSession, b.spacedSession);
     const mergedSpaced = JSON.parse(JSON.stringify(a.spacedReview || {}));
     Object.keys(b.spacedReview || {}).forEach(function (id) {
       const other = b.spacedReview[id];
@@ -278,8 +352,30 @@
     });
     out.spacedReview = mergedSpaced;
 
+    const learnA = a.learningMemory || {}, learnB = b.learningMemory || {};
+    const attempts = unionBy([].concat(learnA.attempts || [], learnB.attempts || []), function (x) { return x.id; })
+      .sort(function (x, y) { return (x.at || 0) - (y.at || 0); }).slice(-3000);
+    const legacyMap = new Map();
+    [].concat(learnA.legacyWrong || [], learnB.legacyWrong || []).forEach(function (x) {
+      const key = x.termId + '|' + x.questionId;
+      const old = legacyMap.get(key);
+      if (!old || (x.count || 0) > (old.count || 0)) legacyMap.set(key, x);
+    });
+    const manual = Object.assign({}, learnA.manual || {});
+    Object.keys(learnB.manual || {}).forEach(function (id) {
+      const incoming = learnB.manual[id];
+      if (!manual[id] || (incoming.at || 0) >= (manual[id].at || 0)) manual[id] = incoming;
+    });
+    const legacyWrong = Array.from(legacyMap.values());
+    out.learningMemory = { version: 1, migrated: !!(learnA.migrated || learnB.migrated), attempts: attempts,
+      legacyWrong: legacyWrong, manual: manual,
+      patterns: window.LearnerMemory ? window.LearnerMemory.buildPatterns(attempts, legacyWrong)
+        : Object.assign({}, learnA.patterns || {}, learnB.patterns || {}) };
+
     out.prefs = newest.prefs || base.prefs;
-    out.plan = newest.plan || base.plan;
+    const profileA = a.learnerProfile || {}, profileB = b.learnerProfile || {};
+    out.learnerProfile = (profileA.updatedAt || 0) >= (profileB.updatedAt || 0) ? profileA : profileB;
+    out.plan = mergePlan(a.plan, b.plan);
     out.updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);
     out.createdAt = Math.min(a.createdAt || Date.now(), b.createdAt || Date.now());
     return out;
@@ -303,6 +399,18 @@
     _writing: false,
     support: support,
     dayKey: dayKey,
+    mergeDoc: mergeDoc,
+    readHot: readHot,
+    applyRemote(remote) {
+      if (!remote || typeof remote !== 'object') return null;
+      const local = readHot();
+      const merged = local ? mergeDoc(local, remote) : remote;
+      writeHot(merged);
+      snapshot(merged);
+      if (window.Mem && window.Mem.reload) window.Mem.reload();
+      notify();
+      return merged;
+    },
 
     async init() {
       const s = support();
@@ -380,13 +488,13 @@
         if (!remote) return false;
         const local = readHot();
         if (!local) {
-          writeHot(remote);
+          Store.applyRemote(remote);
           Store.lastSync = Date.now();
           Store.status = 'synced';
           notify();
           return true;
         }
-        writeHot(mergeDoc(local, remote));
+        Store.applyRemote(remote);
         Store.lastSync = Date.now();
         Store.status = 'synced';
         Store.lastError = '';
@@ -404,6 +512,7 @@
     write(state) {
       writeHot(state);
       snapshot(state);
+      if (window.CloudSync) window.CloudSync.schedule();
       if (!Store.handle) return;
       clearTimeout(Store._timer);
       Store._timer = setTimeout(function () { Store.push(); }, 1200);
@@ -427,7 +536,7 @@
         const w = await Store.handle.createWritable();
         await w.write(JSON.stringify(out, null, 2));
         await w.close();
-        if (out !== local) writeHot(out);
+        if (out !== local) Store.applyRemote(out);
         Store.lastSync = Date.now();
         Store.status = 'synced';
         Store.lastError = '';

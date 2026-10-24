@@ -86,6 +86,8 @@ button:focus-visible,[role=button]:focus-visible,summary:focus-visible{
 .dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px;background:var(--text-3)}
 .dot.mastered{background:var(--green)}
 .dot.fuzzy{background:var(--orange)}
+.dot.learning{background:var(--orange)}
+.dot.pending{background:var(--blue)}
 .dot.weak{background:var(--red)}
 
 .side-foot{padding:10px 12px 12px;border-top:1px solid var(--border)}
@@ -813,6 +815,50 @@ body.simple-mode .simple-only{display:block}
 .my-tabs button{border:0;background:transparent;padding:9px 12px;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .my-tabs button:hover{color:var(--text);background:var(--bg-soft)}
 .my-tabs button.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.term-memory-status{margin-top:8px;color:var(--text-2);font-size:12px}
+.term-memory-status .chip-inline{border:0;background:none;color:var(--blue);cursor:pointer;padding:2px 3px}
+.wrongbook-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 0;margin:20px 0 8px}
+.wrongbook-overview > div{display:flex;flex-direction:column}
+.wrongbook-overview b{font-size:23px;line-height:1.2;font-variant-numeric:tabular-nums}
+.wrongbook-overview span{font-size:12px;color:var(--text-2);margin-top:4px}
+.wrongbook-item{padding:17px 0;border-bottom:1px solid var(--border)}
+.wrongbook-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.wrongbook-top > div{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.wrongbook-term{border:0;background:none;color:var(--text);padding:0;text-align:left;font-size:16px;font-weight:650;cursor:pointer}
+.wrongbook-term:hover,.wrongbook-term:focus-visible{color:var(--blue)}
+.wrongbook-patterns,.wrongbook-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.wrongbook-pattern{padding:4px 9px;border-radius:6px;background:rgba(217,115,13,.075);color:var(--text-2);font-size:12px}
+.wrongbook-pattern small{color:var(--orange);margin-left:4px}
+.wrongbook-actions .btn{min-height:38px}
+.wrongbook-evidence{margin-top:14px;border-top:1px solid var(--border)}
+.wrongbook-evidence summary{padding:11px 0;cursor:pointer;font-size:13px;font-weight:600;color:var(--blue)}
+.wrongbook-evidence article{padding:12px 14px;margin:8px 0;border-radius:8px;background:var(--bg-soft)}
+.wrongbook-evidence article > span,.wrongbook-evidence article > b{display:block}
+.wrongbook-evidence article > b{font-size:13px;margin:5px 0;line-height:1.55}
+.wrongbook-evidence article p{margin:4px 0;font-size:12.5px;overflow-wrap:anywhere}
+.wrongbook-evidence article small{display:block;color:var(--text-2);line-height:1.55;margin-top:6px}
+.wrongbook-legacy{margin-top:12px}
+.cloud-sync-card{padding:18px 20px}
+.cloud-sync-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.cloud-sync-head b{font-size:16px}
+.cloud-sync-head p{margin:5px 0 0;max-width:650px}
+.cloud-label,.cloud-reveal label{display:block;font-size:12px;font-weight:650;margin:15px 0 6px}
+.cloud-entry,.cloud-reveal > div,.cloud-sync-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cloud-entry input,.cloud-reveal input{min-width:220px;flex:1;border:1px solid var(--border-2);border-radius:7px;background:var(--bg-soft);padding:9px 11px;outline:none;font-size:13px}
+.cloud-entry input:focus,.cloud-reveal input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(35,131,226,.12)}
+.cloud-entry input:disabled{opacity:.55}
+.cloud-sync-meta{font-size:12px;color:var(--text-2);margin:12px 0}
+.cloud-sync-actions{margin-top:12px}
+.cloud-reveal{margin-top:14px;padding:12px 14px;border-radius:8px;background:rgba(35,131,226,.055)}
+.cloud-reveal[hidden]{display:none}
+.cloud-reveal input{background:#fff;overflow:hidden;text-overflow:ellipsis}
+.cloud-error{min-height:0;color:var(--red);font-size:12px;margin:9px 0 0}
+.cloud-error:empty{display:none}
+.cloud-sync-warning{border-top:1px solid var(--border);padding-top:11px;margin-top:14px}
+.learner-profile-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:8px;background:rgba(35,131,226,.055);margin:0 0 24px}
+.learner-profile-strip p{margin:2px 0 0;font-size:13px;line-height:1.55}
+.learner-profile-form .field{margin-top:10px}
+.learner-profile-form input{width:100%}
 
 /* 术语页：今天这份计划里的位置 */
 .plan-strip{
@@ -1210,6 +1256,15 @@ body.simple-mode .simple-only{display:block}
   .grid2,.rec-grid{grid-template-columns:1fr}
   .my-tabs{margin-bottom:22px}
   .my-tabs button{flex:0 0 auto;padding:10px 9px;font-size:13px}
+  .wrongbook-overview{gap:8px}
+  .wrongbook-overview b{font-size:20px}
+  .wrongbook-overview span{font-size:11px;line-height:1.35}
+  .wrongbook-top{flex-direction:column;gap:3px}
+  .wrongbook-actions .btn{min-height:42px}
+  .cloud-sync-card{padding:16px}
+  .cloud-entry{align-items:stretch;flex-direction:column}
+  .cloud-entry input,.cloud-entry button,.cloud-reveal input{width:100%;min-height:44px}
+  .learner-profile-strip{align-items:flex-start;flex-direction:column}
   .mentor-profile-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .mentor-profile-stats > div{padding:12px 10px;border-bottom:1px solid var(--border)}
   .mentor-profile-stats > div:nth-child(2){border-right:0}

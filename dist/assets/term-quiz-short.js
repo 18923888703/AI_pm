@@ -85,7 +85,14 @@
     ['regressiondecision', '发布结论须同时看修复与新增失败', '从失败证据提假设，做同集回归'],
     ['jdmatch', '按岗位挑真实证据，不改写经历事实', '将岗位要求逐项映射到本人产出'],
     ['projectevidence', '项目追问要能回到本人决策与口径', '串起任务、动作、产出和测量证据'],
-    ['careerassets', '把旧领域经验外化，再补关键能力证据', '盘点可迁移经验，做小闭环验证']
+    ['careerassets', '把旧领域经验外化，再补关键能力证据', '盘点可迁移经验，做小闭环验证'],
+    ['memorytaxonomy', '按时效和复用价值决定什么值得长期记', '本轮状态留工作记忆，稳定信息再持久化'],
+    ['memorylayers', '概要要能回到题目、选择与时间证据', '分核心画像、阶段概要与原始片段保存'],
+    ['memorypipeline', '定义写入、更正、检索和过期规则', '写入、分类、检索、更新与遗忘成闭环'],
+    ['memoryretrieval', '按用户、任务和时效筛选相关记忆', '事实回原始事件，推荐参考阶段概要'],
+    ['memoryconflict', '区分临时状态与稳定偏好变化', '比较时间、来源与适用场景再更新'],
+    ['personalmemory', '让记忆改善内容、交互与讲解方式', '收集证据、形成画像并随反馈更新'],
+    ['errorpattern', '多次错题成模式，跨日变式验证掌握', '保留原始选择并按间隔安排新问法']
   ];
   window.TERM_QUIZ_SHORT = Object.fromEntries(rows.map(function (row) {
     return [row[0], { pm: row[1], mechanism: row[2] }];

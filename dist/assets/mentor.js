@@ -117,6 +117,10 @@
   }
 
   function termStatus(id) {
+    if (window.LearnerMemory) {
+      const k = window.LearnerMemory.status(id).key;
+      return k === 'mastered' ? 'got' : k === 'weak' ? 'confused' : k === 'new' ? 'new' : 'learning';
+    }
     const r = (window.Mem.state.terms || {})[id];
     if (!r || !r.seen) return 'new';
     if (r.mastery >= 3.5) return 'got';

@@ -172,6 +172,7 @@
     rec.recentIds = (rec.recentIds || []).concat(q.id).slice(-6);
     delete active[termId];
     if (window.SpacedReview) window.SpacedReview.record(termId, q.id, q.variantType, ok, source || 'term');
+    if (window.LearnerMemory) window.LearnerMemory.recordAnswer(q, optionId, ok, source || 'term');
     if (!ok && window.Mentor) window.Mentor.recordQuizWrong(termId, q.prompt, selectedOption.text);
     window.Mem.save();
     return Object.assign({

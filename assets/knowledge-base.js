@@ -220,6 +220,7 @@
   ];
 
   topics.push.apply(topics, window.MATERIAL_TOPICS || []);
+  topics.push.apply(topics, window.LONG_MEMORY_TOPICS || []);
 
   function get(id) { return topics.find(function (x) { return x.id === id; }) || null; }
   function forTerm(termId) {
