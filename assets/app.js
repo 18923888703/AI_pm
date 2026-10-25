@@ -450,6 +450,26 @@
     return html + '</div>';
   }
 
+  function aiHelpRow(kind, id, termId, answered, selectedId) {
+    const full = kind === 'term' || kind === 'kb-topic';
+    return '<div class="ai-help-row"><button type="button" class="btn sm ai-help-trigger" data-ai-help-kind="' + escAttr(kind) +
+      '" data-ai-help-id="' + escAttr(id) + '"' + (termId ? ' data-ai-help-term="' + escAttr(termId) + '"' : '') +
+      (answered ? ' data-ai-help-answered="1"' : '') + (selectedId != null ? ' data-ai-help-selected="' + escAttr(selectedId) + '"' : '') +
+      '>✦ ' + (full ? '问 AI 讲明白' : answered ? '追问这道题' : '不会？问 AI') + '</button>' +
+      '<span>' + (full ? '结合当前内容自由提问' : answered ? '结合你的答案解释原因' : '先给思路，提交后再看完整解析') + '</span></div>';
+  }
+  function updateHelpAfterAnswer(button, selectedId) {
+    if (!button) return;
+    button.dataset.aiHelpAnswered = '1';
+    button.dataset.aiHelpSelected = selectedId;
+    button.textContent = '✦ 追问这道题';
+    if (button.nextElementSibling) button.nextElementSibling.textContent = '结合你的答案解释原因';
+    if (chatHelp && chatHelp.sourceKind === button.dataset.aiHelpKind && chatHelp.id === button.dataset.aiHelpId && !streaming) {
+      const fresh = helpContextFor(button);
+      if (fresh) { fresh.sourceKind = button.dataset.aiHelpKind; chatHelp = fresh; updateChatCtx(); }
+    }
+  }
+
   function learningAdviceHTML(responses, allIds, practiceMode, ctaLabel) {
     const wrongIds = Array.from(new Set((responses || []).filter(function (r) { return !r.correct; }).map(function (r) { return r.termId; })));
     const focusIds = wrongIds.length ? wrongIds : (allIds || []).slice();
@@ -515,6 +535,7 @@
           selectedOptionText: selected ? selected.text : '旧记录未保存所选选项',
           correctOptionText: correct ? correct.text : '', explanation: q.explanation,
           pitfall: term.pitfalls && term.pitfalls[0] || '' }, details)) +
+        aiHelpRow('learning', q.id, term.id, true, response.selectedOptionId) +
         '<button type="button" class="btn sm" data-goto="term:' + escAttr(term.id) + '">重新理解「' + esc(term.name) + '」 →</button></details>';
     });
     return html + '</section>';
@@ -526,7 +547,7 @@
     const question = window.LearningQuiz.bank(last.termId).find(function (q) { return q.id === last.questionId; });
     return '<details class="final-answer-review" open><summary>最后一题解析' +
       (question ? ' · ' + esc(question.prompt) : '') + '</summary>' +
-      answerExplanationHTML(session.feedback) + '</details>';
+      answerExplanationHTML(session.feedback) + (question ? aiHelpRow('learning', question.id, last.termId, true, session.feedback.selectedOptionId) : '') + '</details>';
   }
 
   function viewLearn() {
@@ -562,7 +583,7 @@
       '<div class="assessment-progress" role="progressbar" aria-label="答题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
       '<div class="daily-progress-line" aria-live="polite"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>今日学习</span>' + (q.review ? '<span class="review">变式复测</span>' : '<span>新知识</span>') + '</div>' +
-      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
+      '<h1>' + esc(q.prompt) + '</h1>' + aiHelpRow('learning', q.id, q.termId, !!session.feedback, session.feedback && session.feedback.selectedOptionId) + '<div class="assessment-options">';
     q.options.forEach(function (o, i) {
       let cls = '', disabled = '';
       if (session.feedback) {
@@ -604,7 +625,7 @@
       '<div class="assessment-progress" role="progressbar" aria-label="巩固练习进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
       '<div class="daily-progress-line"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>针对性巩固</span><span class="review">变式复测</span></div>' +
-      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
+      '<h1>' + esc(q.prompt) + '</h1>' + aiHelpRow('learning', q.id, q.termId, !!session.feedback, session.feedback && session.feedback.selectedOptionId) + '<div class="assessment-options">';
     q.options.forEach(function (o, i) {
       const feedback = session.feedback;
       const cls = feedback ? (o.id === feedback.correctOptionId ? ' correct' : o.id === feedback.selectedOptionId ? ' wrong' : '') : '';
@@ -640,7 +661,7 @@
       '<div class="assessment-progress" role="progressbar" aria-label="到期复测进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
       '<div class="daily-progress-line"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>到期复测</span><span class="review">不同问法</span></div>' +
-      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
+      '<h1>' + esc(q.prompt) + '</h1>' + aiHelpRow('learning', q.id, q.termId, !!session.feedback, session.feedback && session.feedback.selectedOptionId) + '<div class="assessment-options">';
     q.options.forEach(function (o, i) {
       const feedback = session.feedback;
       const cls = feedback ? (o.id === feedback.correctOptionId ? ' correct' : o.id === feedback.selectedOptionId ? ' wrong' : '') : '';
@@ -824,7 +845,7 @@
         reason: '题目要求找“不属于”的项。这一项实际是当前专题的核心要点，它与「' + x.title + '」的定义相符：' + x.summary + '。因此不应排除这一项。' }; }).concat([correct]);
     }
     return '<section class="kb-check" data-correct="correct"><div class="sec-h"><span class="ico">✅</span>快速自测 · 每次随机换一种问法</div>' +
-      '<h2>' + esc(prompt) + '</h2><div class="kb-check-options">' + shuffled(choices).map(function (o, i) {
+      '<h2>' + esc(prompt) + '</h2>' + aiHelpRow('kb-question', x.id, '', false) + '<div class="kb-check-options">' + shuffled(choices).map(function (o, i) {
         return '<button type="button" data-kb-answer="' + escAttr(o.id) + '" data-answer-text="' + escAttr(o.text) + '" data-answer-reason="' + escAttr(o.reason) + '"><span>' + 'ABCD'[i] + '</span>' + esc(o.text) + '</button>';
       }).join('') + '</div><div class="kb-check-explain" hidden></div></section>';
   }
@@ -834,7 +855,8 @@
     if (!x) return '<div class="page"><div class="empty">找不到这个知识专题</div></div>';
     const related = x.relatedTerms.map(T).filter(Boolean);
     let html = '<div class="page kb-topic"><button type="button" class="kb-back" data-goto="kb">← 返回专题知识库</button>' +
-      '<header><span class="kb-category">' + esc(x.category) + '</span><h1>' + esc(x.title) + '</h1><p class="lead">' + esc(x.summary) + '</p></header>' +
+      '<header><span class="kb-category">' + esc(x.category) + '</span><h1>' + esc(x.title) + '</h1><p class="lead">' + esc(x.summary) + '</p>' +
+      aiHelpRow('kb-topic', x.id, '', true) + '</header>' +
       '<section class="kb-takeaway"><span>一句话应用</span><p>' + esc(x.application) + '</p></section>' +
       '<section class="sec"><div class="sec-h"><span class="ico">🧭</span>理解这个专题的三个抓手</div><div class="kb-points">' +
       x.keyPoints.map(function (p, i) { return '<div><b>0' + (i + 1) + '</b><p>' + esc(p) + '</p></div>'; }).join('') + '</div></section>';
@@ -961,7 +983,7 @@
         return '<p><b>' + esc(x.title) + '</b> · ' + esc(x.lesson) + '</p>';
       }).join('') + '</details>' +
         '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
-        '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p></div>' +
+        '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p>' + aiHelpRow('practice-task', id, '', false) + '</div>' +
       '<label class="practice-label" for="practiceAnswer">写下你的方案</label>' +
         '<textarea id="practiceAnswer" class="practice-answer" maxlength="6000" placeholder="先写你的判断依据、具体做法和失败时怎么办。提交前不会显示参考拆解。">' + esc(r.answer || '') + '</textarea>' +
         '<div class="practice-save-row"><span class="tiny">草稿保存在当前浏览器；至少写 40 字才能提交。</span>' +
@@ -974,7 +996,7 @@
     const answer = r.submittedAnswer || r.answer || '';
     html += '<div class="case-block"><b>练习场景</b><p>' + esc(p.scenario) + '</p></div>' +
       '<div class="practice-submitted"><div><h2>你提交的方案</h2><button type="button" class="btn sm" data-practice-revise="' + escAttr(id) + '">修改后重新提交</button></div>' +
-      '<p>' + esc(answer) + '</p></div>';
+      '<p>' + esc(answer) + '</p>' + aiHelpRow('practice-task', id, '', true) + '</div>';
     const analysis = r.analysis && r.analysis.submissionId === r.submissionId ? r.analysis :
       !r.phase && answer.length >= 20 ? window.PracticeCoach.localAnalysis(p, answer) : null;
     if (analysis) html += practiceAnalysisHTML(analysis, id);
@@ -985,7 +1007,8 @@
     html += '<h2>交付前检查</h2><div class="check-list">' + p.checkpoints.map(function (x) {
       return '<div><span>□</span>' + esc(x) + '</div>';
     }).join('') + '</div>' +
-      '<h2>关键判断</h2><div class="practice-decision" data-id="' + p.id + '"><div class="practice-question">' + esc(p.decision.q) + '</div>';
+      '<h2>关键判断</h2><div class="practice-decision" data-id="' + p.id + '"><div class="practice-question">' + esc(p.decision.q) + '</div>' +
+      aiHelpRow('practice-decision', id, '', r.decision != null, r.decision);
 
     const order = Array.isArray(r.choiceOrder) && r.choiceOrder.length === p.decision.options.length &&
       new Set(r.choiceOrder).size === p.decision.options.length && r.choiceOrder.every(function (i) {
@@ -1142,14 +1165,15 @@
         const selected = (x.q.options || []).find(function (o) { return x.answer && o.id === x.answer.value; });
         const feedback = Object.assign({ correct: false, selectedOptionText: selected ? selected.text : '未选择', correctOptionText: correct ? correct.text : '—', explanation: x.q.explanation },
           window.Explanations.interview(x.q, selected ? selected.id : ''));
-        return '<details><summary>' + esc(x.q.prompt) + '</summary>' + answerExplanationHTML(feedback) + '</details>';
+        return '<details><summary>' + esc(x.q.prompt) + '</summary>' + answerExplanationHTML(feedback) +
+          aiHelpRow('interview', x.q.id, '', true, x.answer && x.answer.value) + '</details>';
       }).join('') + '</div>';
     }
     if (openAnswers.length) {
       html += '<h2>开放题复盘</h2><div class="wrong-list">' + openAnswers.map(function (x) {
         return '<details><summary>' + esc(x.q.prompt) + ' <span class="tag">' + Math.round((x.answer.score || 0) * 10) / 10 + '/5</span></summary>' +
           '<p><b>你的回答：</b>' + esc(x.answer.text) + '</p><p><b>参考结构：</b>' + esc(x.q.answerOutline) + '</p>' +
-          '<p><button class="btn sm ghost" data-assess-ai="' + esc(x.q.id) + '">让 AI 补充点评</button></p></details>';
+          aiHelpRow('interview', x.q.id, '', true) + '</details>';
       }).join('') + '</div>';
     }
     return html + '</div>';
@@ -1170,7 +1194,9 @@
         '<div class="assessment-session-warning">本轮需要连续完成。刷新页面或退出测评会作废当前答案，返回后重新抽题计分。</div>' +
         '<div class="assessment-card"><div class="assessment-question-meta"><span>随机题</span>' +
         (q.review ? '<span class="review">变式复测</span>' : '<span>首次抽到</span>') +
-        '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>';
+        '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>' +
+        aiHelpRow('interview', q.id, '', q.type === 'mcq' ? !!feedback : !!(iv.pendingOpen && iv.pendingOpen.questionId === q.id),
+          feedback && feedback.selectedOptionId);
       if (q.type === 'mcq') {
         html += '<div class="assessment-options">' + q.options.map(function (o, i) {
           let cls = '', disabled = '';
@@ -1607,7 +1633,8 @@
       '<span class="tag">' + (t.optional ? '延伸知识' : '第 ' + window.Curriculum.lessonNoOf(t.id) + ' 课') + ' · ' + esc(window.STAGES[t.stage].name) + '</span>' +
       '<span class="tag">难度 ' + '●'.repeat(t.level) + '○'.repeat(5 - t.level) + '</span>' +
       '</div><div class="term-memory-status">长期状态：' + esc(window.LearnerMemory ? window.LearnerMemory.status(t.id).label : masteryLabel(t.id).label) +
-      ' · <button type="button" class="chip-inline" data-route="wrongbook">查看错题本</button></div></div>';
+      ' · <button type="button" class="chip-inline" data-route="wrongbook">查看错题本</button></div>' +
+      aiHelpRow('term', t.id, t.id, true) + '</div>';
 
     /* ---------- 如果它在今天的计划里：说清楚这是第几项、要做到什么才算完成 ---------- */
     html += planStripHTML(t);
@@ -1666,6 +1693,7 @@
     if (quiz) {
       html += '<div class="quiz" data-question-id="' + esc(quiz.id) + '"><div class="quiz-q">' +
         (quiz.review ? '<span class="tag purple">变式复测</span> ' : '') + esc(quiz.prompt) + '</div>' +
+        aiHelpRow('learning', quiz.id, t.id, false) +
         quiz.options.map(function (o, oi) {
           return '<button type="button" class="opt" data-opt="' + oi + '" data-answer-id="' + esc(o.id) + '"><span class="k">' + 'ABCDE'[oi] + '</span><span>' + esc(o.text) + '</span></button>';
         }).join('') + '<div class="explain" style="display:none"></div></div>';
@@ -1977,6 +2005,16 @@
     }
 
     content.innerHTML = html;
+    if (chatHelp && !streaming) {
+      const trigger = Array.from(content.querySelectorAll('[data-ai-help-kind]')).find(function (el) {
+        return el.dataset.aiHelpKind === chatHelp.sourceKind && el.dataset.aiHelpId === chatHelp.id;
+      });
+      if (!trigger || chatHelp.route !== r.route) chatHelp = null;
+      else {
+        const fresh = helpContextFor(trigger);
+        if (fresh) { fresh.sourceKind = trigger.dataset.aiHelpKind; chatHelp = fresh; }
+      }
+    }
     content.scrollTop = 0;
     if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
 
@@ -2067,10 +2105,12 @@
      交互（事件委托）
      ============================================================ */
   document.addEventListener('click', function (e) {
-    const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-opt],[data-stage],[data-regen],' +
+    const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-begin],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
-      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-assess-ai],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
+      '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
+
+    if (el.dataset.aiHelpKind) { void openContextHelp(el); return; }
 
     if (el.dataset.memoryMark) {
       const id = el.dataset.memoryTerm || (currentTerm && currentTerm.id);
@@ -2107,6 +2147,9 @@
       const box = el.closest('.kb-check');
       if (!box || box.dataset.done) return;
       box.dataset.done = '1';
+      box.dataset.selectedOptionId = el.dataset.kbAnswer;
+      const helpButton = box.querySelector('[data-ai-help-kind="kb-question"]');
+      updateHelpAfterAnswer(helpButton, el.dataset.kbAnswer);
       const ok = el.dataset.kbAnswer === box.dataset.correct;
       box.querySelectorAll('[data-kb-answer]').forEach(function (button) {
         button.disabled = true;
@@ -2195,14 +2238,6 @@
       const selected = Array.from(document.querySelectorAll('.assessment-rubric input:checked')).map(function (x) { return x.value; });
       window.Lab.scoreOpenAnswer(selected);
       render(); return;
-    }
-    if (el.dataset.assessAi) {
-      const q = window.Lab.interviewQuestions().find(function (x) { return x.id === el.dataset.assessAi; });
-      const idx = window.Lab.interviewQuestions().findIndex(function (x) { return x.id === el.dataset.assessAi; });
-      const answer = window.Lab.interview().answers[idx];
-      openChat();
-      if (q && answer) askQuick('请以 AI PM 面试官身份点评这道题。题目：' + q.prompt + '\n我的回答：' + answer.text + '\n请按参考结构指出做得好的地方、缺失判断和更清晰的表达方式。不要修改系统量表得分。');
-      return;
     }
     if (el.dataset.learnStart) {
       const ids = [];
@@ -2303,6 +2338,9 @@
       if (!result) return;
       const ok = result.correct;
       quizEl.dataset.done = '1';
+      quizEl.dataset.selectedOptionId = el.dataset.answerId;
+      const helpButton = quizEl.querySelector('[data-ai-help-kind="learning"]');
+      updateHelpAfterAnswer(helpButton, el.dataset.answerId);
       quizEl.querySelectorAll('.opt').forEach(function (o) {
         o.classList.add('disabled');
         if (o.dataset.answerId === result.correctOptionId) o.classList.add('correct');
@@ -2478,6 +2516,118 @@
   /* ============================================================
      AI 追问侧栏
      ============================================================ */
+  let chatHelp = null;
+
+  function helpOptionTexts(el, q) {
+    const root = el.closest('.assessment-card,.quiz,.practice-decision,.kb-check');
+    if (!root || !q || !q.options) return (q && q.options || []).map(function (o) { return o.text || o; });
+    const buttons = Array.from(root.querySelectorAll('[data-answer-id],[data-learn-answer],[data-review-answer],[data-spaced-answer],[data-assess-answer]'));
+    if (!buttons.length) return q.options.map(function (o) { return o.text || o; });
+    return buttons.map(function (button) {
+      const id = button.dataset.answerId || button.dataset.learnAnswer || button.dataset.reviewAnswer || button.dataset.spacedAnswer || button.dataset.assessAnswer;
+      const option = q.options.find(function (o) { return o.id === id; });
+      return option ? option.text : '';
+    }).filter(Boolean);
+  }
+
+  function helpContextFor(el) {
+    const kind = el.dataset.aiHelpKind, id = el.dataset.aiHelpId;
+    const route = parseHash().route;
+    if (kind === 'term') {
+      const t = T(id);
+      return t && window.AIHelp.topic({ id: id, scope: id, title: t.name, termId: id, summary: t.one,
+        detail: t.example + '；' + t.pm, route: route });
+    }
+    if (kind === 'kb-topic') {
+      const x = window.KnowledgeBase.get(id);
+      return x && window.AIHelp.topic({ id: id, scope: 'help:knowledge:' + id, title: x.title, summary: x.summary,
+        detail: x.application, route: route });
+    }
+    if (kind === 'kb-question') {
+      const x = window.KnowledgeBase.get(id), box = el.closest('.kb-check');
+      if (!x || !box) return null;
+      const buttons = Array.from(box.querySelectorAll('[data-kb-answer]'));
+      const selectedId = el.dataset.aiHelpSelected || box.dataset.selectedOptionId;
+      const selected = buttons.find(function (b) { return b.dataset.kbAnswer === selectedId; });
+      const correct = buttons.find(function (b) { return b.dataset.kbAnswer === box.dataset.correct; });
+      return window.AIHelp.question({ kind: 'knowledge', id: id,
+        title: x.title + ' · 快速自测', prompt: box.querySelector('h2').textContent, route: route,
+        options: buttons.map(function (b) { return b.dataset.answerText; }), answered: !!box.dataset.done,
+        selectedText: selected && selected.dataset.answerText, correctText: correct && correct.dataset.answerText,
+        wasCorrect: selectedId === box.dataset.correct,
+        reason: selected && selected.dataset.answerReason, explanation: correct && correct.dataset.answerReason });
+    }
+    if (kind === 'learning') {
+      const termId = el.dataset.aiHelpTerm;
+      const term = T(termId);
+      const q = term && window.LearningQuiz.bank(termId).find(function (item) { return item.id === id; });
+      if (!q) return null;
+      const selectedId = el.dataset.aiHelpSelected || (el.closest('.quiz') || {}).dataset?.selectedOptionId;
+      const answered = el.dataset.aiHelpAnswered === '1';
+      const selected = q.options.find(function (o) { return o.id === selectedId; });
+      const correct = q.options.find(function (o) { return o.id === q.correctOptionId; });
+      const detail = answered && selected ? window.Explanations.learning(q, term, selected.id) : null;
+      return window.AIHelp.question({ kind: 'learning', id: id, termId: termId,
+        title: term.name + ' · 知识点题', prompt: q.prompt, options: helpOptionTexts(el, q), route: route,
+        answered: answered, selectedText: selected && selected.text, correctText: correct && correct.text,
+        wasCorrect: selectedId === q.correctOptionId,
+        reason: detail && detail.selectedReason, explanation: q.explanation });
+    }
+    if (kind === 'interview') {
+      const questions = window.Lab.interviewQuestions();
+      const q = questions.find(function (item) { return item.id === id; });
+      if (!q) return null;
+      const iv = window.Lab.interview();
+      const answer = iv.answers[questions.findIndex(function (item) { return item.id === id; })];
+      const pending = iv.pendingOpen && iv.pendingOpen.questionId === id ? iv.pendingOpen : null;
+      const selectedId = el.dataset.aiHelpSelected || (answer && answer.value);
+      const selected = q.options && q.options.find(function (o) { return o.id === selectedId; });
+      const correct = q.options && q.options.find(function (o) { return o.id === q.correctOptionId; });
+      const termId = (q.topics || []).find(function (topicId) { return !!T(topicId); }) ||
+        (window.INTERVIEW_GROUP_TERMS || {})[q.variantGroup] || '';
+      const answered = el.dataset.aiHelpAnswered === '1';
+      const detail = answered && q.type === 'mcq' && selected ? window.Explanations.interview(q, selected.id) : null;
+      return window.AIHelp.question({ kind: 'interview', id: id, termId: termId,
+        title: '面试测评 · ' + (window.INTERVIEW_DIMS[q.dimension] || {}).name,
+        prompt: q.prompt, options: helpOptionTexts(el, q), route: route,
+        answered: answered, selectedText: selected && selected.text, correctText: correct && correct.text,
+        wasCorrect: selectedId === q.correctOptionId,
+        reason: detail && detail.selectedReason, explanation: q.type === 'open' ? q.answerOutline : q.explanation,
+        userAnswer: (pending && pending.text) || (answer && answer.text) });
+    }
+    if (kind === 'practice-task' || kind === 'practice-decision') {
+      const p = window.Lab.exercise(id), rec = window.Lab.practiceRec(id);
+      if (!p) return null;
+      if (kind === 'practice-task') return window.AIHelp.question({ kind: kind, id: id,
+        title: p.title + ' · 实战任务', scenario: p.scenario, prompt: p.task, route: route,
+        answered: el.dataset.aiHelpAnswered === '1', userAnswer: rec.submittedAnswer || rec.answer,
+        explanation: p.reference.join('；') });
+      const selectedIndex = rec.decision;
+      const visibleChoices = Array.from((el.closest('.practice-decision') || document).querySelectorAll('[data-practice-choice]'))
+        .map(function (button) { return p.decision.options[Number(button.dataset.practiceChoice)]; });
+      return window.AIHelp.question({ kind: kind, id: id, title: p.title + ' · 关键判断',
+        scenario: p.scenario, prompt: p.decision.q, options: visibleChoices.length ? visibleChoices : p.decision.options, route: route,
+        answered: selectedIndex != null, selectedText: selectedIndex != null ? p.decision.options[selectedIndex] : '',
+        wasCorrect: selectedIndex === p.decision.a,
+        correctText: p.decision.options[p.decision.a], reason: selectedIndex != null ? (p.decision.reasons || {})[selectedIndex] : '',
+        explanation: p.decision.why });
+    }
+    return null;
+  }
+
+  function openContextHelp(el) {
+    if (streaming) { toast('请等当前回答完成，再切换问题'); return; }
+    const context = helpContextFor(el);
+    if (!context) { toast('暂时无法读取这道题，请重试'); return; }
+    context.sourceKind = el.dataset.aiHelpKind;
+    chatHelp = context;
+    openChat();
+    void send(window.AIHelp.opener(context), true);
+  }
+
+  function chatScope() { return chatHelp ? chatHelp.scope : currentTerm ? currentTerm.id : null; }
+  function chatTerm() { return chatHelp && chatHelp.termId ? T(chatHelp.termId) : currentTerm; }
+
   function openChat() {
     $('#chat').classList.remove('hidden');
     $('#chat').setAttribute('aria-hidden', 'false');
@@ -2500,17 +2650,29 @@
 
   function updateChatCtx() {
     const c = $('#chatCtx');
-    c.textContent = currentTerm ? ('正在看：' + currentTerm.name) : '未选择概念';
+    c.textContent = chatHelp ? chatHelp.title : currentTerm ? ('正在看：' + currentTerm.name) : '未选择概念';
+    const anchor = $('#chatAnchor');
+    anchor.hidden = !chatHelp;
+    if (chatHelp) anchor.innerHTML = '<b>' + (chatHelp.kind === 'topic' ? '当前知识点' : chatHelp.answered ? '已提交 · 可完整解析' : '答题中 · 先给思路') +
+      '</b><p>' + esc(chatHelp.prompt) + '</p><small>' +
+      (window.LLM.getCfg().enabled && window.LLM.getCfg().apiKey
+        ? (chatHelp.answered ? '本题、你的作答与提问会发送给你配置的模型供应商。' : '本题与提问会发送给你配置的模型供应商。')
+        : '当前为离线提示；配置模型后可自由追问。') + '</small>';
     const q = $('#chatQuick');
-    const qs = currentTerm
+    const qs = chatHelp && chatHelp.kind === 'question'
+      ? (chatHelp.answered ? ['我错在哪一步', '正确答案为什么成立', '换个场景再讲'] : ['题干关键条件是什么', '先给一个提示', '举个相似但不同的例子'])
+      : chatHelp && chatHelp.kind === 'topic'
+      ? ['用一个真实案例讲', '和相邻方案有什么区别', '什么时候不该用']
+      : currentTerm
       ? ['举个生活例子', '为什么需要它', '用一个 8 岁小孩能懂的比喻', '它和别的方案比有什么代价']
       : ['我该从哪开始学', 'Agent 和 Chatbot 有什么区别', '给我一个学习路线'];
-    q.innerHTML = qs.map(function (x) { return '<span class="q">' + x + '</span>'; }).join('');
-    const history = window.Mem.chatHistory(currentTerm ? currentTerm.id : null);
+    q.innerHTML = qs.map(function (x) { return '<button type="button" class="q">' + x + '</button>'; }).join('');
+    const history = window.Mem.chatHistory(chatScope());
     const clear = $('#chatClear');
     clear.disabled = !history.length || streaming;
-    clear.title = currentTerm ? '清空「' + currentTerm.name + '」的对话' : '清空未选择概念时的对话';
-    if (!streaming && !$('#chat').classList.contains('hidden') && renderedChatContext !== (currentTerm ? currentTerm.id : null)) renderChatHistory();
+    clear.title = chatHelp ? '清空当前题目的对话' : currentTerm ? '清空「' + currentTerm.name + '」的对话' : '清空未选择概念时的对话';
+    clear.setAttribute('aria-label', clear.title);
+    if (!streaming && !$('#chat').classList.contains('hidden') && renderedChatContext !== chatScope()) renderChatHistory();
   }
 
   let renderedChatContext = undefined;
@@ -2529,8 +2691,8 @@
   function renderChatHistory() {
     const b = $('#chatBody');
     b.innerHTML = '';
-    renderedChatContext = currentTerm ? currentTerm.id : null;
-    const history = window.Mem.chatHistory(currentTerm ? currentTerm.id : null);
+    renderedChatContext = chatScope();
+    const history = window.Mem.chatHistory(chatScope());
     if (!history.length) { welcomeMsg(); return; }
     const signals = window.Mentor.state().signals;
     history.forEach(function (m) {
@@ -2544,8 +2706,8 @@
   function welcomeMsg() {
     const b = $('#chatBody');
     b.innerHTML = '<div class="msg ai"><div class="who">AI</div><div class="bubble">' +
-      '选一个概念后直接追问，我会结合你的学习记录换一种讲法。<br><br>' +
-      '也可以现在问：<b>我该从哪开始学？</b>' +
+      (chatHelp ? '这道题或知识点已经带入当前对话。你可以直接说哪里没懂。' :
+        '选一个概念后直接追问，我会结合你的学习记录换一种讲法。<br><br>也可以现在问：<b>我该从哪开始学？</b>') +
       '</div></div>';
   }
 
@@ -2562,10 +2724,12 @@
 
   let streaming = false;
 
-  async function send(text) {
+  async function send(text, automatic) {
     if (streaming || !text.trim()) return;
     if (text.length > 2000) { toast('一次提问请控制在 2000 字以内'); return; }
-    const termAtSend = currentTerm;
+    const termAtSend = chatTerm();
+    const helpAtSend = chatHelp;
+    const scopeAtSend = chatScope();
     const termId = termAtSend ? termAtSend.id : null;
     streaming = true;
     $('#chatSend').disabled = true;
@@ -2578,13 +2742,13 @@
     abortCtl = new AbortController();
 
     // 记录追问偏好（习惯画像的输入）
-    window.Mem.logAsk(text);
+    if (!automatic) window.Mem.logAsk(text);
 
     const res = await window.LLM.ask(text, termAtSend, function (delta) {
       acc += delta;
       bubble.innerHTML = md(acc) + '<span class="cursor"></span>';
       const b = $('#chatBody'); b.scrollTop = b.scrollHeight;
-    }, abortCtl.signal);
+    }, abortCtl.signal, helpAtSend);
 
     const answerText = acc || res.fallback || '';
     bubble.innerHTML = md(answerText);
@@ -2596,14 +2760,14 @@
         '<div class="signal">⚠️ 在线调用失败：' + esc(res.error) + '。已切换为离线讲解，可到设置检查 API 配置。</div>';
     }
     if (res.mode !== 'abort') {
-      const signal = termId ? window.Mentor.record(termId,
+      const signal = termId && !automatic ? window.Mentor.record(termId,
         res.signals || window.Mentor.infer(text, termId), res.signals ? 'chat-model' : 'chat-rule') : null;
-      window.Mem.pushChat('user', text, termId);
-      window.Mem.pushChat('assistant', answerText, termId, signal ? signal.id : null);
-      if (termId) window.Mem.detectSignal(text, termId);
+      window.Mem.pushChat('user', text, scopeAtSend);
+      window.Mem.pushChat('assistant', answerText, scopeAtSend, signal ? signal.id : null);
+      if (termId && !automatic) window.Mem.detectSignal(text, termId);
       if (signal && bubble.isConnected) bubble.parentNode.insertAdjacentHTML('beforeend', signalHTML(signal));
       renderSidebar();
-      if ((currentTerm ? currentTerm.id : null) !== termId) renderChatHistory();
+      if (chatScope() !== scopeAtSend) renderChatHistory();
     }
     updateChatCtx();
     $('#chatBody').scrollTop = $('#chatBody').scrollHeight;
@@ -2623,8 +2787,8 @@
     if (c.classList.contains('hidden')) openChat(); else closeChat();
   };
   $('#chatClear').onclick = function () {
-    const id = currentTerm ? currentTerm.id : null;
-    const label = currentTerm ? '「' + currentTerm.name + '」' : '当前全局';
+    const id = chatScope();
+    const label = chatHelp ? '这道题的' : currentTerm ? '「' + currentTerm.name + '」的' : '当前全局';
     if (!window.Mem.chatHistory(id).length || !confirm('清空' + label + '对话？导师画像里的学习信号会保留。')) return;
     window.Mem.clearChat(id);
     renderChatHistory();

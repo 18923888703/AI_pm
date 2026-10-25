@@ -26,7 +26,7 @@
   function setCfg(c) { localStorage.setItem(CFG_KEY, JSON.stringify(Object.assign(getCfg(), c))); }
 
   /* ---------- 系统提示词：注入长期记忆 ---------- */
-  function buildSystem(term) {
+  function buildSystem(term, helpContext) {
     const brief = window.Mem.memoryBrief(term || null);
     const mentorBrief = window.Mentor ? window.Mentor.profileText() : '';
     const adapt = term ? window.Mem.adaptFor(term) : null;
@@ -63,6 +63,7 @@
       '',
       adaptNote,
       term ? ('【当前概念卡片】\n' + term.name + '（' + term.en + '）\n一句话：' + term.one + '\n类比：' + term.analogy) : '',
+      helpContext && window.AIHelp ? window.AIHelp.system(helpContext) : '',
       '',
       '请用中文回答，字数控制在 300 字以内，除非用户要求展开。'
     ].filter(Boolean).join('\n');
@@ -368,17 +369,18 @@
   }
 
   /* ---------- 对外接口 ---------- */
-  async function ask(userText, term, onDelta, signal) {
+  async function ask(userText, term, onDelta, signal, helpContext) {
     const cfg = getCfg();
-    const history = window.Mem.chatHistory(term ? term.id : null);
-    const messages = [{ role: 'system', content: buildSystem(term) }]
+    const tutoringTerm = helpContext && helpContext.kind === 'question' && !helpContext.answered ? null : term;
+    const history = window.Mem.chatHistory(helpContext ? helpContext.scope : term ? term.id : null);
+    const messages = [{ role: 'system', content: buildSystem(tutoringTerm, helpContext) }]
       .concat(history.map(m => ({ role: m.role, content: m.content })))
       .concat([{ role: 'user', content: userText }]);
 
     if (cfg.enabled && cfg.apiKey) {
       try {
-        if (term && window.Mentor) {
-          const result = await mentorTurn(messages, term, userText, signal);
+        if (tutoringTerm && window.Mentor) {
+          const result = await mentorTurn(messages, tutoringTerm, userText, signal);
           onDelta(result.reply);
           return { mode: 'llm', reply: result.reply, signals: result.signals };
         }
@@ -386,11 +388,11 @@
         return { mode: 'llm' };
       } catch (e) {
         if (e.name === 'AbortError') return { mode: 'abort' };
-        return { mode: 'error', error: e.message, fallback: offlineAnswer(userText, term) };
+        return { mode: 'error', error: e.message, fallback: helpContext && window.AIHelp ? window.AIHelp.offline(helpContext) : offlineAnswer(userText, term) };
       }
     }
     // 离线：模拟逐段输出，体验一致
-    const text = offlineAnswer(userText, term);
+    const text = helpContext && window.AIHelp ? window.AIHelp.offline(helpContext) : offlineAnswer(userText, term);
     const chunks = text.match(/[\s\S]{1,14}/g) || [text];
     for (const c of chunks) {
       await new Promise(r => setTimeout(r, 16));
