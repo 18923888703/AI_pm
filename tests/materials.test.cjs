@@ -35,7 +35,7 @@ for (const id of w.MATERIAL_TERM_IDS) {
     const wrong = question.options.find(o => o.id !== question.correctOptionId);
     const feedback = w.LearningQuiz.answer(id, question.id, wrong.id);
     assert.equal(feedback.correct, false);
-    assert.equal(feedback.selectedReason, wrong.reason);
+    assert.ok(feedback.selectedReason.startsWith(wrong.reason));
     assert.equal(w.LearningQuiz.answer(id, question.id, question.correctOptionId).correct, true);
   }
   assert.ok(w.KnowledgeBase.forTerm(id).length, `${id} 应能回到资料专题`);

@@ -194,13 +194,38 @@
     return { name: term.name, summary: term.one, analogy: term.analogy, steps: (term.steps || []).slice(0, 4), scenario: term.example, application: term.pm, memory: term.one, termId: term.id };
   }
   function plain(s) { return String(s || '').replace(/\*\*|`/g, '').trim(); }
+  function clause(s) { return plain(s).replace(/[。；;！!？?]+$/, ''); }
+  function learningWrongReason(q, term, option, correct) {
+    const choice = plain(option.text);
+    const rule = plain(q.explanation);
+    let diagnosis = '';
+    if (q.variantType === 'pitfall' && /^(?:采购前|自建前|采购后|先|用|把.*?纳入|记录|明确|保留|检查|同时评估|对.*?安排)/.test(choice) && !/只|不设|没有|不测|当成|误当/.test(choice)) diagnosis = '这是一项可取的防护或验证动作，题目问的却是应避免的误区；不能把纠偏措施当成风险本身。';
+    else if (/持续调用.*自动更新模型参数|立刻更新权重|增加模型参数.*长期/.test(choice)) diagnosis = '普通 API 调用只做本轮推理，不执行训练或更新权重；昨天的新事实不会因此写入模型参数。';
+    else if (/接入外部资料也无法作答/.test(choice)) diagnosis = '参数不自动更新，不等于无法回答新问题；RAG 或工具可把最新资料放进当前请求供模型引用。';
+    else if (/注册时间/.test(choice)) diagnosis = '注册时间是数据库已有的精确字段，按用户标识查询即可；用概率生成反而可能编出错误时间。';
+    else if (/计算订单金额/.test(choice)) diagnosis = '满减规则有确定公式，代码能稳定算出唯一结果；交给概率模型只会增加成本和算错风险。';
+    else if (/温度|采样/.test(choice)) diagnosis = '温度改变生成时的采样稳定性，不会补充事实、改变检索命中或修复业务规则。';
+    else if (/更大模型|更强模型|模型品牌|模型排名|榜单/.test(choice)) diagnosis = '模型规模或公开排名不能替代当前任务的真实数据、执行边界和同口径评测。';
+    else if (/调用量|调用次数|字数|Token|总分|点赞/.test(choice)) diagnosis = '这衡量的是活动量、表达或资源消耗，不能单独证明题目里的任务已经正确完成。';
+    else if (/前端.*密钥|密钥.*前端|URL.*密钥/.test(choice)) diagnosis = '浏览器代码和 URL 都会暴露给用户或日志，不能形成服务密钥的安全边界。';
+    else if (/提示词|角色设定|扮演专家/.test(choice)) diagnosis = '提示词只能影响模型行为，不能凭空提供缺失的数据、阻断真实工具权限或代替可校验契约。';
+    else if (/一次演示|只测一次|正常流程|成功样例/.test(choice)) diagnosis = '少量成功样本不能覆盖真实输入和失败边界，无法证明该方案稳定可用。';
+    else if (/只.*(?:视觉|页面|文案|语气)|界面.*(?:数量|入口)/.test(choice)) diagnosis = '展示形式或入口数量不能代替用户完成任务，也不能修复题干里的流程断点。';
+    else if (/直接.*(?:上线|全量|执行|写入)|跳过.*(?:确认|测试|评测)/.test(choice)) diagnosis = '跳过验证或确认会把尚未核实的输出直接变成业务后果，错误也更难回滚。';
+    else if (/一定|必然|完全|所有|无需|不需要|自动|只要/.test(choice)) diagnosis = '这项把一个可能的条件说成了必然保证；题目还要求检查实际数据、边界或结果。';
+    else if (/猜|推断.*(?:订单|价格|政策|物流)|历史.*(?:订单|额度|政策)/.test(choice)) diagnosis = '历史或相似信息不是当前用户的实时事实，无法确认题目所问的具体对象和状态。';
+    if (!diagnosis) diagnosis = q.variantType === 'pitfall'
+      ? '这项并非当前知识点最需要警惕的错误做法；要区分防护措施与会导致失败的误区。'
+      : '选「' + choice + '」会把判断停在另一个环节，没有解决题干的关键条件。';
+    return diagnosis + ' 本题的依据是：' + rule + ' 因此正确项是「' + plain(correct.text) + '」。';
+  }
   function learning(q, term, selectedId) {
     const correct = q.options.find(function (o) { return o.id === q.correctOptionId; });
     const rows = q.options.map(function (o) {
-      const peer = (window.TERMS || []).find(function (p) { return p.id !== term.id && (plain(p.one) === plain(o.text) || plain(p.pm) === plain(o.text)); });
+      const peer = termById(o.peerTermId) || (window.TERMS || []).find(function (p) { return p.id !== term.id && (plain(p.one) === plain(o.text) || plain(p.pm) === plain(o.text)); });
       let reason = o.id === q.correctOptionId ? q.explanation : (o.reason || '');
-      if (!reason && peer) reason = '这项讲的是「' + peer.name + '」：' + peer.one + '。本题考的是「' + term.name + '」：' + term.one + '。两个概念的作用不同，不能替换。';
-      if (!reason) reason = '本题的判断依据是：' + q.explanation + ' 正确选项将这个判断落实为「' + correct.text + '」。下面结合原理和场景逐步理解这项判断。';
+      if (!reason && peer) reason = '这项描述的是「' + peer.name + '」：' + clause(peer.one) + '；它适合处理自己的任务，但不能代替「' + term.name + '」。本题要求的是：' + clause(term.one) + '。若用前者作答，就把两个不同环节混在了一起。';
+      if (!reason) reason = learningWrongReason(q, term, o, correct);
       if (o.id !== q.correctOptionId && learningNotes[term.id] && learningNotes[term.id][o.text]) reason = learningNotes[term.id][o.text];
       // 常见检索混淆直接说明失败发生在哪个阶段。
       if (term.id === 'rerank' && o.id !== q.correctOptionId && !peer) {
@@ -209,7 +234,7 @@
         else if (/生成.*Rerank|生成之后/.test(o.text)) reason = '重排序的目的是挑选给模型看的资料，必须发生在生成之前。已经用错资料生成的答案，需要另做事实核验。';
         else if (/凭空|没召回/.test(o.text)) reason = 'Reranker 只能给现有候选排序。正确资料没有进入候选集时，需要改召回、切分或数据覆盖，不能靠排序找回。';
       }
-      if (reason.length < 16) reason += ' ' + q.explanation;
+      if (reason.length < 22) reason += ' ' + q.explanation;
       return { id: o.id, text: o.text, correct: o.id === q.correctOptionId, selected: o.id === selectedId, reason: reason };
     });
     const teaching = lesson(term);
@@ -221,14 +246,13 @@
     const authored = notes[q.id];
     const rows = q.options.map(function (o) {
       const index = source.options.findIndex(function (x) { return x.id === o.id; });
-      const refined = window.OPTION_REFINEMENTS && window.OPTION_REFINEMENTS.interview[q.id];
+      const sourceOption = source.options[index];
       return { id: o.id, text: o.text, correct: o.id === q.correctOptionId, selected: o.id === selectedId,
-        reason: o.id === q.correctOptionId ? q.explanation : refined
-          ? '这项把判断重点放在「' + o.text + '」，但还不能满足题目条件。' + q.explanation
-          : (authored && authored[index]) || q.explanation };
+        reason: o.id === q.correctOptionId ? q.explanation : (o.reason || (sourceOption && sourceOption.reason) || (authored && authored[index]) || q.explanation) + (((o.reason || (sourceOption && sourceOption.reason) || '').length < 22) ? ' ' + q.explanation : '') };
     });
     const teaching = guides[q.variantGroup] || lesson(termById(groupTerms[q.variantGroup]));
-    return { teaching: teaching || null, optionReviews: rows, selectedReason: (rows.find(function (o) { return o.selected; }) || {}).reason || '' };
+    const selected = rows.find(function (o) { return o.selected; });
+    return { teaching: teaching || null, optionReviews: rows, selectedReason: selected ? '你选的是「' + selected.text + '」。' + selected.reason : '' };
   }
   window.INTERVIEW_GROUP_TERMS = groupTerms;
   window.Explanations = { learning: learning, interview: interview };

@@ -1004,7 +1004,9 @@
     if (r.decision != null) html += answerExplanationHTML({ correct: r.correct,
       selectedOptionText: p.decision.options[r.decision], correctOptionText: p.decision.options[p.decision.a],
       explanation: p.decision.why,
-      selectedReason: p.decision.why + '。对照这道练习的真实场景：' + p.scenario,
+      selectedReason: (p.decision.reasons || {})[r.decision] || '',
+      optionReviews: p.decision.options.map(function (option, i) { return { id: String(i), text: option, correct: i === p.decision.a,
+        selected: i === r.decision, reason: i === p.decision.a ? p.decision.why : (p.decision.reasons || {})[i] || p.decision.why }; }),
       teaching: { name: p.title, summary: p.decision.why, steps: p.reference,
         scenario: p.scenario, application: '验收时逐项检查：' + p.checkpoints.join('；'), memory: p.decision.why } });
     html += '</div><details class="reference-answer"><summary>查看参考拆解</summary><div>' +

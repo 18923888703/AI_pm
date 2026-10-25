@@ -11,12 +11,15 @@ const { Explanations, LearningQuiz, TERMS, INTERVIEW_BANK } = ctx.window;
 for (const term of TERMS) {
   for (const q of LearningQuiz.bank(term.id)) {
     for (const option of q.options) {
+      if (option.id !== q.correctOptionId) assert(option.reason || option.peerTermId,
+        q.id + '/' + option.id + ' 缺少逐项编写的误因或相邻概念来源');
       const detail = Explanations.learning(q, term, option.id);
       assert(detail.teaching.summary && detail.teaching.analogy && detail.teaching.scenario, term.id + ' 缺少通俗解释和场景');
       assert(detail.teaching.steps.length >= 2, term.id + ' 缺少分步理解');
       assert.equal(detail.optionReviews.filter(x => x.selected).length, 1);
       assert.equal(detail.optionReviews.find(x => x.selected).id, option.id);
       assert(detail.selectedReason.length > 15, term.id + '/' + q.id + '/' + option.id + ' 缺少足够具体的解释');
+      if (option.id !== q.correctOptionId) assert(!detail.selectedReason.startsWith('本题的判断依据是：'), q.id + ' 仍在复述通用模板');
     }
   }
 }
@@ -31,8 +34,22 @@ for (const q of INTERVIEW_BANK.filter(x => x.type === 'mcq')) {
     if (!row.correct) {
       assert.notEqual(row.reason, q.explanation, q.id + ' 错误选项没有专属解释');
       assert(row.reason.length > 20, q.id + ' 错误选项解释过于简短');
+      assert(!row.reason.startsWith('这项把判断重点放在'), q.id + ' 仍在使用旧的笼统解析');
+      assert(option.reason, q.id + ' 重写选项缺少绑定到答案 ID 的专属理由');
     }
   }
+}
+const rerank = LearningQuiz.bank('rerank').find(q => q.id === 'rerank-source-1');
+const wrongRerank = rerank.options.find(o => /温度|扩大召回/.test(o.text));
+assert(wrongRerank && /召回|生成|排序|温度/.test(Explanations.learning(rerank, TERMS.find(t => t.id === 'rerank'), wrongRerank.id).selectedReason));
+const generated = LearningQuiz.bank('rerank').find(q => q.id === 'rerank-generated-mechanism');
+assert(generated.options.some(o => o.peerTermId), '生成题须保留干扰项来源，便于解释相邻概念');
+const basicAi = LearningQuiz.bank('ai').find(q => q.id === 'ai-source-1');
+assert.match(Explanations.learning(basicAi, TERMS.find(t => t.id === 'ai'), basicAi.options.find(o => /注册时间/.test(o.text)).id).selectedReason,
+  /数据库.*精确字段/, '确定性查询与 AI 语义判断须解释具体差异');
+for (const practice of ctx.window.PRACTICES) {
+  const wrong = practice.decision.options.map((_, i) => i).filter(i => i !== practice.decision.a);
+  for (const i of wrong) assert((practice.decision.reasons || {})[i]?.length > 15, practice.id + ' 实战误选缺少专属原因');
 }
 const question = LearningQuiz.pick('rerank');
 const wrongId = question.options.find(o => o.id !== question.correctOptionId).id;
@@ -51,5 +68,8 @@ const wrongInterviewId = firstMcq.options.find(o => o.id !== firstMcq.correctOpt
 ctx.window.Lab.answerInterview(wrongInterviewId);
 assert.equal(ctx.window.Lab.interview().feedback.correct, false);
 assert(ctx.window.Lab.interview().feedback.teaching && ctx.window.Lab.interview().feedback.selectedReason);
+const bankQuestion = INTERVIEW_BANK.find(q => q.id === firstMcq.id);
+assert(ctx.window.Lab.interview().feedback.selectedReason.includes(bankQuestion.options.find(o => o.id === wrongInterviewId).reason),
+  '测评会话洗牌与重新载入后仍须使用新选项专属理由');
 assert.equal(ctx.window.Lab.interview().answers[0].score, 0, '详解不应改变客观判分');
 console.log('explanations: all learning questions and interview options have matched, detailed teaching');

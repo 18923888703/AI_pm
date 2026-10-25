@@ -35,14 +35,14 @@
   function makeOptions(questionId, correctText, distractorTexts) {
     const count = Math.min(3 + (hash(questionId) % 3), distractorTexts.length + 1);
     const seen = new Set([String(correctText)]);
-    const usable = distractorTexts.filter(function (text) {
-      text = String(text || '').trim();
+    const usable = distractorTexts.map(function (item) { return typeof item === 'string' ? { text: item } : item; }).filter(function (item) {
+      const text = String(item && item.text || '').trim();
       if (!text || seen.has(text)) return false;
       seen.add(text); return true;
     }).slice(0, count - 1);
     if (usable.length < 2) throw new Error('题目缺少足够的专属干扰项：' + questionId);
     const raw = [{ id: questionId + '-correct', text: correctText, correct: true }]
-      .concat(usable.map(function (text, i) { return { id: questionId + '-d' + (i + 1), text: text, correct: false }; }));
+      .concat(usable.map(function (item, i) { return { id: questionId + '-d' + (i + 1), text: item.text, correct: false, peerTermId: item.peerTermId || null }; }));
     return shuffled(raw);
   }
 
@@ -68,7 +68,7 @@
       return short[item.id] && short[item.id][field] || fallback;
     };
     const definitionId = term.id + '-generated-definition';
-    const definitionOptions = makeOptions(definitionId, term.one, related.map(function (x) { return x.one; }));
+    const definitionOptions = makeOptions(definitionId, term.one, related.map(function (x) { return { text: x.one, peerTermId: x.id }; }));
     out.push({
       id: definitionId, termId: term.id, variantGroup: term.id, variantType: 'definition',
       prompt: '下面哪项最准确地描述「' + term.name + '」？', options: definitionOptions,
@@ -77,7 +77,7 @@
     });
 
     const pmId = term.id + '-generated-pm';
-    const pmOptions = makeOptions(pmId, display(term, 'pm', term.pm), related.map(function (x) { return display(x, 'pm', x.pm); }));
+    const pmOptions = makeOptions(pmId, display(term, 'pm', term.pm), related.map(function (x) { return { text: display(x, 'pm', x.pm), peerTermId: x.id }; }));
     out.push({
       id: pmId, termId: term.id, variantGroup: term.id, variantType: 'tradeoff',
       prompt: '从产品经理视角应用「' + term.name + '」时，哪项判断最准确？', options: pmOptions,
@@ -88,7 +88,7 @@
     const mechanismId = term.id + '-generated-mechanism';
     const mechanism = term.steps && term.steps[0] ? term.steps[0] : term.one;
     const mechanismOptions = makeOptions(mechanismId, display(term, 'mechanism', mechanism), related.map(function (x) {
-      return display(x, 'mechanism', x.steps && x.steps[0] || x.one);
+      return { text: display(x, 'mechanism', x.steps && x.steps[0] || x.one), peerTermId: x.id };
     }));
     out.push({
       id: mechanismId, termId: term.id, variantGroup: term.id, variantType: 'mechanism',
@@ -99,7 +99,7 @@
 
     const boundaryId = term.id + '-generated-pitfall';
     const pitfall = term.pitfalls && term.pitfalls[0] ? term.pitfalls[0] : term.pm;
-    const boundaryOptions = makeOptions(boundaryId, pitfall, related.map(function (x) { return x.pitfalls && x.pitfalls[0] || x.pm; }));
+    const boundaryOptions = makeOptions(boundaryId, pitfall, related.map(function (x) { return { text: x.pitfalls && x.pitfalls[0] || x.pm, peerTermId: x.id }; }));
     out.push({
       id: boundaryId, termId: term.id, variantGroup: term.id, variantType: 'pitfall',
       prompt: '应用「' + term.name + '」时，哪种误区最需要警惕？', options: boundaryOptions,
