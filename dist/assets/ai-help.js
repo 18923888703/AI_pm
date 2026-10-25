@@ -1,6 +1,7 @@
 /* 把知识点和当前题目交给既有 AI 追问侧栏；答题前绝不把正解装进模型上下文。 */
 (function () {
   function clean(value) { return String(value == null ? '' : value).trim(); }
+  function canAskQuestion(answered) { return answered === true; }
   function topic(input) {
     return {
       scope: clean(input.scope) || 'help:topic:' + clean(input.id), kind: 'topic', id: clean(input.id),
@@ -76,5 +77,6 @@
       (context.explanation ? '**判断依据**：' + context.explanation + '\n\n' : '') +
       '启用在线模型后，可以继续针对其中任一步自由追问。';
   }
-  window.AIHelp = { topic: topic, question: question, system: system, opener: opener, offline: offline };
+  window.AIHelp = { topic: topic, question: question, canAskQuestion: canAskQuestion,
+    system: system, opener: opener, offline: offline };
 })();

@@ -8,6 +8,8 @@ const context = { window: {} };
 vm.createContext(context);
 vm.runInContext(files('ai-help'), context);
 const help = context.window.AIHelp;
+assert.equal(help.canAskQuestion(false), false, '作答前不得展示或调用题目 AI 解析');
+assert.equal(help.canAskQuestion(true), true, '提交后才允许按题追问');
 
 const before = help.question({ kind: 'learning', id: 'rerank-1', termId: 'rerank', title: '重排序',
   prompt: '正确资料在候选第 14 位，模型只看前 5 位，应如何处理？',

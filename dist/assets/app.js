@@ -452,22 +452,12 @@
 
   function aiHelpRow(kind, id, termId, answered, selectedId) {
     const full = kind === 'term' || kind === 'kb-topic';
+    if (!full && !window.AIHelp.canAskQuestion(answered)) return '';
     return '<div class="ai-help-row"><button type="button" class="btn sm ai-help-trigger" data-ai-help-kind="' + escAttr(kind) +
       '" data-ai-help-id="' + escAttr(id) + '"' + (termId ? ' data-ai-help-term="' + escAttr(termId) + '"' : '') +
       (answered ? ' data-ai-help-answered="1"' : '') + (selectedId != null ? ' data-ai-help-selected="' + escAttr(selectedId) + '"' : '') +
-      '>✦ ' + (full ? '问 AI 讲明白' : answered ? '追问这道题' : '不会？问 AI') + '</button>' +
-      '<span>' + (full ? '结合当前内容自由提问' : answered ? '结合你的答案解释原因' : '先给思路，提交后再看完整解析') + '</span></div>';
-  }
-  function updateHelpAfterAnswer(button, selectedId) {
-    if (!button) return;
-    button.dataset.aiHelpAnswered = '1';
-    button.dataset.aiHelpSelected = selectedId;
-    button.textContent = '✦ 追问这道题';
-    if (button.nextElementSibling) button.nextElementSibling.textContent = '结合你的答案解释原因';
-    if (chatHelp && chatHelp.sourceKind === button.dataset.aiHelpKind && chatHelp.id === button.dataset.aiHelpId && !streaming) {
-      const fresh = helpContextFor(button);
-      if (fresh) { fresh.sourceKind = button.dataset.aiHelpKind; chatHelp = fresh; updateChatCtx(); }
-    }
+      '>✦ ' + (full ? '问 AI 讲明白' : '问 AI 解析这道题') + '</button>' +
+      '<span>' + (full ? '结合当前内容自由提问' : '结合你的作答解释判断依据') + '</span></div>';
   }
 
   function learningAdviceHTML(responses, allIds, practiceMode, ctaLabel) {
@@ -583,7 +573,7 @@
       '<div class="assessment-progress" role="progressbar" aria-label="答题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
       '<div class="daily-progress-line" aria-live="polite"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>今日学习</span>' + (q.review ? '<span class="review">变式复测</span>' : '<span>新知识</span>') + '</div>' +
-      '<h1>' + esc(q.prompt) + '</h1>' + aiHelpRow('learning', q.id, q.termId, !!session.feedback, session.feedback && session.feedback.selectedOptionId) + '<div class="assessment-options">';
+      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
     q.options.forEach(function (o, i) {
       let cls = '', disabled = '';
       if (session.feedback) {
@@ -596,6 +586,7 @@
     html += '</div>';
     if (session.feedback) {
       html += answerExplanationHTML(session.feedback) +
+        aiHelpRow('learning', q.id, q.termId, true, session.feedback.selectedOptionId) +
         '<div class="assessment-open-actions"><button class="btn primary" data-learn-next="1">' + (session.index + 1 >= session.questions.length ? '查看今日掌握度' : '下一题 →') + '</button></div>';
     }
     return html + '</div></div>';
@@ -625,13 +616,14 @@
       '<div class="assessment-progress" role="progressbar" aria-label="巩固练习进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
       '<div class="daily-progress-line"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>针对性巩固</span><span class="review">变式复测</span></div>' +
-      '<h1>' + esc(q.prompt) + '</h1>' + aiHelpRow('learning', q.id, q.termId, !!session.feedback, session.feedback && session.feedback.selectedOptionId) + '<div class="assessment-options">';
+      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
     q.options.forEach(function (o, i) {
       const feedback = session.feedback;
       const cls = feedback ? (o.id === feedback.correctOptionId ? ' correct' : o.id === feedback.selectedOptionId ? ' wrong' : '') : '';
       html += '<button class="' + cls + '" data-review-answer="' + escAttr(o.id) + '"' + (feedback ? ' disabled' : '') + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
     });
     html += '</div>' + (session.feedback ? answerExplanationHTML(session.feedback) +
+      aiHelpRow('learning', q.id, q.termId, true, session.feedback.selectedOptionId) +
       '<div class="assessment-open-actions"><button class="btn primary" data-review-next="1">' +
       (session.index + 1 >= session.questions.length ? '查看巩固结果' : '下一题 →') + '</button></div>' : '') + '</div></div>';
     return html;
@@ -661,13 +653,14 @@
       '<div class="assessment-progress" role="progressbar" aria-label="到期复测进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><i style="width:' + progress + '%"></i></div></div>' +
       '<div class="daily-progress-line"><span>答题进度</span><b>' + progress + '%</b></div>' +
       '<div class="assessment-card"><div class="assessment-question-meta"><span>到期复测</span><span class="review">不同问法</span></div>' +
-      '<h1>' + esc(q.prompt) + '</h1>' + aiHelpRow('learning', q.id, q.termId, !!session.feedback, session.feedback && session.feedback.selectedOptionId) + '<div class="assessment-options">';
+      '<h1>' + esc(q.prompt) + '</h1><div class="assessment-options">';
     q.options.forEach(function (o, i) {
       const feedback = session.feedback;
       const cls = feedback ? (o.id === feedback.correctOptionId ? ' correct' : o.id === feedback.selectedOptionId ? ' wrong' : '') : '';
       html += '<button class="' + cls + '" data-spaced-answer="' + escAttr(o.id) + '"' + (feedback ? ' disabled' : '') + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
     });
     html += '</div>' + (session.feedback ? answerExplanationHTML(session.feedback) +
+      aiHelpRow('learning', q.id, q.termId, true, session.feedback.selectedOptionId) +
       '<div class="assessment-open-actions"><button class="btn primary" data-spaced-next="1">下一题 →</button></div>' : '') + '</div></div>';
     return html;
   }
@@ -845,7 +838,7 @@
         reason: '题目要求找“不属于”的项。这一项实际是当前专题的核心要点，它与「' + x.title + '」的定义相符：' + x.summary + '。因此不应排除这一项。' }; }).concat([correct]);
     }
     return '<section class="kb-check" data-correct="correct"><div class="sec-h"><span class="ico">✅</span>快速自测 · 每次随机换一种问法</div>' +
-      '<h2>' + esc(prompt) + '</h2>' + aiHelpRow('kb-question', x.id, '', false) + '<div class="kb-check-options">' + shuffled(choices).map(function (o, i) {
+      '<h2>' + esc(prompt) + '</h2><div class="kb-check-options">' + shuffled(choices).map(function (o, i) {
         return '<button type="button" data-kb-answer="' + escAttr(o.id) + '" data-answer-text="' + escAttr(o.text) + '" data-answer-reason="' + escAttr(o.reason) + '"><span>' + 'ABCD'[i] + '</span>' + esc(o.text) + '</button>';
       }).join('') + '</div><div class="kb-check-explain" hidden></div></section>';
   }
@@ -983,7 +976,7 @@
         return '<p><b>' + esc(x.title) + '</b> · ' + esc(x.lesson) + '</p>';
       }).join('') + '</details>' +
         '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
-        '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p>' + aiHelpRow('practice-task', id, '', false) + '</div>' +
+        '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p></div>' +
       '<label class="practice-label" for="practiceAnswer">写下你的方案</label>' +
         '<textarea id="practiceAnswer" class="practice-answer" maxlength="6000" placeholder="先写你的判断依据、具体做法和失败时怎么办。提交前不会显示参考拆解。">' + esc(r.answer || '') + '</textarea>' +
         '<div class="practice-save-row"><span class="tiny">草稿保存在当前浏览器；至少写 40 字才能提交。</span>' +
@@ -996,19 +989,19 @@
     const answer = r.submittedAnswer || r.answer || '';
     html += '<div class="case-block"><b>练习场景</b><p>' + esc(p.scenario) + '</p></div>' +
       '<div class="practice-submitted"><div><h2>你提交的方案</h2><button type="button" class="btn sm" data-practice-revise="' + escAttr(id) + '">修改后重新提交</button></div>' +
-      '<p>' + esc(answer) + '</p>' + aiHelpRow('practice-task', id, '', true) + '</div>';
+      '<p>' + esc(answer) + '</p></div>';
     const analysis = r.analysis && r.analysis.submissionId === r.submissionId ? r.analysis :
       !r.phase && answer.length >= 20 ? window.PracticeCoach.localAnalysis(p, answer) : null;
     if (analysis) html += practiceAnalysisHTML(analysis, id);
     else html += '<div class="practice-analysis-pending" role="status">' +
       (r.phase ? '正在分析你提交的内容…' : '旧版练习记录已保留。点击“修改后重新提交”即可获得逐项分析。') + '</div>';
+    html += aiHelpRow('practice-task', id, '', true);
 
     if (!analysis) return html + '</div>';
     html += '<h2>交付前检查</h2><div class="check-list">' + p.checkpoints.map(function (x) {
       return '<div><span>□</span>' + esc(x) + '</div>';
     }).join('') + '</div>' +
-      '<h2>关键判断</h2><div class="practice-decision" data-id="' + p.id + '"><div class="practice-question">' + esc(p.decision.q) + '</div>' +
-      aiHelpRow('practice-decision', id, '', r.decision != null, r.decision);
+      '<h2>关键判断</h2><div class="practice-decision" data-id="' + p.id + '"><div class="practice-question">' + esc(p.decision.q) + '</div>';
 
     const order = Array.isArray(r.choiceOrder) && r.choiceOrder.length === p.decision.options.length &&
       new Set(r.choiceOrder).size === p.decision.options.length && r.choiceOrder.every(function (i) {
@@ -1031,7 +1024,8 @@
       optionReviews: p.decision.options.map(function (option, i) { return { id: String(i), text: option, correct: i === p.decision.a,
         selected: i === r.decision, reason: i === p.decision.a ? p.decision.why : (p.decision.reasons || {})[i] || p.decision.why }; }),
       teaching: { name: p.title, summary: p.decision.why, steps: p.reference,
-        scenario: p.scenario, application: '验收时逐项检查：' + p.checkpoints.join('；'), memory: p.decision.why } });
+        scenario: p.scenario, application: '验收时逐项检查：' + p.checkpoints.join('；'), memory: p.decision.why } }) +
+      aiHelpRow('practice-decision', id, '', true, r.decision);
     html += '</div><details class="reference-answer"><summary>查看参考拆解</summary><div>' +
       p.reference.map(function (x) { return '<p>· ' + esc(x) + '</p>'; }).join('') + '</div></details>' +
       '<h2>完成后自评</h2><p class="muted small">不是给内容打分，而是判断你能否独立完成同类任务。</p>' +
@@ -1194,9 +1188,7 @@
         '<div class="assessment-session-warning">本轮需要连续完成。刷新页面或退出测评会作废当前答案，返回后重新抽题计分。</div>' +
         '<div class="assessment-card"><div class="assessment-question-meta"><span>随机题</span>' +
         (q.review ? '<span class="review">变式复测</span>' : '<span>首次抽到</span>') +
-        '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>' +
-        aiHelpRow('interview', q.id, '', q.type === 'mcq' ? !!feedback : !!(iv.pendingOpen && iv.pendingOpen.questionId === q.id),
-          feedback && feedback.selectedOptionId);
+        '<span>' + (q.difficulty === 1 ? '基础' : q.difficulty === 2 ? '进阶' : '高阶') + '</span></div><h1>' + esc(q.prompt) + '</h1>';
       if (q.type === 'mcq') {
         html += '<div class="assessment-options">' + q.options.map(function (o, i) {
           let cls = '', disabled = '';
@@ -1208,7 +1200,8 @@
           return '<button class="' + cls + '" data-assess-answer="' + esc(o.id) + '"' + disabled + '><span>' + 'ABCDE'[i] + '</span>' + esc(o.text) + '</button>';
         }).join('') + '</div>';
         if (feedback) {
-          html += answerExplanationHTML(feedback) + '<div class="assessment-open-actions"><button class="btn primary" data-assess-next="1">' +
+          html += answerExplanationHTML(feedback) + aiHelpRow('interview', q.id, '', true, feedback.selectedOptionId) +
+            '<div class="assessment-open-actions"><button class="btn primary" data-assess-next="1">' +
             (iv.answers.length >= questions.length ? '查看测评结果' : '下一题 →') + '</button></div>';
         } else {
           html += '<p class="assessment-note">选择后先查看解析，再进入下一题。</p>';
@@ -1225,6 +1218,7 @@
         '<div class="assessment-rubric"><h2>根据自己的回答勾选已覆盖要点</h2>' + (q.rubric || []).map(function (r) {
           return '<label><input type="checkbox" value="' + esc(r.id) + '"> <span>' + esc(r.label) + '</span></label>';
         }).join('') + '</div><div class="assessment-outline"><b>参考结构</b><p>' + esc(q.answerOutline) + '</p></div>' +
+        aiHelpRow('interview', q.id, '', true) +
         '<div class="assessment-open-actions"><span class="tiny">AI 点评不会改变量表得分。</span><button class="btn primary" data-assess-open-score="1">确认评分并继续</button></div></div></div>';
       return html;
     }
@@ -1693,7 +1687,6 @@
     if (quiz) {
       html += '<div class="quiz" data-question-id="' + esc(quiz.id) + '"><div class="quiz-q">' +
         (quiz.review ? '<span class="tag purple">变式复测</span> ' : '') + esc(quiz.prompt) + '</div>' +
-        aiHelpRow('learning', quiz.id, t.id, false) +
         quiz.options.map(function (o, oi) {
           return '<button type="button" class="opt" data-opt="' + oi + '" data-answer-id="' + esc(o.id) + '"><span class="k">' + 'ABCDE'[oi] + '</span><span>' + esc(o.text) + '</span></button>';
         }).join('') + '<div class="explain" style="display:none"></div></div>';
@@ -1702,8 +1695,7 @@
     // 反馈
     html += '<div class="feedback"><span class="lbl">这个概念现在懂了吗？</span>' +
       '<button class="btn sm" data-fb="cleared">😄 我懂了</button>' +
-      '<button class="btn sm" data-fb="confused">😵 还是不懂</button>' +
-      '<button class="btn sm ghost" data-ask="1">💬 让 AI 再讲一遍</button></div>';
+      '<button class="btn sm" data-fb="confused">😵 还是不懂</button></div>';
 
     // 今日计划内的上一项 / 下一项
     html += planNavHTML(t);
@@ -2016,6 +2008,10 @@
         if (fresh) { fresh.sourceKind = trigger.dataset.aiHelpKind; chatHelp = fresh; }
       }
     }
+    const hideGlobalAsk = ['term', 'kb-topic', 'learn', 'reinforce', 'spaced', 'practice-detail'].indexOf(r.route) >= 0 ||
+      (r.route === 'interview' && !!content.querySelector('.assessment-card'));
+    $('#toggleChat').hidden = hideGlobalAsk;
+    if (hideGlobalAsk && !chatHelp && !$('#chat').classList.contains('hidden')) closeChat();
     content.scrollTop = 0;
     if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
 
@@ -2087,7 +2083,7 @@
 
   /** 让可点击的 div 也能被键盘访问 */
   function a11yPass() {
-    document.querySelectorAll('.nav-item,[data-goto],[data-ask],.chip,.rec,.term-row,.dict-row,.heat-cell').forEach(function (el) {
+    document.querySelectorAll('.nav-item,[data-goto],.chip,.rec,.term-row,.dict-row,.heat-cell').forEach(function (el) {
       if (el.tagName === 'BUTTON' || el.tagName === 'A') return;
       el.setAttribute('role', 'button');
       el.setAttribute('tabindex', '0');
@@ -2106,7 +2102,7 @@
      交互（事件委托）
      ============================================================ */
   document.addEventListener('click', function (e) {
-    const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ask],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
+    const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
       '[data-practice-begin],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
@@ -2149,8 +2145,6 @@
       if (!box || box.dataset.done) return;
       box.dataset.done = '1';
       box.dataset.selectedOptionId = el.dataset.kbAnswer;
-      const helpButton = box.querySelector('[data-ai-help-kind="kb-question"]');
-      updateHelpAfterAnswer(helpButton, el.dataset.kbAnswer);
       const ok = el.dataset.kbAnswer === box.dataset.correct;
       box.querySelectorAll('[data-kb-answer]').forEach(function (button) {
         button.disabled = true;
@@ -2167,7 +2161,8 @@
       const right = reviews.find(function (o) { return o.correct; });
       explain.innerHTML = answerExplanationHTML({ correct: ok, selectedOptionText: el.dataset.answerText, correctOptionText: right.text,
         selectedReason: el.dataset.answerReason, explanation: right.reason, optionReviews: reviews,
-        teaching: { name: x.title, summary: x.summary, steps: x.keyPoints, scenario: x.application, memory: x.keyPoints[0] } });
+        teaching: { name: x.title, summary: x.summary, steps: x.keyPoints, scenario: x.application, memory: x.keyPoints[0] } }) +
+        aiHelpRow('kb-question', x.id, '', true, el.dataset.kbAnswer);
       return;
     }
 
@@ -2330,8 +2325,6 @@
       return;
     }
 
-    if (el.dataset.ask) { openChat(); if (currentTerm) askQuick('我还没完全懂，换一种更简单的方式再讲一遍'); return; }
-
     if (el.dataset.opt !== undefined && currentTerm) {
       const quizEl = el.closest('.quiz');
       if (quizEl.dataset.done) return;
@@ -2340,8 +2333,6 @@
       const ok = result.correct;
       quizEl.dataset.done = '1';
       quizEl.dataset.selectedOptionId = el.dataset.answerId;
-      const helpButton = quizEl.querySelector('[data-ai-help-kind="learning"]');
-      updateHelpAfterAnswer(helpButton, el.dataset.answerId);
       quizEl.querySelectorAll('.opt').forEach(function (o) {
         o.classList.add('disabled');
         if (o.dataset.answerId === result.correctOptionId) o.classList.add('correct');
@@ -2349,7 +2340,7 @@
       });
       const ex = quizEl.querySelector('.explain');
       ex.style.display = 'block';
-      ex.innerHTML = answerExplanationHTML(result);
+      ex.innerHTML = answerExplanationHTML(result) + aiHelpRow('learning', quizEl.dataset.questionId, currentTerm.id, true, el.dataset.answerId);
       window.Mem.quiz(currentTerm.id, currentTerm.cat, ok);
       checkPlanDone(currentTerm.id);
       updatePlanUI();
@@ -2625,6 +2616,9 @@
     if (streaming) { toast('请等当前回答完成，再切换问题'); return; }
     const context = helpContextFor(el);
     if (!context) { toast('暂时无法读取这道题，请重试'); return; }
+    if (context.kind === 'question' && !window.AIHelp.canAskQuestion(context.answered)) {
+      toast('请先完成这道题，再问 AI 解析'); return;
+    }
     context.sourceKind = el.dataset.aiHelpKind;
     chatHelp = context;
     openChat();

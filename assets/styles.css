@@ -691,6 +691,7 @@ body.simple-mode .simple-only{display:block}
 .ai-help-row > span{font-size:11.5px;line-height:1.5;color:var(--text-3)}
 .ai-help-trigger{min-height:40px;border-color:rgba(35,131,226,.24);background:rgba(35,131,226,.055);color:var(--blue);font-weight:600}
 .ai-help-trigger:hover,.ai-help-trigger:focus-visible{background:rgba(35,131,226,.12);border-color:var(--blue)}
+#toggleChat[hidden]{display:none}
 .term-head > .ai-help-row,.kb-topic header > .ai-help-row{margin:12px 0 0}
 .quiz > .ai-help-row,.practice-task > .ai-help-row,.practice-decision > .ai-help-row,.kb-check > .ai-help-row{margin:10px 0 15px}
 .daily-wrong-item > .ai-help-row,.final-answer-review > .ai-help-row,.wrong-list details > .ai-help-row{margin:10px 0 16px}
