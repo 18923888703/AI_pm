@@ -1776,7 +1776,8 @@
         '<div id="cloudRevealBox" class="cloud-reveal" hidden><label for="cloudSavedCode">在手机上打开同一网站，输入这个配对码</label>' +
         '<div><input id="cloudSavedCode" type="text" readonly autocomplete="off" value=""><button class="btn sm" id="cloudCopy">复制</button></div></div>';
     } else {
-      html += '<label class="cloud-label" for="cloudCode">配对码</label><div class="cloud-entry"><input id="cloudCode" type="password" autocomplete="off" spellcheck="false" placeholder="APM1-…"' +
+      html += '<div class="cloud-first-note" role="note"><b>首次连接，没有配对码？</b><p>配对码由站点所有者单独签发，不会自动显示在未连接的设备上。若另一台设备已连接，可在那里点击“显示配对码”；两台都未连接且没有保存过码时，需要重新签发。下方的示例文字不是配对码。</p></div>' +
+        '<label class="cloud-label" for="cloudCode">配对码</label><div class="cloud-entry"><input id="cloudCode" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴完整的 APM1- 配对码"' +
         (cloud.support() ? '' : ' disabled') + '><button class="btn primary" id="cloudConnect"' +
         (cloud.support() ? '' : ' disabled') + '>连接并合并记录</button></div>' +
         '<p class="tiny">电脑和手机输入同一个配对码。已有本机记录会先合并再上传，不会直接覆盖。' +
@@ -2386,6 +2387,11 @@
 
     bind('cloudConnect', async function () {
       const button = $('#cloudConnect'), message = $('#cloudError');
+      if (!$('#cloudCode').value.trim()) {
+        message.textContent = '这里需要实际配对码；输入框里的示例不是配对码。请使用单独签发的完整编码。';
+        $('#cloudCode').focus();
+        return;
+      }
       button.disabled = true; message.textContent = '正在加密并合并记录…';
       try {
         await window.CloudSync.connect($('#cloudCode').value);

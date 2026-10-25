@@ -849,6 +849,9 @@ body.simple-mode .simple-only{display:block}
 .cloud-sync-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .cloud-sync-head b{font-size:16px}
 .cloud-sync-head p{margin:5px 0 0;max-width:650px}
+.cloud-first-note{margin-top:14px;padding:12px 14px;border-radius:8px;background:rgba(35,131,226,.055);color:var(--text-2)}
+.cloud-first-note b{display:block;color:var(--text);font-size:13px;font-weight:650}
+.cloud-first-note p{margin:3px 0 0;font-size:12px;line-height:1.6}
 .cloud-label,.cloud-reveal label{display:block;font-size:12px;font-weight:650;margin:15px 0 6px}
 .cloud-entry,.cloud-reveal > div,.cloud-sync-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cloud-entry input,.cloud-reveal input{min-width:220px;flex:1;border:1px solid var(--border-2);border-radius:7px;background:var(--bg-soft);padding:9px 11px;outline:none;font-size:13px}
