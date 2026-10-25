@@ -413,19 +413,20 @@
   }
 
   function answerExplanationHTML(f) {
-    // 旧版进行中的今日学习保留答案，同时补上新详解。
-    if (!f.teaching && f.termId && window.LearningQuiz && window.Explanations) {
+    // 学习题使用稳定题目与选项 ID 重新生成解析，避免旧缓存沿用已过时的变式讲法。
+    if (f.termId && window.LearningQuiz && window.Explanations) {
       const term = T(f.termId);
       const question = window.LearningQuiz.bank(f.termId).find(function (q) { return q.id === f.questionId; });
       if (term && question) f = Object.assign({}, f, window.Explanations.learning(question, term, f.selectedOptionId));
     }
     let html = '<div class="answer-explanation ' + (f.correct ? 'is-correct' : 'is-wrong') + '">' +
+      (f.showQuestionPrompt && f.questionPrompt ? '<div class="answer-question-context"><span>' + esc(f.variantLabel || '本题') + '</span><b>' + esc(f.questionPrompt) + '</b></div>' : '') +
       '<div class="answer-verdict"><b>' + (f.correct ? '判断正确' : '这道题答错了') + '</b><span>' +
       (f.correct ? '看看判断依据，确认自己也能解释原因。' : '看清选项的差异，再用具体场景理解。') + '</span></div>' +
       '<div class="answer-compare"><div><span>你的选择</span><p>' + esc(f.selectedOptionText || '—') + '</p></div>' +
       '<div><span>正确答案</span><p>' + esc(f.correctOptionText || '—') + '</p></div></div>' +
       (!f.correct && f.selectedReason ? '<div class="answer-reason answer-selected-reason"><b>你选的这一项，具体错在哪里</b><p>' + md(f.selectedReason) + '</p></div>' : '') +
-      '<div class="answer-reason"><b>正确答案为什么成立</b><p>' + md(f.explanation || '') + '</p></div>';
+      '<div class="answer-reason"><b>正确答案为什么成立</b><p>' + md(f.correctReason || f.explanation || '') + '</p></div>';
     const teach = f.teaching;
     if (teach) {
       html += '<section class="answer-teaching"><h3>把「' + esc(teach.name) + '」讲明白</h3>' +
@@ -450,12 +451,13 @@
     return html + '</div>';
   }
 
-  function aiHelpRow(kind, id, termId, answered, selectedId) {
+  function aiHelpRow(kind, id, termId, answered, selectedId, optionIds) {
     const full = kind === 'term' || kind === 'kb-topic';
     if (!full && !window.AIHelp.canAskQuestion(answered)) return '';
     return '<div class="ai-help-row"><button type="button" class="btn sm ai-help-trigger" data-ai-help-kind="' + escAttr(kind) +
       '" data-ai-help-id="' + escAttr(id) + '"' + (termId ? ' data-ai-help-term="' + escAttr(termId) + '"' : '') +
       (answered ? ' data-ai-help-answered="1"' : '') + (selectedId != null ? ' data-ai-help-selected="' + escAttr(selectedId) + '"' : '') +
+      (Array.isArray(optionIds) ? ' data-ai-help-order="' + escAttr(optionIds.join(',')) + '"' : '') +
       '>✦ ' + (full ? '问 AI 讲明白' : '问 AI 解析这道题') + '</button>' +
       '<span>' + (full ? '结合当前内容自由提问' : '结合你的作答解释判断依据') + '</span></div>';
   }
@@ -508,13 +510,22 @@
       ? '<p class="reinforcement-next">建议继续补强：' + esc(progress.needsWork.map(function (id) { const t = T(id); return t ? t.name : id; }).join('、')) + '。</p>' : '') + '</section>';
   }
 
+  function orderedLearningQuestion(question, ref) {
+    if (!question || !ref || !Array.isArray(ref.optionIds)) return question;
+    const options = ref.optionIds.map(function (id) { return question.options.find(function (o) { return o.id === id; }); });
+    return options.length === question.options.length && options.every(Boolean)
+      ? Object.assign({}, question, { options: options }) : question;
+  }
+
   function wrongAnswerReviewHTML(session) {
     const wrong = (session.responses || []).filter(function (response) { return !response.correct; });
     if (!wrong.length) return '';
     let html = '<section class="daily-wrong-review"><h2>错题逐题查看</h2><p class="tiny">展开可看当时选项、判断依据和具体场景；点知识点可重新学习。</p>';
     wrong.forEach(function (response) {
       const term = T(response.termId);
-      const q = window.LearningQuiz.bank(response.termId).find(function (item) { return item.id === response.questionId; });
+      const source = window.LearningQuiz.bank(response.termId).find(function (item) { return item.id === response.questionId; });
+      const ref = (session.questions || []).find(function (item) { return item.termId === response.termId && item.questionId === response.questionId; });
+      const q = orderedLearningQuestion(source, ref);
       if (!term || !q) return;
       const selected = q.options.find(function (option) { return option.id === response.selectedOptionId; });
       const correct = q.options.find(function (option) { return option.id === q.correctOptionId; });
@@ -525,7 +536,7 @@
           selectedOptionText: selected ? selected.text : '旧记录未保存所选选项',
           correctOptionText: correct ? correct.text : '', explanation: q.explanation,
           pitfall: term.pitfalls && term.pitfalls[0] || '' }, details)) +
-        aiHelpRow('learning', q.id, term.id, true, response.selectedOptionId) +
+        aiHelpRow('learning', q.id, term.id, true, response.selectedOptionId, ref && ref.optionIds) +
         '<button type="button" class="btn sm" data-goto="term:' + escAttr(term.id) + '">重新理解「' + esc(term.name) + '」 →</button></details>';
     });
     return html + '</section>';
@@ -534,10 +545,46 @@
   function finalAnswerReviewHTML(session) {
     if (!session.feedback) return '';
     const last = session.questions[session.questions.length - 1];
-    const question = window.LearningQuiz.bank(last.termId).find(function (q) { return q.id === last.questionId; });
+    const question = orderedLearningQuestion(window.LearningQuiz.bank(last.termId).find(function (q) { return q.id === last.questionId; }), last);
     return '<details class="final-answer-review" open><summary>最后一题解析' +
       (question ? ' · ' + esc(question.prompt) : '') + '</summary>' +
-      answerExplanationHTML(session.feedback) + (question ? aiHelpRow('learning', question.id, last.termId, true, session.feedback.selectedOptionId) : '') + '</details>';
+      answerExplanationHTML(session.feedback) + (question ? aiHelpRow('learning', question.id, last.termId, true, session.feedback.selectedOptionId, last.optionIds) : '') + '</details>';
+  }
+
+  function roundAnswerReviewHTML(session) {
+    const responses = session && session.responses || [];
+    if (!responses.length) return '';
+    const firstWrong = responses.findIndex(function (r) { return !r.correct; });
+    let html = '<section class="round-answer-review"><h2>本轮逐题解析</h2>' +
+      '<p class="tiny">按实际抽到的变式题逐题查看；每题的判断依据和误选原因都与该题对应。</p>';
+    responses.forEach(function (response, index) {
+      const term = T(response.termId);
+      const source = term && window.LearningQuiz.bank(response.termId).find(function (q) { return q.id === response.questionId; });
+      const ref = session.questions && session.questions[index] && session.questions[index].questionId === response.questionId
+        ? session.questions[index] : (session.questions || []).find(function (item) {
+          return item.termId === response.termId && item.questionId === response.questionId;
+        });
+      const question = orderedLearningQuestion(source, ref);
+      if (!question) {
+        html += '<details class="round-answer-item"><summary><b>第 ' + (index + 1) + ' 题 · 旧题版本已更新</b></summary>' +
+          '<p class="tiny">这条历史作答已保留，但原题内容已变更，无法生成准确的逐项解析。</p></details>';
+        return;
+      }
+      const selected = question.options.find(function (o) { return o.id === response.selectedOptionId; });
+      const correct = question.options.find(function (o) { return o.id === question.correctOptionId; });
+      const detail = window.Explanations.learning(question, term, response.selectedOptionId || '');
+      const feedback = Object.assign({ correct: !!response.correct, termId: term.id, questionId: question.id,
+        selectedOptionId: response.selectedOptionId || '',
+        selectedOptionText: selected ? selected.text : '旧记录未保存所选选项',
+        correctOptionText: correct ? correct.text : '', explanation: question.explanation,
+        pitfall: question.variantType === 'pitfall' ? '' : term.pitfalls && term.pitfalls[0] || '', showQuestionPrompt: true }, detail);
+      html += '<details class="round-answer-item"' + (index === firstWrong ? ' open' : '') + '><summary>' +
+        '<span class="tag ' + (response.correct ? 'green' : 'red') + '">' + (response.correct ? '答对' : '答错') + '</span>' +
+        '<b>第 ' + (index + 1) + ' 题 · ' + esc(question.prompt) + '</b><small>' + esc(term.name) + '</small></summary>' +
+        answerExplanationHTML(feedback) + aiHelpRow('learning', question.id, term.id, true, response.selectedOptionId,
+          ref && ref.optionIds) + '</details>';
+    });
+    return html + '</section>';
   }
 
   function viewLearn() {
@@ -606,7 +653,7 @@
         learningAdviceHTML(session.responses, session.focusIds, true, false) +
         (progress && progress.wrongIds.length && (!progress.verified || progress.needsWork.length) ?
           '<button type="button" class="btn" data-review-start="1">' + (progress.verified ? '继续补强薄弱点' : '继续下一轮巩固') + ' →</button>' : '') +
-        finalAnswerReviewHTML(session) + '</div>';
+        roundAnswerReviewHTML(session) + '</div>';
     }
     const q = window.LearningQuiz.practiceQuestion();
     if (!q) return '<div class="page"><div class="empty">练习题暂时无法读取。<br><br><button class="btn" data-route="learn">返回今日成绩</button></div></div>';
@@ -643,7 +690,7 @@
         '<div class="spaced-result-note">' + (pending ? '有 ' + pending + ' 个知识点答错，已安排约 1 天后再测。' :
           '本轮答对会延长复测间隔；首次跨日答对仍需再通过一次不同日期的到期复测。') +
         ' ' + nextText + '</div>' +
-        finalAnswerReviewHTML(session) + '</div>';
+        roundAnswerReviewHTML(session) + '</div>';
     }
     const q = window.LearningQuiz.spacedQuestion();
     if (!q) return '<div class="page"><div class="empty">复测题暂时无法读取。<br><br><button class="btn" data-route="review">返回复习安排</button></div></div>';
@@ -2516,6 +2563,13 @@
   let chatHelp = null;
 
   function helpOptionTexts(el, q) {
+    if (el.dataset.aiHelpOrder && q && q.options) {
+      const ordered = el.dataset.aiHelpOrder.split(',').map(function (id) {
+        const option = q.options.find(function (o) { return o.id === id; });
+        return option && option.text;
+      });
+      if (ordered.length === q.options.length && ordered.every(Boolean)) return ordered;
+    }
     const root = el.closest('.assessment-card,.quiz,.practice-decision,.kb-check');
     if (!root || !q || !q.options) return (q && q.options || []).map(function (o) { return o.text || o; });
     const buttons = Array.from(root.querySelectorAll('[data-answer-id],[data-learn-answer],[data-review-answer],[data-spaced-answer],[data-assess-answer]'));

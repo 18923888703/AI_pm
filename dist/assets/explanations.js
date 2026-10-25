@@ -195,6 +195,12 @@
   }
   function plain(s) { return String(s || '').replace(/\*\*|`/g, '').trim(); }
   function clause(s) { return plain(s).replace(/[。；;！!？?]+$/, ''); }
+  function variantMeaning(term, variantType) {
+    if (variantType === 'pitfall') return (term.pitfalls || [])[0] || term.pm || term.one;
+    if (variantType === 'tradeoff') return term.pm || term.one;
+    if (variantType === 'mechanism') return (term.steps || [])[0] || term.one;
+    return term.one;
+  }
   function learningWrongReason(q, term, option, correct) {
     const choice = plain(option.text);
     const rule = plain(q.explanation);
@@ -221,10 +227,18 @@
   }
   function learning(q, term, selectedId) {
     const correct = q.options.find(function (o) { return o.id === q.correctOptionId; });
+    const variantNames = { definition: '概念边界', scenario: '场景判断', boundary: '边界取舍',
+      tradeoff: '产品取舍', mechanism: '工作机制', pitfall: '常见误区' };
     const rows = q.options.map(function (o) {
       const peer = termById(o.peerTermId) || (window.TERMS || []).find(function (p) { return p.id !== term.id && (plain(p.one) === plain(o.text) || plain(p.pm) === plain(o.text)); });
       let reason = o.id === q.correctOptionId ? q.explanation : (o.reason || '');
-      if (!reason && peer) reason = '这项描述的是「' + peer.name + '」：' + clause(peer.one) + '；它适合处理自己的任务，但不能代替「' + term.name + '」。本题要求的是：' + clause(term.one) + '。若用前者作答，就把两个不同环节混在了一起。';
+      if (!reason && peer) {
+        const peerMeaning = clause(variantMeaning(peer, q.variantType));
+        const targetMeaning = clause(variantMeaning(term, q.variantType));
+        reason = q.variantType === 'pitfall'
+          ? '你选的「' + o.text + '」是「' + peer.name + '」相关的误区；它发生在「' + clause(peer.one) + '」这一层。本题问的是「' + term.name + '」的误区，应关注「' + correct.text + '」。两者都可能是风险，但考查对象不同。'
+          : '你选的「' + o.text + '」对应「' + peer.name + '」：' + peerMeaning + '。本题考「' + term.name + '」的同一角度，应依据「' + targetMeaning + '」判断；不能用相邻概念的答案替代。';
+      }
       if (!reason) reason = learningWrongReason(q, term, o, correct);
       if (o.id !== q.correctOptionId && learningNotes[term.id] && learningNotes[term.id][o.text]) reason = learningNotes[term.id][o.text];
       // 常见检索混淆直接说明失败发生在哪个阶段。
@@ -239,7 +253,16 @@
     });
     const teaching = lesson(term);
     teaching.contrasts = (term.related || []).map(termById).filter(Boolean).slice(0, 2).map(function (p) { return { name: p.name, meaning: p.one, termId: p.id }; });
-    return { teaching: teaching, optionReviews: rows, selectedReason: (rows.find(function (o) { return o.selected; }) || {}).reason || '' };
+    const reverse = /不属于|不正确|哪项错误|哪个错误/.test(q.prompt);
+    const exactRepeat = clause(q.explanation) === clause(correct.text);
+    const support = q.variantType === 'pitfall' ? term.pm :
+      q.variantType === 'mechanism' ? (term.steps || [])[1] || term.example : term.example;
+    const correctReason = (reverse ? '本题要找例外或错误项，不能按“哪项正确”来选。' : '') +
+      '本题考查「' + (variantNames[q.variantType] || '场景应用') + '」。选「' + correct.text + '」的原因是：' +
+      (exactRepeat ? clause(support || q.explanation) : q.explanation);
+    return { teaching: teaching, questionPrompt: q.prompt, questionId: q.id,
+      variantLabel: variantNames[q.variantType] || '场景应用', correctReason: correctReason,
+      optionReviews: rows, selectedReason: (rows.find(function (o) { return o.selected; }) || {}).reason || '' };
   }
   function interview(q, selectedId) {
     const source = (window.INTERVIEW_BANK || []).find(function (x) { return x.id === q.id; }) || q;

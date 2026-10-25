@@ -14,6 +14,10 @@ for (const term of TERMS) {
       if (option.id !== q.correctOptionId) assert(option.reason || option.peerTermId,
         q.id + '/' + option.id + ' 缺少逐项编写的误因或相邻概念来源');
       const detail = Explanations.learning(q, term, option.id);
+      assert.equal(detail.questionId, q.id);
+      assert.equal(detail.questionPrompt, q.prompt);
+      assert(detail.correctReason.includes(q.options.find(o => o.id === q.correctOptionId).text),
+        q.id + ' 正解解析未关联本题选项');
       assert(detail.teaching.summary && detail.teaching.analogy && detail.teaching.scenario, term.id + ' 缺少通俗解释和场景');
       assert(detail.teaching.steps.length >= 2, term.id + ' 缺少分步理解');
       assert.equal(detail.optionReviews.filter(x => x.selected).length, 1);
@@ -44,9 +48,21 @@ const wrongRerank = rerank.options.find(o => /温度|扩大召回/.test(o.text))
 assert(wrongRerank && /召回|生成|排序|温度/.test(Explanations.learning(rerank, TERMS.find(t => t.id === 'rerank'), wrongRerank.id).selectedReason));
 const generated = LearningQuiz.bank('rerank').find(q => q.id === 'rerank-generated-mechanism');
 assert(generated.options.some(o => o.peerTermId), '生成题须保留干扰项来源，便于解释相邻概念');
+const reversedGenerated = { ...generated, options: generated.options.slice().reverse() };
+const reversedDetail = Explanations.learning(reversedGenerated, TERMS.find(t => t.id === 'rerank'), reversedGenerated.options[0].id);
+assert.deepEqual(Array.from(reversedDetail.optionReviews.map(o => o.id)), Array.from(reversedGenerated.options.map(o => o.id)),
+  '复盘时逐项解析顺序应与当时展示的变式题选项顺序一致');
 const basicAi = LearningQuiz.bank('ai').find(q => q.id === 'ai-source-1');
 assert.match(Explanations.learning(basicAi, TERMS.find(t => t.id === 'ai'), basicAi.options.find(o => /注册时间/.test(o.text)).id).selectedReason,
   /数据库.*精确字段/, '确定性查询与 AI 语义判断须解释具体差异');
+const aiPitfall = LearningQuiz.bank('ai').find(q => q.id === 'ai-generated-pitfall');
+const modelPitfall = aiPitfall.options.find(o => o.peerTermId === 'model');
+const pitfallDetail = Explanations.learning(aiPitfall, TERMS.find(t => t.id === 'ai'), modelPitfall.id);
+assert(pitfallDetail.selectedReason.includes(modelPitfall.text) &&
+  pitfallDetail.selectedReason.includes(aiPitfall.options.find(o => o.id === aiPitfall.correctOptionId).text),
+  '误区变式必须对照本题所选误区与正确误区，而不是只解释相邻概念定义');
+assert(pitfallDetail.correctReason.includes('AI 不是万能胶'),
+  '正确项原文与题库解释相同时，必须补充原因而不是重复答案');
 for (const practice of ctx.window.PRACTICES) {
   const wrong = practice.decision.options.map((_, i) => i).filter(i => i !== practice.decision.a);
   for (const i of wrong) assert((practice.decision.reasons || {})[i]?.length > 15, practice.id + ' 实战误选缺少专属原因');

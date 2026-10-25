@@ -183,7 +183,7 @@
       conceptName: term ? term.name : termId,
       conceptSummary: term ? term.one : '',
       pmView: term ? term.pm : '',
-      pitfall: term && term.pitfalls && term.pitfalls.length ? term.pitfalls[0] : ''
+      pitfall: q.variantType !== 'pitfall' && term && term.pitfalls && term.pitfalls.length ? term.pitfalls[0] : ''
     }, window.Explanations ? window.Explanations.learning(q, term, optionId) : {});
   }
 
@@ -452,7 +452,7 @@
     if (!result) return null;
     const term = window.TERMS.find(function (x) { return x.id === q.termId; });
     if (window.Mem.quiz && term) window.Mem.quiz(q.termId, term.cat, result.correct);
-    s.responses.push({ termId: q.termId, questionId: q.id, correct: result.correct, at: Date.now() });
+    s.responses.push({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId), correct: result.correct, at: Date.now() });
     s.feedback = Object.assign({ termId: q.termId, questionId: q.id, selectedOptionId: String(optionId) }, result);
     finishSession(s);
     window.Mem.save(); return s.feedback;

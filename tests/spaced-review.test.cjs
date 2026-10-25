@@ -24,6 +24,9 @@ assert.equal(session.questions.length, 1);
 assert.notEqual(question.id, 'rerank-source-1', '复测应优先更换原题');
 assert.notEqual(question.variantType, 'scenario', '复测应优先换一种问法');
 quiz.answerSpaced(question.correctOptionId);
+assert.equal(quiz.spaced().responses[0].questionId, question.id);
+assert.equal(quiz.spaced().responses[0].selectedOptionId, question.correctOptionId,
+  '到期变式题须保存所选选项，完成后才能重建对应题的解析');
 assert.equal(spaced.status('rerank').successStreak, 1);
 assert.equal(quiz.spaced().result.score, 100, '最后一题答完即显示本轮成绩');
 assert.equal(spaced.summary(now).score, 0, '一次跨日答对仍不能算长期掌握');

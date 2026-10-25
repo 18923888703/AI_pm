@@ -93,6 +93,10 @@ while (!context.window.LearningQuiz.practice().completedAt) {
   const lastQuestion = context.window.LearningQuiz.practice().responses.length + 1 === context.window.LearningQuiz.practice().questions.length;
   const feedback = context.window.LearningQuiz.answerPractice(chosen);
   assert.ok(feedback && feedback.explanation && feedback.correctOptionText);
+  assert.equal(feedback.questionId, q.id, '变式题反馈必须对应刚刚作答的题目 ID');
+  assert.equal(feedback.questionPrompt, q.prompt, '变式题解析必须对应当前题干');
+  assert.ok(feedback.correctReason.includes(feedback.correctOptionText), '正确项的解释必须点名本题答案');
+  assert.equal(feedback.optionReviews.find(o => o.selected).id, chosen, '选项洗牌后误因仍须对应实际选择');
   if (lastQuestion) {
     assert.ok(context.window.LearningQuiz.practice().completedAt, '巩固练习最后一题应立即出分');
     assert.equal(context.window.LearningQuiz.practice().result.score, 75);
@@ -102,6 +106,13 @@ while (!context.window.LearningQuiz.practice().completedAt) {
   practiceAnswered++;
 }
 assert.equal(context.window.LearningQuiz.practice().result.score, 75);
+context.window.LearningQuiz.practice().responses.forEach((response) => {
+  const original = context.window.LearningQuiz.bank(response.termId).find(q => q.id === response.questionId);
+  const term = context.window.TERMS.find(t => t.id === response.termId);
+  const detail = context.window.Explanations.learning(original, term, response.selectedOptionId);
+  assert.equal(detail.questionPrompt, original.prompt, '完成页每道变式题都应能按题目 ID 重建解析');
+  assert.equal(detail.optionReviews.find(o => o.selected).id, response.selectedOptionId);
+});
 assert.equal(context.window.LearningQuiz.dailyResult().score, 100, '追加练习不能修改今日掌握度');
 assert.equal(reviewEvents.length, 4, '追加练习应计入知识点记忆');
 const sevenWeak = context.window.LearningQuiz.startPractice(['ai', 'model', 'llm', 'token', 'prompt', 'context', 'hallucination']);
