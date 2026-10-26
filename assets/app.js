@@ -1800,11 +1800,11 @@
     const ev = (window.Mem.state.events || []).length;
 
     let html = '<div class="page"><h1>我的学习</h1>' + myTabs('settings') + '<h2>设置与记忆</h2>' +
-      '<p class="lead">学习记录先保存在本机。开启加密同步后，电脑和手机可用同一个同步码接续学习。</p>';
+      '<p class="lead">学习记录保存在当前浏览器。本站暂不提供配对码云同步，可在下方导出 JSON，并在另一台设备导入。</p>';
 
     const cloud = window.CloudSync;
-    html += '<h2>手机与电脑同步</h2><section class="card cloud-sync-card"><div class="cloud-sync-head"><div><b>加密同步</b>' +
-      '<p class="tiny">题目记录、错因与复测计划在本机加密后存到本站云端；同步码只留在你的设备，模型 API Key 不同步。</p></div>' +
+    html += '<h2>跨设备记录</h2><section class="card cloud-sync-card"><div class="cloud-sync-head"><div><b>配对码同步暂不可用</b>' +
+      '<p class="tiny">Sites 静态版不运行原 Netlify 同步后端。题目记录、错因与复测计划仍保存在本机；请用下方 JSON 导出与导入迁移。</p></div>' +
       '<span id="cloudStatus" class="tag ' + (cloud.status === 'synced' ? 'green' : cloud.status === 'error' ? 'red' : 'orange') + '">' +
       (cloud.status === 'synced' ? '已同步' : cloud.status === 'syncing' ? '同步中' : cloud.status === 'error' ? '同步失败' : '未连接') + '</span></div>';
     if (cloud.connected()) {
@@ -1815,15 +1815,15 @@
         '<div id="cloudRevealBox" class="cloud-reveal" hidden><label for="cloudSavedCode">在手机上打开同一网站，输入这个配对码</label>' +
         '<div><input id="cloudSavedCode" type="text" readonly autocomplete="off" value=""><button class="btn sm" id="cloudCopy">复制</button></div></div>';
     } else {
-      html += '<div class="cloud-first-note" role="note"><b>首次连接，没有配对码？</b><p>配对码由站点所有者单独签发，不会自动显示在未连接的设备上。若另一台设备已连接，可在那里点击“显示配对码”；两台都未连接且没有保存过码时，需要重新签发。下方的示例文字不是配对码。</p></div>' +
+      html += '<div class="cloud-first-note" role="note"><b>如何把旧站记录带过来？</b><p>新域名不能读取旧站浏览器记录。请在旧站「我的学习 → 设置与记忆」导出 JSON，再复制到本站下方文本框导入；模型 API Key 需在新站单独配置。</p></div>' +
         '<label class="cloud-label" for="cloudCode">配对码</label><div class="cloud-entry"><input id="cloudCode" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴完整的 APM1- 配对码"' +
         (cloud.support() ? '' : ' disabled') + '><button class="btn primary" id="cloudConnect"' +
         (cloud.support() ? '' : ' disabled') + '>连接并合并记录</button></div>' +
-        '<p class="tiny">电脑和手机输入同一个配对码。已有本机记录会先合并再上传，不会直接覆盖。' +
-        (cloud.support() ? '' : '请通过 HTTPS 公开站点打开。') + '</p>';
+        '<p class="tiny">配对码输入在此版本已禁用。旧站记录不会自动合并；请使用下方 JSON 备份与导入。' +
+        (cloud.support() ? '' : '本托管版本暂不支持自动云同步。') + '</p>';
     }
     html += '<p id="cloudError" class="cloud-error" role="status">' + esc(cloud.lastError || '') + '</p>' +
-      '<p class="tiny cloud-sync-warning">请妥善保管配对码；任何拿到它的人都可读取并改写这份学习记忆。断开只停止此设备同步，不删除云端数据。</p></section>';
+      '<p class="tiny cloud-sync-warning">导出的 JSON 包含学习数据，请自行保管；导入前可先备份本站现有记录。</p></section>';
 
     html += '<h2>你确认的学习画像</h2><div class="card learner-profile-form">' +
       '<p class="tiny">只记录与你学习有关的目标和节奏；自动归纳的错因是待验证线索，可在错题本核对。</p>' +
@@ -1865,7 +1865,7 @@
     html += '<div class="hint-box">' +
       '<b>文件备份：</b>点「创建同步文件」，把它存进 <b>iCloud Drive / OneDrive / 坚果云 / Dropbox</b> 的文件夹。' +
       '之后每次学习都会自动写回这个文件；在另一台设备等网盘同步完成后打开本页，会自动把两边的记录合并起来。<br>' +
-      '<span class="tiny">部分手机浏览器不支持文件访问 API，手机请优先使用上方加密同步。</span>' +
+      '<span class="tiny">部分手机浏览器不支持文件访问 API；手机可使用下方 JSON 导出与导入。</span>' +
       '</div></div>';
 
     /* ---------- 快照与恢复 ---------- */
@@ -1924,7 +1924,7 @@
       '<div class="tiny" style="margin-bottom:10px">' +
       '今天这份清单生成于 ' + (plS.items.length ? timeAgo(window.Mem.state.plan.genAt) : '—') +
       '，按天冻结保存 —— 第二天打开时，没做完的项目会自动顺延到新清单的最前面。' +
-      '课表进度也一并写进记忆，换设备同步后会接着走，不用重学。</div>' +
+      '课表进度也写进本机记忆，导出后在另一台设备导入即可接着学习。</div>' +
       (hist.length
         ? '<div class="plan-hist">' + hist.map(function (d) {
           const l = window.Mem.state.planLog[d];
@@ -1960,7 +1960,7 @@
       '<div class="callout"><span class="emo">🔒</span><div class="ct"><b>关于隐私</b><br>' +
       '· 学习记录、练习答案、面试分数、对话历史和 API Key 保存在本机浏览器，可自行导出或清空。<br>' +
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
-      '· 启用手机同步时，学习数据在浏览器内加密后写入本站 Netlify 存储；配对码是解密与写入凭据，请勿公开。模型 API Key 不参与同步。<br>' +
+      '· 本 Sites 版本不提供 Netlify 配对码同步；跨设备迁移请使用 JSON 导出与导入，模型 API Key 需分别配置。<br>' +
       '· 启用在线模型后，问题、当前概念、相关对话、学习画像摘要，以及你提交的实战练习答案会发送给你配置的模型厂商，用于回答、归纳、重讲和具体点评。<br>' +
       '· 可以导出、回滚或清空本机记忆；断开同步不会删除云端密文。</div></div>';
 
@@ -2461,7 +2461,7 @@
     bind('saveLearnerProfile', function () {
       window.Mem.setLearnerProfile({ goal: $('#learnerGoal').value, background: $('#learnerBackground').value,
         dailyMinutes: $('#learnerMinutes').value });
-      toast('学习目标与节奏已保存，可在手机同步');
+      toast('学习目标与节奏已保存，可通过 JSON 备份迁移');
     });
 
     bind('syncLink', async function () {

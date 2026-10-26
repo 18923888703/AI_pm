@@ -6,7 +6,8 @@
   let account = null, timer = null, inFlight = null, dirty = false;
 
   function support() {
-    return location.protocol === 'https:' && !!(window.crypto && crypto.subtle && crypto.getRandomValues && window.fetch);
+    // Sites 静态版没有 Netlify Functions；禁用配对连接，避免向不存在的端点发送数据。
+    return false;
   }
   function bytesToHex(bytes) { return Array.from(bytes).map(function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }
   function toBase64Url(bytes) {
