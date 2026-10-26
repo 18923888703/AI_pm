@@ -9,7 +9,7 @@ seededMath.random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 0x100000
 const state = {};
 const context = { window: {}, Math: seededMath, Date, Set, Map, console };
 vm.createContext(context);
-['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/data-extension.js', 'assets/data-materials.js', 'assets/data-long-memory.js', 'assets/interview-core50.js'].forEach((file) => {
+['assets/data-core.js', 'assets/data-adv.js', 'assets/data-pro.js', 'assets/data-pm.js', 'assets/data-extension.js', 'assets/data-materials.js', 'assets/data-long-memory.js', 'assets/data-agent-hallucination.js', 'assets/interview-core50.js'].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
 const reviewEvents = [];

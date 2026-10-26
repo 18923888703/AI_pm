@@ -92,7 +92,8 @@
     ['memoryretrieval', '按用户、任务和时效筛选相关记忆', '事实回原始事件，推荐参考阶段概要'],
     ['memoryconflict', '区分临时状态与稳定偏好变化', '比较时间、来源与适用场景再更新'],
     ['personalmemory', '让记忆改善内容、交互与讲解方式', '收集证据、形成画像并随反馈更新'],
-    ['errorpattern', '多次错题成模式，跨日变式验证掌握', '保留原始选择并按间隔安排新问法']
+    ['errorpattern', '多次错题成模式，跨日变式验证掌握', '保留原始选择并按间隔安排新问法'],
+    ['agenthallucination', '分开治理无证据结论与错误动作反馈', '核对来源、生成、工具和目标状态']
   ];
   window.TERM_QUIZ_SHORT = Object.fromEntries(rows.map(function (row) {
     return [row[0], { pm: row[1], mechanism: row[2] }];

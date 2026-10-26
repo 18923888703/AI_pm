@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const context = { window: { Mem: { state: {}, save() {} } }, Math, Date, Set, Map, console };
 vm.createContext(context);
 for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials',
-  'data-long-memory', 'interview-core50', 'term-quiz-short', 'learning-quiz', 'knowledge-base', 'practice', 'interview-bank']) {
+  'data-long-memory', 'data-agent-hallucination', 'interview-core50', 'term-quiz-short', 'learning-quiz', 'knowledge-base', 'practice', 'interview-bank']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets', name + '.js'), 'utf8'), context, { filename: name });
 }
 const w = context.window;

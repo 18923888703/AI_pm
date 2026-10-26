@@ -9,7 +9,7 @@ const state = { terms: { rag: { seen: 1, right: 0, wrong: 2, confused: 0, cleare
 let saves = 0;
 const context = { window: { Mem: { state, save() { saves++; } } }, Math, Date, Set, Map, console };
 vm.createContext(context);
-for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory',
+for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory', 'data-agent-hallucination',
   'interview-core50', 'term-quiz-short', 'spaced-review', 'learner-memory', 'learning-quiz']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets', name + '.js'), 'utf8'), context, { filename: name });
 }

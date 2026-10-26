@@ -13,15 +13,16 @@ vm.createContext(context);
   'assets/data-extension.js',
   'assets/data-materials.js',
   'assets/data-long-memory.js',
+  'assets/data-agent-hallucination.js',
   'assets/curriculum.js'
 ].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
 });
 
 const terms = context.window.TERMS;
-assert.equal(terms.length, 92, '应包含 61 个主课知识点与 31 个延伸知识点');
+assert.equal(terms.length, 93, '应包含 61 个主课知识点与 32 个延伸知识点');
 assert.equal(terms.filter((t) => !t.optional).length, 61);
-assert.equal(context.window.Curriculum.extension.length, 31);
+assert.equal(context.window.Curriculum.extension.length, 32);
 assert.equal(new Set(terms.map((t) => t.id)).size, terms.length, '知识点 ID 不应重复');
 
 const rerank = terms.find((t) => t.id === 'rerank');

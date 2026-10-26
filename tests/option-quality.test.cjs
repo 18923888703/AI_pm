@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const context = { window: { Mem: { state: {}, save() {} } }, Math, Date, Set, Map, console };
 vm.createContext(context);
-for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory',
+for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials', 'data-long-memory', 'data-agent-hallucination',
   'interview-core50', 'term-quiz-short', 'explanations', 'learning-quiz', 'practice', 'interview-bank', 'option-refinements']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets', name + '.js'), 'utf8'), context, { filename: name });
 }
@@ -18,7 +18,7 @@ const pools = {
     correctOptionId: String(p.decision.a) }))
 };
 assert.equal(pools.interview.length, 62);
-assert.equal(pools.practice.length, 16);
+assert.equal(pools.practice.length, 17);
 for (const [name, questions] of Object.entries(pools)) {
   for (const q of questions) {
     assert.ok(q.options.length >= 3 && q.options.length <= 5, `${name}/${q.id}: 选项数`);
