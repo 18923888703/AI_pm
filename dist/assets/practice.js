@@ -376,6 +376,8 @@
   }
   function practiceDone(id) {
     const r = practiceRec(id);
+    if (r.assessmentRequired) return r.phase === 'review' && !!r.analysis &&
+      r.analysis.submissionId === r.submissionId && r.analysis.mode === 'model' && r.analysis.verdict === 'pass';
     if (r.phase) return r.phase === 'review' && !!r.analysis && r.analysis.submissionId === r.submissionId;
     return String(r.answer || '').trim().length >= 20 && r.decision != null && r.rating != null;
   }
@@ -583,6 +585,7 @@
       r.answer = text;
       r.submittedAnswer = text;
       r.submissionId = 'submission-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      r.assessmentRequired = true;
       r.analysis = null;
       r.phase = 'review';
       r.choiceOrder = p.decision.options.map(function (_, index) { return index; });

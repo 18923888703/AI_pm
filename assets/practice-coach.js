@@ -101,25 +101,47 @@
       else gaps.push({ criterion: criterion, quote: '', why: '本地检查未找到与「' + criterion + '」明显相关的文字，可能遗漏，也可能用了不同说法。',
         revision: '回到这道题的任务要求，补写与「' + criterion + '」相关的对象、判断条件、处理动作和验收办法；再对照下面的参考拆解。' });
     });
-    return { mode: 'local', summary: '已根据你提交的 ' + text.length + ' 个字寻找结构线索；本地检查不能判断方案是否正确，也不能确认缺失项一定没有写。若已配置在线模型，会继续获取针对原文的具体点评。',
+    return { mode: 'local', summary: '已根据你提交的 ' + text.length + ' 个字寻找结构线索；本地检查不能判断方案是否正确，也不能确认缺失项一定没有写。',
       strengths: strengths, gaps: gaps,
       nextStep: gaps.length ? '先补「' + gaps[0].criterion + '」，写出一个可被他人复核的例子，再对照参考拆解。' :
         '四项结构均有提及。请对照参考拆解检查条件、证据和异常路径是否真的可执行。' };
   }
-  function normalizeModelAnalysis(raw, answer) {
-    if (!raw || typeof raw !== 'object') return null;
+  function normalizeModelAnalysis(raw, practice, answer) {
+    if (!raw || typeof raw !== 'object' || !practice || !Array.isArray(practice.rubric)) return null;
     const text = String(answer || '');
-    const strengths = (Array.isArray(raw.strengths) ? raw.strengths : []).filter(item => item && typeof item.quote === 'string' &&
-      item.quote.trim() && text.includes(item.quote.trim()) && typeof item.why === 'string' && item.why.trim())
-      .slice(0, 4).map(item => ({ quote: item.quote.trim().slice(0, 160), why: item.why.trim().slice(0, 380) }));
-    const gaps = (Array.isArray(raw.gaps) ? raw.gaps : []).filter(item => item && typeof item.criterion === 'string' &&
-      typeof item.why === 'string' && typeof item.revision === 'string')
-      .slice(0, 5).map(item => ({ criterion: item.criterion.trim().slice(0, 80),
-        quote: item.quote && text.includes(String(item.quote).trim()) ? String(item.quote).trim().slice(0, 160) : '',
-        why: item.why.trim().slice(0, 380), revision: item.revision.trim().slice(0, 400) }));
-    if (!strengths.length && !gaps.length) return null;
-    return { mode: 'model', summary: String(raw.summary || '').trim().slice(0, 500), strengths, gaps,
-      nextStep: String(raw.nextStep || '').trim().slice(0, 500) };
+    const rubric = practice.rubric;
+    if (!Array.isArray(raw.criteria) || raw.criteria.length !== rubric.length || !rubric.length) return null;
+    const summary = String(raw.summary || '').trim();
+    const nextStep = String(raw.nextStep || '').trim();
+    if (summary.length < 12 || nextStep.length < 8) return null;
+    const statuses = ['met', 'partial', 'missing', 'uncertain'];
+    const criteria = rubric.map(function (label) {
+      const matches = raw.criteria.filter(function (row) { return row && row.criterion === label; });
+      if (matches.length !== 1) return null;
+      const row = matches[0];
+      const status = String(row.status || '');
+      const quote = String(row.quote || '').trim();
+      const why = String(row.why || '').trim();
+      const revision = String(row.revision || '').trim();
+      if (!statuses.includes(status) || why.length < 12 || (quote && !text.includes(quote))) return null;
+      if ((status === 'met' || status === 'partial') && !quote) return null;
+      if (status !== 'met' && revision.length < 8) return null;
+      return { criterion: label, status: status, quote: quote.slice(0, 160),
+        why: why.slice(0, 500), revision: revision.slice(0, 500) };
+    });
+    if (criteria.some(function (row) { return !row; })) return null;
+    const met = criteria.filter(function (row) { return row.status === 'met'; }).length;
+    const uncertain = criteria.filter(function (row) { return row.status === 'uncertain'; }).length;
+    const partial = criteria.filter(function (row) { return row.status === 'partial'; }).length;
+    const verdict = uncertain >= Math.ceil(criteria.length / 2) ? 'unverified' :
+      met === criteria.length ? 'pass' : met + partial >= Math.ceil(criteria.length / 2) ? 'partial' : 'revise';
+    return { mode: 'model', verdict: verdict, criteria: criteria, summary: summary.slice(0, 500),
+      strengths: criteria.filter(function (row) { return row.status === 'met'; }).map(function (row) {
+        return { quote: row.quote, why: row.why };
+      }),
+      gaps: criteria.filter(function (row) { return row.status !== 'met'; }).map(function (row) {
+        return { criterion: row.criterion, quote: row.quote, why: row.why, revision: row.revision };
+      }), nextStep: nextStep.slice(0, 500) };
   }
   window.PracticeCoach = { examples: id => (examples[id] || []).slice(), localAnalysis, normalizeModelAnalysis };
 })();

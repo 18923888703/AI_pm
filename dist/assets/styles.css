@@ -583,6 +583,8 @@ body.simple-mode .simple-only{display:block}
 .practice-example-review summary{cursor:pointer;font-weight:600;color:var(--blue)}
 .practice-example-review p{margin:9px 0 0;color:var(--text-2)}
 .practice-privacy{margin-top:11px;color:var(--text-3)}
+.practice-model-setup{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;padding:12px 14px;border:1px solid rgba(35,131,226,.23);border-radius:8px;background:rgba(35,131,226,.055);font-size:13px;line-height:1.65}
+.practice-model-setup .btn{min-height:40px}
 .practice-submitted{padding:18px 20px;background:var(--bg-soft);border-radius:10px;margin:20px 0}
 .practice-submitted > div{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .practice-submitted h2{margin:0}
@@ -591,6 +593,14 @@ body.simple-mode .simple-only{display:block}
 .practice-analysis-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .practice-analysis-head h2{margin:8px 0 0}
 .practice-analysis-summary{line-height:1.7;color:var(--text-2)}
+.practice-criteria{margin-top:18px;border-top:1px solid var(--border)}
+.practice-criterion{padding:15px 0;border-bottom:1px solid var(--border)}
+.practice-criterion-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.practice-criterion-head b{font-size:14px}
+.practice-criterion blockquote{margin:10px 0 0;padding:0;color:var(--text);font-weight:600;line-height:1.65;overflow-wrap:anywhere}
+.practice-criterion p{margin:8px 0 0;color:var(--text-2);line-height:1.7;overflow-wrap:anywhere}
+.practice-criterion .practice-revision{color:var(--text)}
+.practice-assessment-gate{margin:14px 0 4px;line-height:1.65;color:var(--text-2)}
 .practice-analysis h3{font-size:15px;margin:23px 0 10px}
 .practice-feedback-row{padding:13px 15px;margin:9px 0;background:#fff;border:1px solid var(--border);border-radius:8px}
 .practice-feedback-row.positive{border-left:3px solid var(--green)}

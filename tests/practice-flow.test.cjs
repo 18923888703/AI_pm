@@ -35,7 +35,7 @@ assert.ok(local.summary.includes('本地检查不能判断方案是否正确'));
 assert.ok(local.strengths.every(x => answer.includes(x.quote)));
 assert.ok(local.gaps.every(x => x.criterion && x.why && x.revision));
 assert.equal(Lab.savePracticeAnalysis(id, first.submissionId, local), true);
-assert.equal(Lab.practiceDone(id), true);
+assert.equal(Lab.practiceDone(id), false, '本地关键词提示不能代替在线模型判定');
 Lab.revisePractice(id);
 assert.equal(Lab.practicePhase(id), 'write');
 assert.equal(Lab.practiceDone(id), false);
@@ -43,13 +43,34 @@ const second = Lab.submitPractice(id, answer + ' 另外增加一次失败时的�
 assert.notEqual(second.submissionId, first.submissionId);
 assert.deepEqual(Array.from(Lab.practiceRec(id).choiceOrder).sort(), [0, 1, 2, 3]);
 assert.equal(Lab.savePracticeAnalysis(id, first.submissionId, local), false, '旧请求不得覆盖新版本点评');
-assert.equal(PracticeCoach.normalizeModelAnalysis({ strengths: [{ quote: '不存在的原文', why: '夸奖' }], gaps: [] }, answer), null);
-const valid = PracticeCoach.normalizeModelAnalysis({ summary: '已覆盖输入，但仍缺失败状态。',
-  strengths: [{ quote: '缺少时间时提示补充', why: '写明了缺参路径' }],
-  gaps: [{ criterion: '异常处理', quote: '', why: '没有写接口失败后的状态', revision: '失败时保留草稿并提示重试。' }],
-  nextStep: '补写接口失败。' }, answer);
+assert.equal(PracticeCoach.normalizeModelAnalysis({ summary: '已覆盖输入，但仍缺失败状态。',
+  criteria: [{ criterion: '问题和用户是否具体', status: 'met', quote: '不存在的原文', why: '这是一个无法在原文中核对的评价依据。', revision: '' }],
+  nextStep: '补写接口失败时的状态。' }, Lab.exercise(id), answer), null);
+const phrases = ['目标用户是初次接触项目管理的同事', '输入预约时间和联系方式',
+  '缺少时间时提示补充', '验收时修改输入，检查提醒和取消预约后的状态'];
+const valid = PracticeCoach.normalizeModelAnalysis({ summary: '四项要求都有具体表述，方案可以进入下一轮真实验证。',
+  criteria: Lab.exercise(id).rubric.map((criterion, i) => ({ criterion, status: 'met', quote: phrases[i],
+    why: '这一处写出了本题所要求的具体对象或处理动作，可据此继续检查方案。', revision: '' })),
+  nextStep: '下一版补充一条真实输入的验收样本。' }, Lab.exercise(id), answer);
 assert.equal(valid.mode, 'model');
-assert.equal(valid.strengths[0].quote, '缺少时间时提示补充');
+assert.equal(valid.verdict, 'pass');
+assert.equal(valid.criteria[2].quote, '缺少时间时提示补充');
+const partial = PracticeCoach.normalizeModelAnalysis({ summary: '输入与用户有依据，但失败和验收仍不够可执行。',
+  criteria: Lab.exercise(id).rubric.map((criterion, i) => ({ criterion,
+    status: i < 2 ? 'met' : 'partial', quote: phrases[i],
+    why: '这一处虽然写了相关动作，但还缺少明确的失败处理或可核对结果。',
+    revision: i < 2 ? '' : '请补写触发条件、预期状态和实际可检查的结果。' })),
+  nextStep: '先补全失败状态与恢复动作。' }, Lab.exercise(id), answer);
+assert.equal(partial.verdict, 'partial');
+Lab.savePracticeAnalysis(id, second.submissionId, partial);
+assert.equal(Lab.practiceDone(id), false, '未完全达到量表时应保留修改任务');
+const unverifiable = PracticeCoach.normalizeModelAnalysis({ summary: '答案中两项结论没有证据，当前不能确认方案成立。',
+  criteria: Lab.exercise(id).rubric.map((criterion, i) => ({ criterion,
+    status: i < 2 ? 'uncertain' : 'missing', quote: '',
+    why: '答案没有提供可以核对的依据，暂时无法确认这一处判断是否成立。',
+    revision: '请写出证据来源、判断条件和对应的操作步骤。' })),
+  nextStep: '先核对事实来源并补齐一个可验证例子。' }, Lab.exercise(id), answer);
+assert.equal(unverifiable.verdict, 'unverified');
 Lab.savePracticeAnalysis(id, second.submissionId, valid);
 assert.equal(Lab.practiceDone(id), true);
 
