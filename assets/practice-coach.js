@@ -123,9 +123,9 @@
       const quote = String(row.quote || '').trim();
       const why = String(row.why || '').trim();
       const revision = String(row.revision || '').trim();
-      if (!statuses.includes(status) || why.length < 12 || (quote && !text.includes(quote))) return null;
+      if (!statuses.includes(status) || why.length < 18 || (quote && !text.includes(quote))) return null;
       if ((status === 'met' || status === 'partial') && !quote) return null;
-      if (status !== 'met' && revision.length < 8) return null;
+      if (status !== 'met' && revision.length < 12) return null;
       return { criterion: label, status: status, quote: quote.slice(0, 160),
         why: why.slice(0, 500), revision: revision.slice(0, 500) };
     });
