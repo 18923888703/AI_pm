@@ -46,6 +46,10 @@ assert.equal(Lab.savePracticeAnalysis(id, first.submissionId, local), false, '�
 assert.equal(PracticeCoach.normalizeModelAnalysis({ summary: '已覆盖输入，但仍缺失败状态。',
   criteria: [{ criterion: '问题和用户是否具体', status: 'met', quote: '不存在的原文', why: '这是一个无法在原文中核对的评价依据。', revision: '' }],
   nextStep: '补写接口失败时的状态。' }, Lab.exercise(id), answer), null);
+assert.equal(PracticeCoach.normalizeModelAnalysis({ summary: '还需要进一步优化才能使用。',
+  criteria: Lab.exercise(id).rubric.map(criterion => ({ criterion, status: 'missing', quote: '',
+    why: '需要进一步优化方案', revision: '请继续完善内容' })),
+  nextStep: '继续优化方案' }, Lab.exercise(id), answer), null, '笼统的模型评价不能被当成具体解析');
 const phrases = ['目标用户是初次接触项目管理的同事', '输入预约时间和联系方式',
   '缺少时间时提示补充', '验收时修改输入，检查提醒和取消预约后的状态'];
 const valid = PracticeCoach.normalizeModelAnalysis({ summary: '四项要求都有具体表述，方案可以进入下一轮真实验证。',
