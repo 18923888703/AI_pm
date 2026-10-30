@@ -12,6 +12,7 @@
   let searchQuery = '';
   let abortCtl = null;
   let activeRoute = null;
+  const practiceAnalysisInFlight = new Map();
 
   const T = function (id) { return window.TERMS.find(function (t) { return t.id === id; }); };
   const STAGE_ICONS = ['🌱', '🔧', '🔄', '🚀', '⚡', '🎯'];
@@ -994,6 +995,11 @@
     return html + '</div>';
   }
 
+  function practiceModelReady() {
+    const cfg = window.LLM.getCfg();
+    return !!(cfg.enabled && cfg.apiKey && cfg.baseUrl && cfg.model);
+  }
+
   function viewPracticeDetail(id) {
     const p = window.Lab.exercise(id);
     if (!p) return '<div class="page"><div class="empty">找不到这个练习<br><br><button class="btn" data-route="practice">返回练习列表</button></div></div>';
@@ -1019,6 +1025,7 @@
     }
 
     if (phase === 'write') {
+      const modelReady = practiceModelReady();
       html += '<details class="practice-example-review"><summary>回看刚才的两个案例</summary>' + examples.map(function (x) {
         return '<p><b>' + esc(x.title) + '</b> · ' + esc(x.lesson) + '</p>';
       }).join('') + '</details>' +
@@ -1028,8 +1035,11 @@
         '<textarea id="practiceAnswer" class="practice-answer" maxlength="6000" placeholder="先写你的判断依据、具体做法和失败时怎么办。提交前不会显示参考拆解。">' + esc(r.answer || '') + '</textarea>' +
         '<div class="practice-save-row"><span class="tiny">草稿保存在当前浏览器；至少写 40 字才能提交。</span>' +
         '<div><button class="btn" data-practice-save="' + escAttr(id) + '">保存草稿</button> ' +
-        '<button class="btn primary" data-practice-submit="' + escAttr(id) + '">提交并分析 →</button></div></div>' +
-        '<p class="tiny practice-privacy">启用在线模型时，提交的答案会发送给你已配置的供应商用于具体点评；未启用时提供本地结构检查。</p>';
+        '<button class="btn primary" data-practice-submit="' + escAttr(id) + '"' + (modelReady ? '' : ' disabled') +
+        '>提交并请在线模型评估 →</button></div></div>' +
+        (modelReady ? '<p class="tiny practice-privacy">答案会发送给你在本站配置的模型供应商；提交后按四项量表判断是否达标、哪里有问题、下一版怎么改。</p>' :
+          '<div class="practice-model-setup" role="note">需要先在「我的学习 → 设置与记忆」启用并保存在线模型，才能提交评估。草稿可先保存。 ' +
+          '<button type="button" class="btn sm" data-route="settings">去配置模型 →</button></div>');
       return html + '</div>';
     }
 
@@ -1039,12 +1049,21 @@
       '<p>' + esc(answer) + '</p></div>';
     const analysis = r.analysis && r.analysis.submissionId === r.submissionId ? r.analysis :
       !r.phase && answer.length >= 20 ? window.PracticeCoach.localAnalysis(p, answer) : null;
+    const busy = practiceAnalysisInFlight.get(id) === r.submissionId;
+    if (busy && analysis) html += '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="true">正在重新请求在线模型逐项评估；下面保留的是上一次提示。</div>';
     if (analysis) html += practiceAnalysisHTML(analysis, id);
-    else html += '<div class="practice-analysis-pending" role="status">' +
-      (r.phase ? '正在分析你提交的内容…' : '旧版练习记录已保留。点击“修改后重新提交”即可获得逐项分析。') + '</div>';
+    else {
+      html += '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="' + (busy ? 'true' : 'false') + '">' +
+        (busy ? '在线模型正在按量表逐项检查你的答案，通常需要几十秒。' :
+          r.phase && practiceModelReady() ? '这次在线评估尚未完成。可以重新请求，不会覆盖你的答案。' :
+          '这份答案尚未完成在线评估；先到设置中启用并保存模型。') +
+        (!busy && practiceModelReady() ? ' <button type="button" class="btn sm" data-practice-analyze="' + escAttr(id) + '">重新请求在线评估</button>' : '') +
+        (!busy && !practiceModelReady() ? ' <button type="button" class="btn sm" data-route="settings">去配置模型 →</button>' : '') + '</div>';
+    }
     html += aiHelpRow('practice-task', id, '', true);
 
-    if (!analysis) return html + '</div>';
+    if (!analysis || (r.assessmentRequired && (analysis.mode !== 'model' || !analysis.verdict)))
+      return html + '<p class="tiny practice-assessment-gate">参考拆解与后续自评将在在线模型完成逐项判断后显示；本地关键词提示不代表答案正确。</p></div>';
     html += '<h2>交付前检查</h2><div class="check-list">' + p.checkpoints.map(function (x) {
       return '<div><span>□</span>' + esc(x) + '</div>';
     }).join('') + '</div>' +
@@ -1092,18 +1111,40 @@
   }
 
   function practiceAnalysisHTML(a, id) {
+    if (a.mode === 'model' && a.verdict && Array.isArray(a.criteria)) {
+      const verdicts = { pass: ['符合要求', 'green'], partial: ['方向基本正确，需补强', 'orange'],
+        revise: ['当前方案不符合要求', 'red'], unverified: ['证据不足，暂不能确认', 'orange'] };
+      const result = verdicts[a.verdict] || verdicts.unverified;
+      const labels = { met: ['已达到', 'green'], partial: ['部分达到', 'orange'],
+        missing: ['未达到', 'red'], uncertain: ['待核实', 'orange'] };
+      const met = a.criteria.filter(function (row) { return row.status === 'met'; }).length;
+      return '<section class="practice-analysis" aria-label="在线模型逐项评估结果"><div class="practice-analysis-head"><div>' +
+        '<span class="tag ' + result[1] + '">在线模型建议判定 · ' + result[0] + '</span>' +
+        '<h2>按任务要求逐项看你的方案</h2></div><span class="tiny">已达到 ' + met + '/' + a.criteria.length + ' 项</span></div>' +
+        '<p class="practice-analysis-summary">' + esc(a.summary) + '</p>' +
+        '<div class="practice-criteria">' + a.criteria.map(function (row) {
+          const label = labels[row.status] || labels.uncertain;
+          return '<article class="practice-criterion"><div class="practice-criterion-head"><b>' + esc(row.criterion) + '</b>' +
+            '<span class="tag ' + label[1] + '">' + label[0] + '</span></div>' +
+            (row.quote ? '<blockquote>你写的是：“' + esc(row.quote) + '”</blockquote>' : '') +
+            '<p><strong>为什么这样判断：</strong>' + esc(row.why) + '</p>' +
+            (row.status !== 'met' ? '<p class="practice-revision"><strong>下一版怎么改：</strong>' + esc(row.revision) + '</p>' : '') +
+            '</article>';
+        }).join('') + '</div><div class="practice-next-step"><b>最优先修改</b><p>' + esc(a.nextStep) + '</p></div>' +
+        '<p class="tiny practice-privacy">这是基于题目材料和你提交的文字做出的量表判断；未经外部核验的数据或经历仍需你自行提供证据。</p></section>';
+    }
     let html = '<section class="practice-analysis"><div class="practice-analysis-head"><div><span class="tag ' +
-      (a.mode === 'model' ? 'green' : 'orange') + '">' + (a.mode === 'model' ? '在线模型具体点评' : '本地结构检查') +
-      '</span><h2>这份答案，哪里有效、哪里要补</h2></div>' +
-      (a.mode === 'local' && window.LLM.getCfg().enabled && window.LLM.getCfg().apiKey
-        ? '<button type="button" class="btn sm" data-practice-analyze="' + escAttr(id) + '">重新获取模型点评</button>' : '') +
+      'orange">' + (a.mode === 'model' ? '旧版模型点评' : '本地结构提示 · 未判断正确性') +
+      '</span><h2>这些只是写作线索</h2></div>' +
+      (practiceModelReady() && window.Lab.practiceRec(id).submissionId && !practiceAnalysisInFlight.has(id)
+        ? '<button type="button" class="btn sm" data-practice-analyze="' + escAttr(id) + '">重新请求在线评估</button>' : '') +
       '</div><p class="practice-analysis-summary">' + esc(a.summary || '') + '</p>' +
       (a.notice ? '<p class="practice-analysis-notice">' + esc(a.notice) + '</p>' : '') +
-      '<h3>已经写到的有效内容</h3>';
+      '<h3>找到的相关表述</h3>';
     html += a.strengths && a.strengths.length ? a.strengths.map(function (x) {
       return '<div class="practice-feedback-row positive"><blockquote>“' + esc(x.quote) + '”</blockquote><p>' + esc(x.why) + '</p></div>';
     }).join('') : '<p class="tiny">当前没有足够具体、能直接标记为优势的原文；先把一个判断写成可执行动作。</p>';
-    html += '<h3>需要补强的地方</h3>';
+    html += '<h3>可能缺少的内容</h3>';
     html += a.gaps && a.gaps.length ? a.gaps.map(function (x) {
       return '<div class="practice-feedback-row gap"><b>' + esc(x.criterion) + '</b>' +
         (x.quote ? '<blockquote>你写的是：“' + esc(x.quote) + '”</blockquote>' : '') +
@@ -1112,27 +1153,41 @@
     return html + '<div class="practice-next-step"><b>下一版先改什么</b><p>' + esc(a.nextStep || '') + '</p></div></section>';
   }
 
+  function practiceFailureReason(error) {
+    const message = String(error && error.message || '');
+    if (error && error.name === 'AbortError') return '在线模型响应超时，请稍后重试，答案已保存。';
+    if (/HTTP 401|HTTP 403/.test(message)) return '模型供应商拒绝了当前配置，请检查 API Key 和模型权限。';
+    if (/HTTP 429/.test(message)) return '模型供应商正在限流或额度不足，请稍后重试。';
+    if (/格式|结构化|可核对/.test(message)) return '模型没有返回完整且可核对的逐项判断，请重试或切换已配置的模型。';
+    return '在线评估暂时失败，请检查模型连接后重试；答案已保留。';
+  }
+
   async function analyzeSubmittedPractice(id, submissionId, answer) {
     const p = window.Lab.exercise(id);
     if (!p || !submissionId || !answer) return;
-    const local = window.PracticeCoach.localAnalysis(p, answer);
-    window.Lab.savePracticeAnalysis(id, submissionId, local);
+    if (practiceAnalysisInFlight.get(id) === submissionId) return;
+    if (!practiceModelReady()) {
+      window.Lab.savePracticeAnalysis(id, submissionId, Object.assign(
+        window.PracticeCoach.localAnalysis(p, answer), { notice: '尚未启用在线模型，因此没有判断这份方案是否正确。' }));
+      if (parseHash().route === 'practice-detail' && parseHash().id === id) render();
+      return;
+    }
+    practiceAnalysisInFlight.set(id, submissionId);
     if (parseHash().route === 'practice-detail' && parseHash().id === id) render();
-    const cfg = window.LLM.getCfg();
-    if (!cfg.enabled || !cfg.apiKey) { renderSidebar(); return; }
     const controller = new AbortController();
-    const timer = setTimeout(function () { controller.abort(); }, 30000);
+    const timer = setTimeout(function () { controller.abort(); }, 60000);
     try {
       const raw = await window.LLM.analyzePractice(p, answer, controller.signal);
-      const specific = window.PracticeCoach.normalizeModelAnalysis(raw, answer);
-      if (!specific) throw new Error('模型未返回可核对的具体点评');
+      const specific = window.PracticeCoach.normalizeModelAnalysis(raw, p, answer);
+      if (!specific) throw new Error('模型未返回完整、可核对的逐项评估');
       window.Lab.savePracticeAnalysis(id, submissionId, specific);
     } catch (error) {
-      window.Lab.savePracticeAnalysis(id, submissionId, Object.assign({}, local, {
-        notice: '在线点评暂未成功，当前显示本地结构检查。你可以稍后重试。'
+      window.Lab.savePracticeAnalysis(id, submissionId, Object.assign({}, window.PracticeCoach.localAnalysis(p, answer), {
+        notice: practiceFailureReason(error) + ' 当前仅展示本地结构提示，尚未判定正确性。'
       }));
     } finally {
       clearTimeout(timer);
+      if (practiceAnalysisInFlight.get(id) === submissionId) practiceAnalysisInFlight.delete(id);
       renderSidebar();
       if (parseHash().route === 'practice-detail' && parseHash().id === id) render();
     }
@@ -1804,7 +1859,7 @@
 
     const cloud = window.CloudSync;
     html += '<h2>跨设备记录</h2><section class="card cloud-sync-card"><div class="cloud-sync-head"><div><b>配对码同步暂不可用</b>' +
-      '<p class="tiny">Sites 静态版不运行原 Netlify 同步后端。题目记录、错因与复测计划仍保存在本机；请用下方 JSON 导出与导入迁移。</p></div>' +
+      '<p class="tiny">静态版不运行原 Netlify 同步后端。题目记录、错因与复测计划仍保存在本机；请用下方 JSON 导出与导入迁移。</p></div>' +
       '<span id="cloudStatus" class="tag ' + (cloud.status === 'synced' ? 'green' : cloud.status === 'error' ? 'red' : 'orange') + '">' +
       (cloud.status === 'synced' ? '已同步' : cloud.status === 'syncing' ? '同步中' : cloud.status === 'error' ? '同步失败' : '未连接') + '</span></div>';
     if (cloud.connected()) {
@@ -1960,7 +2015,7 @@
       '<div class="callout"><span class="emo">🔒</span><div class="ct"><b>关于隐私</b><br>' +
       '· 学习记录、练习答案、面试分数、对话历史和 API Key 保存在本机浏览器，可自行导出或清空。<br>' +
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
-      '· 本 Sites 版本不提供 Netlify 配对码同步；跨设备迁移请使用 JSON 导出与导入，模型 API Key 需分别配置。<br>' +
+      '· 本静态版本不提供 Netlify 配对码同步；跨设备迁移请使用 JSON 导出与导入，模型 API Key 需分别配置。<br>' +
       '· 启用在线模型后，问题、当前概念、相关对话、学习画像摘要，以及你提交的实战练习答案会发送给你配置的模型厂商，用于回答、归纳、重讲和具体点评。<br>' +
       '· 可以导出、回滚或清空本机记忆；断开同步不会删除云端密文。</div></div>';
 
@@ -2226,6 +2281,7 @@
       return;
     }
     if (el.dataset.practiceSubmit) {
+      if (!practiceModelReady()) { toast('请先在「设置与记忆」启用并保存在线模型'); return; }
       const answer = $('#practiceAnswer');
       const result = window.Lab.submitPractice(el.dataset.practiceSubmit, answer ? answer.value : '');
       if (result.error) { toast(result.error); return; }
@@ -2241,7 +2297,8 @@
     }
     if (el.dataset.practiceAnalyze) {
       const r = window.Lab.practiceRec(el.dataset.practiceAnalyze);
-      if (!window.LLM.getCfg().enabled || !window.LLM.getCfg().apiKey) { toast('请先在设置中启用并配置在线模型'); return; }
+      if (!practiceModelReady()) { toast('请先在设置中启用并配置在线模型'); return; }
+      if (!r.submissionId || !r.submittedAnswer) { toast('请修改答案并重新提交'); return; }
       void analyzeSubmittedPractice(el.dataset.practiceAnalyze, r.submissionId, r.submittedAnswer);
       toast('正在重新获取具体点评…');
       return;
