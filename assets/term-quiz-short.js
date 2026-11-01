@@ -93,7 +93,14 @@
     ['memoryconflict', '区分临时状态与稳定偏好变化', '比较时间、来源与适用场景再更新'],
     ['personalmemory', '让记忆改善内容、交互与讲解方式', '收集证据、形成画像并随反馈更新'],
     ['errorpattern', '多次错题成模式，跨日变式验证掌握', '保留原始选择并按间隔安排新问法'],
-    ['agenthallucination', '分开治理无证据结论与错误动作反馈', '核对来源、生成、工具和目标状态']
+    ['agenthallucination', '分开治理无证据结论与错误动作反馈', '核对来源、生成、工具和目标状态'],
+    ['memorystate', '按有效状态过滤旧偏好，冲突先确认', '新记忆待确认，旧记录按状态失效'],
+    ['memorywriteverify', '用新会话重查证明写入，不靠流畅回复', '检索、提取、比较、写入后再核验'],
+    ['modelunitcost', '按完整任务算成本和可归因收益', '合并多轮调用、工具、兜底与摊销'],
+    ['modelscorecard', '同题同尺比较质量、时延、成本与风险', '先定底线，再跑业务集并小流量回归'],
+    ['growthloop', '首个有价值任务先于拉新与推荐', '获客、激活、复用、付费、推荐成闭环'],
+    ['agentpricing', '配额按任务价值与用量尾部共同定', '测用量分布，再设套餐与超额规则'],
+    ['cacltv', '按同期群净贡献与获客成本看回本', '逐月算收入、毛利、退款和激励']
   ];
   window.TERM_QUIZ_SHORT = Object.fromEntries(rows.map(function (row) {
     return [row[0], { pm: row[1], mechanism: row[2] }];
