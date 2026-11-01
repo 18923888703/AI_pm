@@ -1938,20 +1938,35 @@
     html += '</div>';
 
     // LLM
+    const deepseekCfg = /^https:\/\/api\.deepseek\.com(?:\/|$)/i.test(cfg.baseUrl);
+    const legacyDeepSeekModel = deepseekCfg && /^(deepseek-chat|deepseek-reasoner)$/i.test(cfg.model);
     html += '<h2>大模型接入</h2>' +
       '<div class="card"><div class="field">' +
-      '<div class="switch' + (cfg.enabled ? ' on' : '') + '" id="swEnable"><div class="track"><i></i></div>' +
+      '<div class="switch' + (cfg.enabled ? ' on' : '') + '" id="swEnable" role="switch" tabindex="0" aria-checked="' +
+      (cfg.enabled ? 'true' : 'false') + '" aria-label="启用在线大模型"><div class="track"><i></i></div>' +
       '<div><div style="font-size:13.5px;font-weight:500">启用在线大模型</div>' +
-      '<div class="desc">不开启也能用内置知识库讲解。开启后，追问会同时给出回答和学习信号，并支持按画像重讲。</div></div></div></div>' +
-      '<div class="field"><label>API Base URL</label>' +
-      '<input type="text" id="cfgUrl" value="' + esc(cfg.baseUrl) + '" placeholder="https://api.openai.com/v1">' +
-      '<div class="desc">任意 OpenAI 兼容端点。例如 DeepSeek: https://api.deepseek.com/v1 ；Moonshot: https://api.moonshot.cn/v1 ；本地 Ollama: http://localhost:11434/v1</div></div>' +
-      '<div class="field"><label>API Key</label><input type="password" id="cfgKey" value="' + esc(cfg.apiKey) + '" placeholder="sk-..."></div>' +
-      '<div class="field"><label>模型名</label><input type="text" id="cfgModel" value="' + esc(cfg.model) + '" placeholder="gpt-4o-mini"></div>' +
+      '<div class="desc">不开启也能用内置知识库讲解；开启后可让模型分析实战答案、解释错题并回答追问。</div></div></div></div>' +
+      '<div class="field"><label for="cfgProvider">接入方式</label><select id="cfgProvider">' +
+      '<option value="custom"' + (deepseekCfg ? '' : ' selected') + '>手动填写兼容接口</option>' +
+      '<option value="deepseek"' + (deepseekCfg ? ' selected' : '') + '>DeepSeek 官方 API</option></select>' +
+      '<div class="desc" id="cfgProviderHint">' + (deepseekCfg ? '选择 DeepSeek 后可一键填入官方地址和当前模型名；你的 Key 不会被覆盖。' :
+        '支持 OpenAI 兼容的 Chat Completions 接口；选择 DeepSeek 可自动填入官方地址。') + '</div></div>' +
+      '<div class="field"><label for="cfgUrl">API Base URL</label>' +
+      '<input type="text" id="cfgUrl" autocomplete="url" spellcheck="false" aria-describedby="cfgUrlHint cfgUrlError" value="' + escAttr(cfg.baseUrl) + '" placeholder="https://api.deepseek.com">' +
+      '<div class="desc" id="cfgUrlHint">DeepSeek 官方地址：<code>https://api.deepseek.com</code>，不要填完整的 <code>/chat/completions</code> 路径。' +
+      '<a href="https://api-docs.deepseek.com/quick_start/agent_integrations/" target="_blank" rel="noopener noreferrer">官方文档 ↗</a></div><p class="cfg-field-error" id="cfgUrlError" role="alert"></p></div>' +
+      '<div class="field"><label for="cfgKey">API Key</label><div class="cfg-key-entry"><input type="password" id="cfgKey" autocomplete="off" aria-describedby="cfgKeyHint cfgKeyError" value="' + escAttr(cfg.apiKey) + '" placeholder="在此粘贴你自己的 DeepSeek API Key">' +
+      '<button type="button" class="btn sm" id="cfgToggleKey" aria-controls="cfgKey" aria-label="显示 API Key" aria-pressed="false">显示</button></div>' +
+      '<div class="desc" id="cfgKeyHint">仅保存在当前浏览器，不会写进公开仓库；换域名或设备需重新填写。</div><p class="cfg-field-error" id="cfgKeyError" role="alert"></p></div>' +
+      '<div class="field"><label for="cfgModel">模型名</label><input type="text" id="cfgModel" list="cfgDeepSeekModels" autocomplete="off" spellcheck="false" aria-describedby="cfgModelHint cfgModelError" value="' + escAttr(cfg.model) + '" placeholder="deepseek-flash">' +
+      '<datalist id="cfgDeepSeekModels"><option value="deepseek-flash"><option value="deepseek-v4-pro"></datalist>' +
+      '<div class="desc" id="cfgModelHint">DeepSeek 可选 <code>deepseek-flash</code> 或 <code>deepseek-v4-pro</code>；模型名也可以手动修改。</div>' +
+      (legacyDeepSeekModel ? '<div class="cfg-legacy-note">当前模型名已过时，建议改用上面的现行名称后再测试。</div>' : '') +
+      '<p class="cfg-field-error" id="cfgModelError" role="alert"></p></div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<button class="btn primary sm" id="testConn">测试连接</button>' +
       '<button class="btn sm" id="saveCfg">保存</button>' +
-      '<span class="tiny" id="cfgMsg"></span></div></div>';
+      '<span class="tiny" id="cfgMsg" role="status" aria-live="polite"></span></div></div>';
 
     // 讲解偏好
     html += '<h2>讲解偏好</h2><div class="card">' +
@@ -2017,7 +2032,7 @@
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
       '· 本静态版本不提供 Netlify 配对码同步；跨设备迁移请使用 JSON 导出与导入，模型 API Key 需分别配置。<br>' +
       '· 启用在线模型后，问题、当前概念、相关对话、学习画像摘要，以及你提交的实战练习答案会发送给你配置的模型厂商，用于回答、归纳、重讲和具体点评。<br>' +
-      '· 可以导出、回滚或清空本机记忆；断开同步不会删除云端密文。</div></div>';
+      '· 可以导出、回滚或清空本机记忆；本站不会创建配对码云端记录。</div></div>';
 
     return html + '</div>';
   }
@@ -2473,7 +2488,13 @@
   /* ---------- 设置页绑定 ---------- */
   function bindSettings() {
     const sw = $('#swEnable');
-    sw.onclick = function () { sw.classList.toggle('on'); };
+    sw.onclick = function () {
+      sw.classList.toggle('on');
+      sw.setAttribute('aria-checked', sw.classList.contains('on') ? 'true' : 'false');
+    };
+    sw.onkeydown = function (event) {
+      if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); sw.click(); }
+    };
     const swA = $('#swAuto');
     swA.onclick = function () { swA.classList.toggle('on'); };
 
@@ -2563,38 +2584,101 @@
       toast('讲解偏好已保存');
     };
 
-    $('#saveCfg').onclick = function () {
-      window.LLM.setCfg({
-        enabled: sw.classList.contains('on'),
-        baseUrl: $('#cfgUrl').value.trim(),
-        apiKey: $('#cfgKey').value.trim(),
-        model: $('#cfgModel').value.trim()
+    const providerInput = $('#cfgProvider');
+    const configInputs = { cfgUrl: $('#cfgUrl'), cfgKey: $('#cfgKey'), cfgModel: $('#cfgModel') };
+    $('#cfgToggleKey').onclick = function () {
+      const shown = configInputs.cfgKey.type === 'password';
+      configInputs.cfgKey.type = shown ? 'text' : 'password';
+      this.textContent = shown ? '隐藏' : '显示';
+      this.setAttribute('aria-pressed', shown ? 'true' : 'false');
+      this.setAttribute('aria-label', shown ? '隐藏 API Key' : '显示 API Key');
+    };
+    function configIssue(id, requireComplete) {
+      const value = configInputs[id].value.trim();
+      if (!requireComplete && !value) return '';
+      if (id === 'cfgKey') return requireComplete && !value ? '请输入你自己的 API Key。' : '';
+      if (id === 'cfgModel') {
+        if (requireComplete && !value) return '请输入模型名。';
+        if (providerInput.value === 'deepseek' && /^(deepseek-chat|deepseek-reasoner)$/i.test(value))
+          return '这个旧模型名已停用，请改用 deepseek-flash 或 deepseek-v4-pro。';
+        return '';
+      }
+      if (!value) return requireComplete ? '请输入 API Base URL。' : '';
+      let url;
+      try { url = new URL(value); } catch (error) { return '请输入完整的 API 地址，例如 https://api.deepseek.com。'; }
+      const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+      if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) return 'API 地址需使用 HTTPS；仅本机服务可用 HTTP。';
+      if (url.username || url.password || url.search || url.hash) return 'Base URL 不应包含账号、密钥、查询参数或锚点。';
+      if (/\/chat\/completions\/?$/.test(url.pathname)) return '这里只填 Base URL，不要加 /chat/completions。';
+      if (providerInput.value === 'deepseek' && (url.origin !== 'https://api.deepseek.com' || url.pathname !== '/'))
+        return 'DeepSeek 官方 Base URL 应为 https://api.deepseek.com。';
+      return '';
+    }
+    function showConfigIssue(id, issue) {
+      $('#' + id + 'Error').textContent = issue;
+      if (issue) configInputs[id].setAttribute('aria-invalid', 'true');
+      else configInputs[id].removeAttribute('aria-invalid');
+    }
+    function readModelConfig(requireComplete) {
+      let firstInvalid = null;
+      ['cfgUrl', 'cfgKey', 'cfgModel'].forEach(function (id) {
+        const issue = configIssue(id, requireComplete);
+        showConfigIssue(id, issue);
+        if (issue && !firstInvalid) firstInvalid = configInputs[id];
       });
-      $('#cfgMsg').textContent = '已保存';
+      if (firstInvalid) { firstInvalid.focus(); return null; }
+      return { enabled: sw.classList.contains('on'), baseUrl: $('#cfgUrl').value.trim().replace(/\/+$/, ''),
+        apiKey: $('#cfgKey').value.trim(), model: $('#cfgModel').value.trim() };
+    }
+    providerInput.onchange = function () {
+      if (this.value === 'deepseek') {
+        $('#cfgUrl').value = 'https://api.deepseek.com';
+        $('#cfgModel').value = 'deepseek-flash';
+        $('#cfgProviderHint').textContent = '已填入 DeepSeek 官方地址和当前 Flash 模型；也可改为 deepseek-v4-pro。请确认输入的是 DeepSeek API Key。';
+      } else $('#cfgProviderHint').textContent = '手动填写供应商的 OpenAI 兼容 Base URL、API Key 和模型名。';
+      ['cfgUrl', 'cfgKey', 'cfgModel'].forEach(function (id) { showConfigIssue(id, ''); });
+      $('#cfgMsg').textContent = '请测试连接后保存。';
+    };
+    ['cfgUrl', 'cfgKey', 'cfgModel'].forEach(function (id) {
+      configInputs[id].onblur = function () { showConfigIssue(id, configIssue(id, sw.classList.contains('on'))); };
+    });
+    $('#saveCfg').onclick = function () {
+      const config = readModelConfig(sw.classList.contains('on'));
+      if (!config) { $('#cfgMsg').textContent = '配置尚未保存，请修正标出的字段。'; return; }
+      window.LLM.setCfg(config);
+      $('#cfgMsg').textContent = '已保存到当前浏览器';
       updateModePill();
-      toast('配置已保存到本地');
+      toast('模型配置已保存到本地');
     };
 
     $('#testConn').onclick = async function () {
+      const config = readModelConfig(true);
       const msg = $('#cfgMsg');
-      msg.textContent = '测试中…';
-      window.LLM.setCfg({
-        enabled: true,
-        baseUrl: $('#cfgUrl').value.trim(),
-        apiKey: $('#cfgKey').value.trim(),
-        model: $('#cfgModel').value.trim()
-      });
-      const cfg = window.LLM.getCfg();
+      if (!config) { msg.textContent = '请先修正标出的字段。'; return; }
+      const button = $('#testConn');
+      button.disabled = true; msg.textContent = '正在测试模型响应…';
+      const body = { model: config.model, messages: [{ role: 'user', content: '请只回复“连接正常”。' }],
+        max_tokens: 32, stream: false };
+      if (/^https:\/\/api\.deepseek\.com(?:\/|$)/i.test(config.baseUrl)) body.thinking = { type: 'disabled' };
+      const controller = new AbortController();
+      const timer = setTimeout(function () { controller.abort(); }, 30000);
       try {
-        const resp = await fetch(cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+        const resp = await fetch(config.baseUrl + '/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
-          body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 })
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.apiKey },
+          body: JSON.stringify(body)
         });
-        msg.textContent = resp.ok ? '✅ 连接成功' : '❌ HTTP ' + resp.status;
+        if (!resp.ok) { msg.textContent = '连接失败：HTTP ' + resp.status + (resp.status === 401 ? '，请核对 API Key。' : '，请核对地址、模型名或账户额度。'); return; }
+        const data = await resp.json();
+        const reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        msg.textContent = typeof reply === 'string' && reply.trim() ?
+          (sw.classList.contains('on') ? '连接成功，点击“保存”后即可用于实战练习。' : '连接成功；请开启上方开关并点击“保存”。') :
+          '接口已响应，但没有返回可读内容；请检查模型名或重试。';
       } catch (err) {
-        msg.textContent = '❌ ' + (err.message || '连接失败');
-      }
+        msg.textContent = err && err.name === 'AbortError' ? '连接测试超时，请稍后重试。' :
+          '连接失败：浏览器无法读取接口响应，请检查网络、API 地址及跨域权限。';
+      } finally { clearTimeout(timer); button.disabled = false; }
     };
 
     $('#expMem').onclick = function () { $('#memBox').value = window.Mem.exportJSON(); toast('已导出到下方文本框'); };
