@@ -87,7 +87,7 @@ python3 -m http.server 8777
 
 ## 接真实大模型
 
-我的学习 → 设置与记忆 → 启用在线大模型 → 填 Base URL / Key / 模型名 → 测试连接。沿用原有供应商配置，支持 OpenAI 兼容端点。导师结构化输出优先尝试 JSON Schema，供应商不支持时降级到 JSON Object，再降级到普通文本提示，并记住本次可用模式。
+我的学习 → 设置与记忆 → 大模型接入 → 选择 DeepSeek 官方 API 或手动填写其他兼容接口 → 填 API Key 和模型名 → 测试连接 → 启用并保存。DeepSeek 官方 Base URL 为 `https://api.deepseek.com`，当前可选 `deepseek-flash`、`deepseek-v4-pro`；旧名 `deepseek-chat`、`deepseek-reasoner` 不再作为默认项。测试会检查模型是否返回可读内容，失败不会覆盖已保存的配置。Key 仅保存在当前浏览器，不进入公开仓库。DeepSeek 的结构化结果直接使用 JSON Object；其他兼容供应商优先尝试 JSON Schema，失败后降级到 JSON Object 和普通文本。
 
 新增导师能力参考了用户提供的 [agentpm 公开仓库](https://github.com/gaoweiblue-source/agentpm) 的功能设计，按本站已有架构独立实现；原仓库使用的本机 Python/SQLite 服务没有作为线上后端部署。
 

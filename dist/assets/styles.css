@@ -1118,6 +1118,14 @@ body.simple-mode .simple-only{display:block}
 .field{margin-bottom:16px}
 .field label{display:block;font-size:13px;font-weight:500;margin-bottom:5px}
 .field .desc{font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.5}
+.cfg-field-error{margin:5px 0 0;color:var(--red);font-size:12px;line-height:1.5}
+.cfg-field-error:empty{display:none}
+.field input[aria-invalid="true"]{border-color:var(--red)}
+.cfg-legacy-note{margin-top:7px;color:var(--orange);font-size:12px;line-height:1.5}
+.cfg-key-entry{display:flex;align-items:center;gap:8px}
+.cfg-key-entry input{flex:1;min-width:0;min-height:44px}
+.cfg-key-entry .btn{min-height:44px}
+#cfgProvider,#cfgUrl,#cfgModel{min-height:44px}
 .field input[type=text],.field input[type=password],.field select,.field textarea{
   width:100%;height:32px;border:1px solid var(--border-2);border-radius:var(--radius);
   padding:0 10px;outline:none;background:#fff;font-size:13.5px;
@@ -1125,6 +1133,7 @@ body.simple-mode .simple-only{display:block}
 .field textarea{height:auto;padding:9px 10px;resize:vertical;line-height:1.6}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(35,131,226,.14)}
 .switch{display:flex;align-items:center;gap:10px;cursor:pointer}
+.switch:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:4px}
 .switch .track{width:34px;height:20px;border-radius:20px;background:var(--border);position:relative;transition:background .18s;flex:0 0 34px}
 .switch .track i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .18s}
 .switch.on .track{background:var(--green)}

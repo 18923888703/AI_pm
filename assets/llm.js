@@ -118,13 +118,15 @@
     const cfg = getCfg();
     const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
     const key = url + '|' + cfg.model;
+    const deepseek = /^https:\/\/api\.deepseek\.com(?:\/|$)/i.test(cfg.baseUrl);
     const reasoner = /reasoner|thinking|(?:^|[-/])o[1-9](?:$|[-/])/.test(String(cfg.model).toLowerCase());
     const modes = schema ? ['json_schema', 'json_object', 'plain'] : ['plain'];
-    const start = schema ? (structuredMode[key] || (reasoner ? 'plain' : 'json_schema')) : 'plain';
+    const start = schema ? (structuredMode[key] || (deepseek ? 'json_object' : reasoner ? 'plain' : 'json_schema')) : 'plain';
     for (let i = Math.max(0, modes.indexOf(start)); i < modes.length; i++) {
       const mode = modes[i];
       const body = { model: cfg.model, messages: messages, stream: false,
         max_tokens: reasoner ? Math.max(maxTokens || 1000, 4096) : maxTokens || 1000 };
+      if (deepseek && schema) body.thinking = { type: 'disabled' };
       if (!reasoner) body.temperature = Number(cfg.temperature);
       if (mode === 'json_schema') body.response_format = { type: 'json_schema', json_schema: {
         name: 'mentor_output', strict: true, schema: schema } };

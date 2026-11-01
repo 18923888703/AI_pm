@@ -109,6 +109,22 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
   assert.deepEqual(formatAttempts, ['json_schema', 'json_object', 'plain', 'plain'],
     '不支持结构化格式的供应商应降级并记住可用模式');
 
+  let deepseekCalls = 0;
+  context.fetch = async (url, options) => {
+    deepseekCalls++;
+    const body = JSON.parse(options.body);
+    assert.equal(url, 'https://api.deepseek.com/chat/completions');
+    assert.equal(body.model, 'deepseek-flash');
+    assert.equal(body.response_format.type, 'json_object', 'DeepSeek 不应先发送不支持的 json_schema');
+    assert.equal(body.thinking.type, 'disabled', '结构化评估应保留足够输出预算');
+    return { ok: true, json: async () => ({ choices: [{ message: {
+      content: JSON.stringify({ memory: '按具体场景讲清检索与训练的边界。' })
+    } }] }) };
+  };
+  context.window.LLM.setCfg({ enabled: true, baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash' });
+  await context.window.LLM.summarizeLearner(profile, state.mentor.signals);
+  assert.equal(deepseekCalls, 1, 'DeepSeek 结构化请求应直接走官方 JSON Object 格式');
+
   const practiceAnswer = '我会先写清目标用户和输入字段，再定义缺参提示与验收步骤。';
   let practicePayload;
   context.fetch = async (_url, options) => {
