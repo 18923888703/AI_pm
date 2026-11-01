@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const context = { window: { Mem: { state: {}, save() {}, completeDailyQuiz() {} } }, Math, Date, Set, Map, console };
 vm.createContext(context);
 for (const name of ['data-core', 'data-adv', 'data-pro', 'data-pm', 'data-extension', 'data-materials',
-  'data-long-memory', 'data-agent-hallucination', 'curriculum', 'knowledge-base', 'knowledge-relations',
+  'data-long-memory', 'data-agent-hallucination', 'data-memory-workflow', 'data-model-growth', 'curriculum', 'knowledge-base', 'knowledge-relations',
   'explanations', 'interview-core50', 'term-quiz-short', 'learning-quiz', 'practice', 'practice-coach', 'interview-bank']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../assets', name + '.js'), 'utf8'), context, { filename: name });
 }
@@ -44,8 +44,8 @@ assert(practice && practice.checkpoints.length === 4 && practice.reference.lengt
 assert.equal(w.PracticeCoach.examples(practice.id).length, 2);
 const interview = w.INTERVIEW_BANK.find(q => q.id === 'agent-hallucination-governance-open');
 assert(interview && interview.rubric.length === 4 && interview.answerOutline);
-assert.equal(w.TERMS.length, 93);
-assert.equal(w.KNOWLEDGE_BASE.length, 35);
-assert.equal(w.PRACTICES.length, 17);
-assert.equal(w.INTERVIEW_BANK.length, 153);
+assert.equal(w.TERMS.length, 100);
+assert.equal(w.KNOWLEDGE_BASE.length, 38);
+assert.equal(w.PRACTICES.length, 20);
+assert.equal(w.INTERVIEW_BANK.length, 156);
 console.log('agent hallucination content: concept, variants, explanations, map, topic, practice and interview validated');

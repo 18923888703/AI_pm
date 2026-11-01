@@ -11,6 +11,8 @@ vm.createContext(context);
   'assets/data-materials.js',
   'assets/data-long-memory.js',
   'assets/data-agent-hallucination.js',
+  'assets/data-memory-workflow.js',
+  'assets/data-model-growth.js',
   'assets/curriculum.js', 'assets/knowledge-relations.js'
 ].forEach((file) => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context, { filename: file });
