@@ -83,6 +83,37 @@
       item('反例：奖励冲注册', '邀请得积分带来大量新号，实际任务完成率却低。', '把奖励、作弊和重度生成成本计入渠道账；没有净新增贡献时应停或缩小激励。', '推荐量和注册量不能替代留存与回本。')
     ]
   };
+  /* 每题只给拆解问题，不在作答前泄露参考方案。 */
+  function guide(meaning, questions) { return { meaning: meaning, questions: questions }; }
+  const guides = {
+    'brief-to-task': guide('把一句功能愿望变成团队能实现、测试能验收的任务。', ['谁在什么时候遇到什么困难？', '用户提供什么，系统交付什么？', '哪些情况不能生成或不能承诺？', '怎样操作一次就能检查结果是否正确？']),
+    'assumption-evidence': guide('把看到的现象、原因猜测和解决方案分开，避免把想做的功能说成已证实的需求。', ['目前真正知道了什么？', '哪些只是猜测，还缺哪类证据？', '提到的功能分别想验证什么假设？', '现有证据最多支持什么结论？']),
+    'mvp-slice': guide('用最小的端到端任务验证一个关键问题，而不是堆很多半成品入口。', ['先服务哪一类用户和哪一刻？', '首版让用户从输入走到什么可用结果？', '哪些诱人功能这次明确不做？', '出现什么信号算有效，何时停止？']),
+    'prompt-contract': guide('把模型输入输出写成可接入系统的契约，缺字段时也有确定状态。', ['角色、目标和输入材料分别是什么？', '输出有哪些稳定字段和类型？', '缺失或冲突时返回什么，禁止猜什么？', '准备哪两类样本验证正常和异常？']),
+    'workflow-breakdown': guide('先定交付结果，再按单一职责拆节点、字段与分支，使故障能被定位。', ['最终结果要包含哪些可交付字段？', '每个节点只负责哪一种判断或动作？', '上游给下游的字段和类型是什么？', '哪个分支会失败，如何测试和恢复？']),
+    'confirmation-gate': guide('让 AI 的候选结果经过证据核对和人类确认后才改变业务状态。', ['每个关键字段能指回哪段原文？', '草稿、待确认、可执行如何区分？', '谁能确认、修改或排除这条结果？', '执行失败后保留什么、如何重试？']),
+    'agent-four-layers': guide('把 Agent 的事实、任务状态、工具能力和执行边界拆开。', ['目前有哪些可验证事实？', '哪些信息不足，最少要追问什么？', '确认后才能调用哪项能力？', '催促、越权或工具失败时怎样守住边界？']),
+    'rag-tool-selection': guide('先看数据类型和动作风险，再选择检索、精确查询或工具调用。', ['哪些问题问文档，哪些问实时结构化数据？', '查到候选后如何核实相关性和来源？', '哪些动作要权限、确认或去重？', '查不到或工具失败时怎样回应？']),
+    'order-chatflow': guide('把订单咨询拆成识别、补参、查询、确认和异常交接的可运行链路。', ['用户可能带来哪些凭证或意图？', '缺参数时只追问哪一项？', '查到多笔或查无结果时走哪条分支？', '哪些承诺不能由系统直接作出？']),
+    'risk-workflow': guide('区分已经发生的问题与未来风险，并把处置动作写给具体负责人。', ['已发生的事实及其证据是什么？', '哪些后果仍只是风险假设？', '谁在何时做哪项具体动作？', '缺信息或逾期时如何升级验证？']),
+    'demo-product-loop': guide('找出 Demo 阻断用户完成任务的断点，一次只推进一个可验收版本。', ['用户完成任务在哪一步断掉？', '这一版只修哪一个最小闭环？', '完成、撤销和刷新后状态要怎样一致？', '旧进度如何保存与恢复？']),
+    'enterprise-handoff': guide('把能演示的原型交给团队做成可联调、可验收、可回滚的产品。', ['目标、范围和责任边界谁说清？', '密钥、权限和敏感数据由谁保管？', '接口字段、错误码和重试契约是什么？', '上线前测什么，失败后谁回滚？']),
+    'prd-ue-contract': guide('让 PRD 与界面设计同时说清正常行为、禁止边界和异常状态。', ['用户目标与明确不做的事是什么？', 'Prompt、知识和工具各承担什么？', '空、多、错、慢时用户看到什么？', '交给研发测试的验收样本有哪些？']),
+    'eval-regression-lab': guide('让同一问题在固定题集、评分器和版本下回归，区分修复与新增失败。', ['这次要判定哪类失败和成功？', '哪条实际回复或 Trace 支持判断？', '题集、评分器和配置怎样保持可比？', '什么结果允许发布，什么结果必须暂缓？']),
+    'resume-evidence-lab': guide('用真实项目证据匹配岗位要求，不把模拟效果写成上线业绩。', ['岗位最看重哪两项任务？', '你本人做了什么、处于什么阶段？', '哪项结果有可核对的样本和口径？', '哪个能力缺口需要新的小项目补证？']),
+    'learning-memory-design': guide('让学习记忆从原始答题证据到可更正的画像与复测安排形成闭环。', ['原始作答要保存哪些证据？', '几次证据才可归纳成错因？', '同日与跨日复测分别测什么？', '用户更正或跨设备冲突时怎样处理？']),
+    'agent-hallucination-governance': guide('分别治理无依据的事实结论和未核验的工具动作，不把所有失败混叫幻觉。', ['哪一句结论需要什么来源和时间口径？', '没有有效数据时返回什么状态？', '工具超时后如何核对最终动作？', 'Trace 和回归题怎样定位新失败？']),
+    'memory-conflict-workflow': guide('用明确状态和确认分支处理临时偏好、稳定变化与删除。', ['本轮表达是临时状态还是持续事实？', '待确认、有效、替代和删除怎样流转？', '哪些高风险约束不能被口味变化弱化？', '同一身份的新会话怎样验收？']),
+    'model-selection-unit-economics': guide('用同一任务集比较模型质量与完整任务成本，而非只看单次价格。', ['哪些业务样本和评分尺必须相同？', '一次任务实际调用几次、谁来兜底？', '哪些高风险失败与 P95 需要单列？', '什么证据足够支持灰度和回滚？']),
+    'agent-growth-pricing': guide('从首次有价值任务追到复用、付费和回本，同时控制激励与重度用量。', ['什么行为证明用户首次得到价值？', '哪一组同期群的续费和退款可比较？', '配额、奖励和重度用户花费怎么算？', '价格实验何时停止或扩大？'])
+  };
+  function breakdownGuide(practice) {
+    const own = guides[practice.id] || guide(practice.task, practice.rubric.map(function (r) { return '你会怎样证明「' + r + '」？'; }));
+    return { meaning: own.meaning, steps: practice.rubric.map(function (criterion, index) {
+      return { title: criterion, prompt: own.questions[index] || ('你会怎样处理「' + criterion + '」？'),
+        hint: practice.checkpoints[index] || '' };
+    }) };
+  }
   const cues = {
     'brief-to-task': [/用户|人群|场景/, /输入|字段|参数|输出/, /缺失|缺少|异常|边界|不做|不编造/, /验收|指标|验证/],
     'assumption-evidence': [/事实|观察|已知/, /假设|推测|可能/, /证据|访谈|数据|日志/, /结论|验证|方案/],
@@ -128,7 +159,8 @@
     if (!Array.isArray(raw.criteria) || raw.criteria.length !== rubric.length || !rubric.length) return null;
     const summary = String(raw.summary || '').trim();
     const nextStep = String(raw.nextStep || '').trim();
-    if (summary.length < 12 || nextStep.length < 8) return null;
+    const revisedAnswer = String(raw.revisedAnswer || '').trim();
+    if (summary.length < 12 || nextStep.length < 8 || revisedAnswer.length < 40 || revisedAnswer.length > 6000) return null;
     const statuses = ['met', 'partial', 'missing', 'uncertain'];
     const criteria = rubric.map(function (label) {
       const matches = raw.criteria.filter(function (row) { return row && row.criterion === label; });
@@ -156,7 +188,8 @@
       }),
       gaps: criteria.filter(function (row) { return row.status !== 'met'; }).map(function (row) {
         return { criterion: row.criterion, quote: row.quote, why: row.why, revision: row.revision };
-      }), nextStep: nextStep.slice(0, 500) };
+      }), nextStep: nextStep.slice(0, 500), revisedAnswer: revisedAnswer };
   }
-  window.PracticeCoach = { examples: id => (examples[id] || []).slice(), localAnalysis, normalizeModelAnalysis };
+  window.PracticeCoach = { examples: id => (examples[id] || []).slice(), guide: breakdownGuide,
+    localAnalysis, normalizeModelAnalysis };
 })();
