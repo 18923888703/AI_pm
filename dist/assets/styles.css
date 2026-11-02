@@ -765,6 +765,16 @@ body.simple-mode .simple-only{display:block}
 .daily-score-method{margin:0 0 12px}
 .adaptive-summary-row{display:flex;flex-wrap:wrap;gap:8px 20px;margin:20px 0;padding:12px 15px;border-radius:8px;background:var(--bg-soft);font-size:12px;color:var(--text-2)}
 .adaptive-summary-row b{color:var(--text);font-variant-numeric:tabular-nums}
+.optional-practice{margin:22px 0;padding:20px 22px;border:1px solid rgba(35,131,226,.26);border-radius:11px;background:rgba(35,131,226,.035)}
+.optional-practice-head h2{margin:8px 0 4px}
+.optional-practice>p{line-height:1.65;color:var(--text-2)}
+.optional-practice-skills,.optional-practice-formats,.optional-practice-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.optional-practice-skills .chip,.optional-practice-formats .btn,.optional-practice-actions .btn{min-height:44px}
+.optional-practice-skills .chip.active{border-color:var(--blue);background:rgba(35,131,226,.09);color:var(--blue)}
+.optional-practice-formats{align-items:center;margin-top:18px}
+.optional-practice-formats>b{width:100%;font-size:13px}
+.optional-practice>.adaptive-review-card{margin:16px 0 0;background:#fff}
+.optional-practice-actions{margin-top:14px}
 @media(max-width:720px){
   .practice-head,.practice-submitted > div,.practice-analysis-head,.practice-save-row{flex-direction:column;align-items:flex-start}
   .daily-decomp-card{grid-template-columns:1fr;padding:18px 18px 23px}
@@ -778,6 +788,7 @@ body.simple-mode .simple-only{display:block}
   .adaptive-review-head{align-items:flex-start;flex-direction:column}
   .daily-decomp-review-history-list{grid-template-columns:1fr}
   .daily-analysis-score{align-self:flex-start}
+  .optional-practice{padding:16px}
   .practice-example,.practice-analysis{padding:16px}
   .practice-save-row > div{display:flex;gap:8px;flex-wrap:wrap}
   .practice-concept-list{grid-template-columns:1fr}

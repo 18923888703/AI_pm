@@ -16,6 +16,7 @@
   let practiceBreakdownSaveTimer = null;
   let dailyDecompositionSaveTimer = null;
   const dailyDecompositionInFlight = new Map();
+  let optionalPracticeSkill = '';
 
   const T = function (id) { return window.TERMS.find(function (t) { return t.id === id; }); };
   const STAGE_ICONS = ['🌱', '🔧', '🔄', '🚀', '⚡', '🎯'];
@@ -1019,6 +1020,7 @@
     const learner = window.DailyDecomposition.profile();
     const review = plan.started ? window.DailyDecomposition.dueReview() : null;
     const todayReview = plan.started ? window.DailyDecomposition.todayReview() : null;
+    const optionalRun = plan.started ? window.DailyDecomposition.optionalRun() : null;
     const dayNo = plan.completedToday ? plan.todayDay : plan.day;
     const task = dayNo <= plan.total ? window.DailyDecomposition.task(dayNo) : null;
     const rec = dayNo <= plan.total ? window.DailyDecomposition.record(dayNo, false) : null;
@@ -1078,9 +1080,11 @@
         (modelReady ? '<button class="btn sm" data-daily-retry="' + dayNo + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') + '</div>';
     }
 
+    if (plan.started && (plan.completedToday || plan.complete || optionalRun))
+      html += dailyOptionalPracticeHTML(optionalRun, optionalPracticeSkill || learner.weakestKey, modelReady);
     const reviewHistory = window.DailyDecomposition.reviewHistory();
     html += '<div class="adaptive-summary-row"><span>主线达标 <b>' + plan.completed + '/' + plan.total + '</b></span>' +
-      '<span>累计间隔复测 <b>' + reviewHistory.length + '</b> 次</span><span>待复习 <b>' + plan.scheduledReviewCount + '</b> 项</span>' +
+      '<span>累计复测与加练 <b>' + reviewHistory.length + '</b> 次</span><span>待复习 <b>' + plan.scheduledReviewCount + '</b> 项</span>' +
       '<span>当前节奏 <b>' + esc(learner.pace) + '</b></span></div>';
     return html + '</div>';
   }
@@ -1092,12 +1096,14 @@
       '<button class="btn primary" data-daily-resubmit="' + dayNo + '"' + (!modelReady || busy ? ' disabled' : '') + '>重新分析修改稿</button></details>';
   }
 
-  function dailyReviewSection(review, modelReady) {
+  function dailyReviewSection(review, modelReady, optional) {
     const task = review.task, rec = review.record, id = review.id;
     const busy = !!(rec.submissionId && dailyDecompositionInFlight.get('review:' + id) === rec.submissionId);
-    let html = '<section class="adaptive-review-card"><div class="adaptive-review-head"><div><span class="tag orange">到期复习 · 换题型</span>' +
+    let html = '<section class="adaptive-review-card" data-review-run="' + escAttr(id) + '"><div class="adaptive-review-head"><div><span class="tag ' + (optional ? 'blue' : 'orange') + '">' +
+      (optional ? '自主变式加练' : '到期复习 · 换题型') + '</span>' +
       '<h2>' + esc(task.title) + '</h2></div><span class="tag blue">' + esc(task.levelLabel) + '</span></div>' +
-      '<p class="adaptive-review-reason">根据你之前「' + esc(review.queue.lastCriterion || task.focus) + '」的评估安排，换一个问题和题型检查是否能迁移。</p>' +
+      '<p class="adaptive-review-reason">' + (optional ? '你选择了「' + esc(task.focus) + '」；这是一道不同场景的变式题。' :
+        '根据你之前「' + esc(review.queue.lastCriterion || task.focus) + '」的评估安排，换一个问题和题型检查是否能迁移。') + '</p>' +
       '<div class="adaptive-review-meta"><span>主题：' + esc(task.focus) + '</span><span>形式：' + esc(task.format) + '</span><span>复测难度：' + task.level + '/3</span></div>' +
       '<div class="daily-decomp-focus"><b>复习目标</b><p>' + esc(task.meaning) + '</p></div>' +
       '<div class="case-block"><b>新场景</b><p>' + esc(task.scenario) + '</p></div><p class="daily-decomp-task-prompt">' + esc(task.task) + '</p>';
@@ -1111,15 +1117,16 @@
     if (!rec.analysis || rec.analysis.mode !== 'model') {
       html += '<div class="daily-decomp-steps" data-daily-review-id="' + escAttr(id) + '">' + task.fields.map(function (field, index) {
         return '<div class="practice-breakdown-step"><div class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(field[0]) + '</b></div>' +
-          '<label for="dailyReviewField' + index + '">' + esc(field[1]) + '</label><textarea id="dailyReviewField' + index + '" data-daily-review-field="' + index + '" rows="2" maxlength="1200">' +
+          '<label for="dailyReviewField' + escAttr(id) + index + '">' + esc(field[1]) + '</label><textarea id="dailyReviewField' + escAttr(id) + index + '" data-daily-review-field="' + index + '" rows="2" maxlength="3000">' +
           esc((rec.fields || [])[index] || '') + '</textarea></div>';
-      }).join('') + '</div><p class="tiny" role="status" id="dailyReviewSaveStatus">复习答案会自动保存。</p>' +
+      }).join('') + '</div><p class="tiny daily-review-save-status" role="status">答案会自动保存。</p>' +
         (!modelReady ? '<div class="practice-model-setup" role="note">在线评估需要先启用模型。<button class="btn sm" data-route="settings">去设置 →</button></div>' : '') +
-        '<div class="daily-decomp-submit-row"><span class="tiny">约 3–5 分钟 · 针对一项薄弱能力快速复测</span>' +
-        '<button class="btn primary" data-daily-review-submit="' + escAttr(id) + '"' + (!modelReady || busy ? ' disabled' : '') + '>提交复测 →</button></div>';
+        '<div class="daily-decomp-submit-row"><span class="tiny">约 3–5 分钟 · ' + (optional ? '自选题型加练' : '针对薄弱能力复测') + '</span>' +
+        '<button class="btn primary" data-daily-review-submit="' + escAttr(id) + '"' + (!modelReady || busy ? ' disabled' : '') + '>' + (optional ? '提交加练' : '提交复测') + ' →</button></div>';
     }
     if (busy) html += '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="true">模型正在分析这道变式复习题…</div>';
-    if (rec.analysis) html += dailyDecompositionAnalysisHTML(rec.analysis, task.title, { label: '间隔复习 · ' + task.format, reviewId: id });
+    if (rec.analysis) html += dailyDecompositionAnalysisHTML(rec.analysis, task.title, { label: (optional ? '自主加练 · ' : '间隔复习 · ') + task.format, reviewId: id });
+    if (optional && rec.analysis && rec.analysis.mode === 'model') html += dailyReviewRevisionEditor(rec, modelReady);
     return html + '</section>';
   }
 
@@ -1128,7 +1135,7 @@
     const busy = !!(review.pending && dailyDecompositionInFlight.get('review:' + id) === review.submissionId);
     const nextAt = review.queue && review.queue.status === 'active' && review.queue.dueAt
       ? new Date(review.queue.dueAt).toLocaleDateString('zh-CN') : '';
-    return '<section class="adaptive-review-card adaptive-review-complete"><span class="tag green">' + (busy ? '正在评估修改稿' : '今日间隔复习已记录') + '</span><h2>' + esc(task.title) + '</h2>' +
+    return '<section class="adaptive-review-card adaptive-review-complete" data-review-run="' + escAttr(id) + '"><span class="tag green">' + (busy ? '正在评估修改稿' : '今日间隔复习已记录') + '</span><h2>' + esc(task.title) + '</h2>' +
       '<p>' + (busy ? '模型正在检查你修改后的答案。' : !review.analysis ? '这次评估尚未完成，草稿已保留。' : passed ? '本次达标。' + (nextAt ? '下次复测安排在 ' + nextAt + '。' : '这一能力已通过三次间隔复测。') :
         '仍有薄弱项，系统会缩短复测间隔' + (nextAt ? '，下一次安排在 ' + nextAt + '。' : '。')) + '</p>' +
       (busy ? '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="true">正在分析…</div>' :
@@ -1137,9 +1144,32 @@
       dailyReviewRevisionEditor(review, modelReady) + '</section>';
   }
 
+  function dailyOptionalPracticeHTML(run, selectedSkill, modelReady) {
+    let html = '<section class="optional-practice"><div class="optional-practice-head"><div><span class="tag blue">自己选择 · 不限次数</span><h2>换个思路，再练一题</h2></div></div>' +
+      '<p>选一个能力和题型，系统会换场景出题。长需求也可以分四格作答；每次都会单独评分并给出修改思路。加练不会占用当天的主线题。</p>';
+    if (run) {
+      const format = window.DailyDecomposition.optionalFormats(run.skill).find(function (item) { return item.name === run.task.format; });
+      const formatIndex = format ? format.index : 0;
+      html += dailyReviewSection({ task: run.task, record: run, id: run.id,
+        queue: { lastCriterion: run.task.focus } }, modelReady, true) +
+        '<div class="optional-practice-actions"><button class="btn" data-daily-optional-next="' + escAttr(run.skill + ':' + formatIndex) + '">换一道同类新题 →</button>' +
+        '<button class="btn ghost" data-daily-optional-reset="1">改选能力或题型</button></div>';
+    } else {
+      const skill = window.DailyDecomposition.skills.find(function (item) { return item.key === selectedSkill; }) ? selectedSkill : 'framing';
+      html += '<p class="tiny">当前建议先练：' + esc(window.DailyDecomposition.skills.find(function (item) { return item.key === skill; }).label) + '。也可以自由选择。</p>' +
+        '<div class="optional-practice-skills">' + window.DailyDecomposition.skills.map(function (item) {
+          return '<button type="button" class="chip' + (item.key === skill ? ' active' : '') + '" data-daily-optional-skill="' + escAttr(item.key) + '">' + esc(item.label) + '</button>';
+        }).join('') + '</div><div class="optional-practice-formats"><b>选题型</b>' +
+        window.DailyDecomposition.optionalFormats(skill).map(function (item) {
+          return '<button type="button" class="btn" data-daily-optional-start="' + escAttr(skill + ':' + item.index) + '">' + esc(item.name) + ' →</button>';
+        }).join('') + '</div>';
+    }
+    return html + '</section>';
+  }
+
   function dailyReviewRevisionEditor(review, modelReady) {
     if (!review.analysis || review.analysis.mode !== 'model' || review.analysis.verdict === 'pass') return '';
-    return '<details class="daily-decomp-revision"><summary>按反馈修改，再巩固一次</summary><textarea id="dailyReviewRevisionAnswer" rows="8" maxlength="6000">' +
+    return '<details class="daily-decomp-revision"><summary>按反馈修改，再巩固一次</summary><textarea class="daily-review-revision-answer" rows="8" maxlength="12000">' +
       esc(review.analysis.revisedAnswer || review.submittedAnswer || '') + '</textarea><button class="btn primary" data-daily-review-resubmit="' + escAttr(review.id) + '"' +
       (!modelReady ? ' disabled' : '') + '>重新分析复习答案</button></details>';
   }
@@ -2484,7 +2514,7 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-assess-start],[data-assess-answer],' +
+      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-daily-optional-skill],[data-daily-optional-start],[data-daily-optional-next],[data-daily-optional-reset],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
 
@@ -2543,9 +2573,24 @@
       void analyzeDailyDecomposition(day, result.submissionId, result.answer);
       return;
     }
+    if (el.dataset.dailyOptionalSkill) {
+      optionalPracticeSkill = el.dataset.dailyOptionalSkill;
+      render(); return;
+    }
+    if (el.dataset.dailyOptionalStart || el.dataset.dailyOptionalNext) {
+      const choice = (el.dataset.dailyOptionalStart || el.dataset.dailyOptionalNext).split(':');
+      const run = window.DailyDecomposition.startOptional(choice[0], Number(choice[1]));
+      if (!run) { toast('暂时无法生成这道变式题'); return; }
+      optionalPracticeSkill = choice[0]; render(); return;
+    }
+    if (el.dataset.dailyOptionalReset !== undefined) {
+      window.DailyDecomposition.clearOptional();
+      render(); return;
+    }
     if (el.dataset.dailyReviewSubmit) {
       if (!practiceModelReady()) { toast('请先在「我的学习 → 设置与记忆」启用并保存在线模型'); return; }
-      const id = el.dataset.dailyReviewSubmit, fields = Array.from(document.querySelectorAll('[data-daily-review-field]')).map(function (input) { return input.value; });
+      const id = el.dataset.dailyReviewSubmit, card = el.closest('[data-review-run]');
+      const fields = Array.from(card ? card.querySelectorAll('[data-daily-review-field]') : []).map(function (input) { return input.value; });
       window.DailyDecomposition.saveReviewFields(id, fields);
       const result = window.DailyDecomposition.submitReview(id, fields);
       if (result.error) { toast(result.error); return; }
@@ -2564,7 +2609,8 @@
     }
     if (el.dataset.dailyReviewResubmit) {
       if (!practiceModelReady()) { toast('请先在设置中启用并配置在线模型'); return; }
-      const id = el.dataset.dailyReviewResubmit, run = window.DailyDecomposition.reviewRun(id), answer = $('#dailyReviewRevisionAnswer');
+      const id = el.dataset.dailyReviewResubmit, run = window.DailyDecomposition.reviewRun(id);
+      const answer = el.closest('[data-review-run]')?.querySelector('.daily-review-revision-answer');
       if (!run) return;
       const result = window.DailyDecomposition.submitReview(id, answer ? answer.value : '');
       if (result.error) { toast(result.error); return; }
@@ -2827,11 +2873,11 @@
       const id = box.dataset.dailyReviewId;
       const fields = Array.from(box.querySelectorAll('[data-daily-review-field]')).map(function (input) { return input.value; });
       clearTimeout(dailyDecompositionSaveTimer);
-      const status = $('#dailyReviewSaveStatus');
+      const status = box.closest('[data-review-run]')?.querySelector('.daily-review-save-status');
       if (status) status.textContent = '正在保存复习答案…';
       dailyDecompositionSaveTimer = setTimeout(function () {
         window.DailyDecomposition.saveReviewFields(id, fields);
-        const saved = $('#dailyReviewSaveStatus');
+        const saved = document.querySelector('[data-review-run="' + id + '"] .daily-review-save-status');
         if (saved) saved.textContent = '复习答案已自动保存。';
       }, 300);
       return;

@@ -233,8 +233,11 @@
       });
     });
     const started = [a.startedAt || 0, b.startedAt || 0].filter(Boolean);
+    const optionalCurrent = [a.optionalCurrentId, b.optionalCurrentId].filter(function (id) { return id && reviewRuns[id]; })
+      .sort(function (x, y) { return (reviewRuns[y].updatedAt || 0) - (reviewRuns[x].updatedAt || 0); })[0] || '';
     return { version: 2, startedAt: started.length ? Math.min.apply(Math, started) : 0, sessions: sessions,
-      reviewQueue: reviewQueue, reviewRuns: reviewRuns, reviewSeeded: !!(a.reviewSeeded || b.reviewSeeded) };
+      reviewQueue: reviewQueue, reviewRuns: reviewRuns, reviewSeeded: !!(a.reviewSeeded || b.reviewSeeded),
+      optionalSeq: Math.max(a.optionalSeq || 0, b.optionalSeq || 0), optionalCurrentId: optionalCurrent };
   }
 
   /* ---------- 合并策略 ----------

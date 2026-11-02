@@ -147,10 +147,11 @@
     if (/验收|指标|评测|回归|样本|通过|验证|实验/.test(text)) return 'validation';
     return 'scope';
   }
-  function buildReviewTask(skill, level, runCount) {
+  function buildReviewTask(skill, level, runCount, chosenFormat) {
     const domain = SKILLS[skill] || SKILLS.scope;
     const index = Math.max(0, Number(runCount || 1) - 1) % domain.scenarios.length;
-    const formIndex = (index + Math.max(0, Number(level || 2) - 1)) % domain.forms.length;
+    const formIndex = Number.isInteger(chosenFormat) && chosenFormat >= 0 && chosenFormat < domain.forms.length
+      ? chosenFormat : (index + Math.max(0, Number(level || 2) - 1)) % domain.forms.length;
     const form = domain.forms[formIndex];
     const difficulty = Number(level || 2);
     const tier = difficulty === 1 ? '基础补强' : difficulty >= 3 ? '高阶迁移' : '场景应用';
@@ -217,6 +218,7 @@
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
     if (!s.reviewQueue || typeof s.reviewQueue !== 'object') s.reviewQueue = {};
     if (!s.reviewRuns || typeof s.reviewRuns !== 'object') s.reviewRuns = {};
+    if (!Number.isInteger(s.optionalSeq)) s.optionalSeq = 0;
     if (previousVersion < 2) Object.keys(s.sessions).forEach(function (key) {
       const item = s.sessions[key];
       if (item && item.completedAt && item.analysis && item.analysis.mode === 'model') item.coreAdvancedAt = item.completedAt;
@@ -378,23 +380,44 @@
     return { queue: queue, record: run, task: run.task, id: run.id, level: learnerProfile(s).level };
   }
   function reviewRun(id) { return state().reviewRuns[id] || null; }
+  function optionalRun() {
+    const s = state();
+    return s.optionalCurrentId ? s.reviewRuns[s.optionalCurrentId] || null : null;
+  }
+  function startOptional(skill, formatIndex) {
+    const s = state(), domain = SKILLS[skill];
+    if (!domain) return null;
+    s.optionalSeq++;
+    const count = Object.keys(s.reviewRuns).filter(function (id) { return s.reviewRuns[id].optional && s.reviewRuns[id].skill === skill; }).length + 1;
+    const task = buildReviewTask(skill, learnerProfile(s).level, count, Number(formatIndex));
+    const id = 'optional-' + skill + '-' + s.optionalSeq;
+    s.reviewRuns[id] = { id: id, type: 'review', optional: true, skill: skill, day: nextDay(s), runCount: count,
+      variantId: task.id, task: task, fields: ['', '', '', ''], answer: '', submittedAnswer: '', submissionId: '',
+      analysis: null, attempts: [], completedAt: 0, updatedAt: Date.now() };
+    s.optionalCurrentId = id; save(); return s.reviewRuns[id];
+  }
+  function clearOptional() { const s = state(); s.optionalCurrentId = ''; save(); }
+  function optionalFormats(skill) {
+    const domain = SKILLS[skill];
+    return domain ? domain.forms.map(function (form, index) { return { index: index, name: form.name }; }) : [];
+  }
   function saveReviewFields(id, fields) {
     const run = reviewRun(id); if (!run) return null;
-    run.fields = (Array.isArray(fields) ? fields : []).slice(0, 4).map(function (x) { return String(x || '').slice(0, 1200); });
+    run.fields = (Array.isArray(fields) ? fields : []).slice(0, 4).map(function (x) { return String(x || '').slice(0, 3000); });
     while (run.fields.length < 4) run.fields.push('');
     run.updatedAt = Date.now(); save(); return run;
   }
   function submitReview(id, answerOrFields) {
     const s = state(), run = s.reviewRuns[id];
-    if (!run || !s.reviewQueue[run.skill] || s.reviewQueue[run.skill].currentRunId !== id)
+    if (!run || (!run.optional && (!s.reviewQueue[run.skill] || s.reviewQueue[run.skill].currentRunId !== id)))
       return { error: '这条间隔复习已更新，请刷新后继续。' };
     const item = run.task;
     let answer;
     if (Array.isArray(answerOrFields)) {
-      run.fields = answerOrFields.slice(0, 4).map(function (x) { return String(x || '').trim().slice(0, 1200); });
+      run.fields = answerOrFields.slice(0, 4).map(function (x) { return String(x || '').trim().slice(0, 3000); });
       while (run.fields.length < 4) run.fields.push('');
       answer = item.fields.map(function (field, i) { return field[0] + '：' + run.fields[i]; }).filter(function (_, i) { return !!run.fields[i]; }).join('\n');
-    } else answer = String(answerOrFields || '').trim().slice(0, 6000);
+    } else answer = String(answerOrFields || '').trim().slice(0, 12000);
     if (answer.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length < 40) return { error: '请先写出至少 40 个有效字符，再提交评估。' };
     if (run.submissionId && run.submittedAnswer) run.attempts = (run.attempts || []).concat([{ answer: run.submittedAnswer, analysis: run.analysis, at: run.updatedAt }]).slice(-10);
     run.answer = answer; run.submittedAnswer = answer;
@@ -404,11 +427,15 @@
   }
   function saveReviewAnalysis(id, submissionId, analysis) {
     const s = state(), run = s.reviewRuns[id], queue = run && s.reviewQueue[run.skill];
-    if (!run || !queue || run.submissionId !== submissionId) return false;
+    if (!run || (!run.optional && !queue) || run.submissionId !== submissionId) return false;
     run.analysis = Object.assign({}, analysis, { submissionId: submissionId, at: Date.now() });
     run.pending = false; run.updatedAt = Date.now();
     if (analysis && analysis.mode === 'model') {
       run.completedAt = Date.now();
+      if (run.optional) {
+        queueWeakCriteria(s, run.day || nextDay(s), run, run.analysis, run.completedAt);
+        save(); return true;
+      }
       const passed = analysis.verdict === 'pass';
       if (passed) {
         queue.successes = (queue.successes || 0) + 1;
@@ -427,7 +454,7 @@
   function todayReview() {
     const s = state(), today = todayKey();
     const run = Object.keys(s.reviewRuns).map(function (key) { return s.reviewRuns[key]; })
-      .filter(function (run) { return run && ((run.lastAttemptAt && todayKey(new Date(run.lastAttemptAt)) === today) ||
+      .filter(function (run) { return run && !run.optional && ((run.lastAttemptAt && todayKey(new Date(run.lastAttemptAt)) === today) ||
         (run.completedAt && todayKey(new Date(run.completedAt)) === today)); })
       .sort(function (a, b) { return (b.lastAttemptAt || b.completedAt || 0) - (a.lastAttemptAt || a.completedAt || 0); })[0] || null;
     return run ? Object.assign({}, run, { queue: s.reviewQueue[run.skill] || null }) : null;
@@ -444,5 +471,8 @@
   window.DailyDecomposition = { days: DAYS.slice(), task: task, state: viewState, start: start, record: record,
     saveFields: saveFields, submit: submit, saveAnalysis: saveAnalysis, history: history, todayKey: todayKey,
     dueReview: dueReview, reviewRun: reviewRun, saveReviewFields: saveReviewFields, submitReview: submitReview,
-    saveReviewAnalysis: saveReviewAnalysis, todayReview: todayReview, reviewHistory: reviewHistory, profile: function () { return learnerProfile(state()); } };
+    saveReviewAnalysis: saveReviewAnalysis, todayReview: todayReview, reviewHistory: reviewHistory,
+    optionalRun: optionalRun, startOptional: startOptional, clearOptional: clearOptional, optionalFormats: optionalFormats,
+    skills: Object.keys(SKILLS).map(function (key) { return { key: key, label: SKILLS[key].label }; }),
+    profile: function () { const p = learnerProfile(state()); p.weakestKey = Object.keys(p.weakCounts).sort(function (a, b) { return p.weakCounts[b] - p.weakCounts[a]; })[0] || 'framing'; return p; } };
 })();
