@@ -5,11 +5,13 @@ const ID = /^[a-f0-9]{64}$/;
 const B64 = /^[A-Za-z0-9_-]+$/;
 const ETAG = /^[\x21-\x7e]{1,180}$/;
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: {
+function json(data, status = 200, origin = '') {
+  const headers = {
     'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff'
-  } });
+  };
+  if (origin) { headers['Access-Control-Allow-Origin'] = origin; headers.Vary = 'Origin'; }
+  return new Response(JSON.stringify(data), { status, headers });
 }
 function equalHash(left, right) {
   if (!ID.test(left || '') || !ID.test(right || '')) return false;
@@ -21,37 +23,47 @@ function validPayload(value) {
 }
 
 export async function handleSync(request, store, config) {
-  if (!ID.test(config.roomId || '') || !ID.test(config.authHash || '')) return json({ error: 'sync-not-configured' }, 503);
   const url = new URL(request.url);
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigin = origin === url.origin || origin === 'https://18923888703.github.io' ? origin : '';
+  if (origin && !allowedOrigin) return json({ error: 'origin-not-allowed' }, 403);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-AIPM-Sync-Auth',
+    'Access-Control-Max-Age': '600', 'Vary': 'Origin', 'Cache-Control': 'no-store'
+  } });
+  const respond = (data, status) => json(data, status, allowedOrigin);
+  if (!ID.test(config.roomId || '') || !ID.test(config.authHash || '')) return respond({ error: 'sync-not-configured' }, 503);
   const id = url.searchParams.get('id');
-  if (!ID.test(id || '') || !equalHash(id, config.roomId)) return json({ error: 'not-found' }, 404);
+  if (!ID.test(id || '') || !equalHash(id, config.roomId)) return respond({ error: 'not-found' }, 404);
   if (request.method === 'GET') {
     const entry = await store.getWithMetadata(id, { consistency: 'strong' });
-    if (!entry) return json({ error: 'empty' }, 404);
-    try { return json({ payload: JSON.parse(entry.data), etag: entry.etag }); }
-    catch (error) { return json({ error: 'stored-payload-invalid' }, 500); }
+    if (!entry) return respond({ error: 'empty' }, 404);
+    try { return respond({ payload: JSON.parse(entry.data), etag: entry.etag }); }
+    catch (error) { return respond({ error: 'stored-payload-invalid' }, 500); }
   }
-  if (request.method !== 'PUT' && request.method !== 'DELETE') return json({ error: 'method-not-allowed' }, 405);
+  if (request.method !== 'PUT' && request.method !== 'DELETE') return respond({ error: 'method-not-allowed' }, 405);
   const token = request.headers.get('X-AIPM-Sync-Auth') || '';
   const tokenHash = createHash('sha256').update(token).digest('hex');
-  if (!ID.test(token) || !equalHash(tokenHash, config.authHash)) return json({ error: 'unauthorized' }, 401);
+  if (!ID.test(token) || !equalHash(tokenHash, config.authHash)) return respond({ error: 'unauthorized' }, 401);
   if (request.method === 'DELETE') {
     await store.delete(id);
-    return json({ deleted: true });
+    return respond({ deleted: true });
   }
   const declared = Number(request.headers.get('Content-Length') || 0);
-  if (declared > MAX_BODY) return json({ error: 'payload-too-large' }, 413);
+  if (declared > MAX_BODY) return respond({ error: 'payload-too-large' }, 413);
   let body;
   try {
     const raw = await request.text();
-    if (raw.length > MAX_BODY) return json({ error: 'payload-too-large' }, 413);
+    if (raw.length > MAX_BODY) return respond({ error: 'payload-too-large' }, 413);
     body = JSON.parse(raw);
-  } catch (error) { return json({ error: 'invalid-json' }, 400); }
+  } catch (error) { return respond({ error: 'invalid-json' }, 400); }
   if (!validPayload(body.payload) || (body.etag != null && (typeof body.etag !== 'string' || !ETAG.test(body.etag))))
-    return json({ error: 'invalid-payload' }, 400);
+    return respond({ error: 'invalid-payload' }, 400);
   const options = body.etag ? { onlyIfMatch: body.etag } : { onlyIfNew: true };
   const result = await store.set(id, JSON.stringify(body.payload), options);
-  if (!result.modified) return json({ error: 'conflict' }, 409);
+  if (!result.modified) return respond({ error: 'conflict' }, 409);
   const saved = await store.getMetadata(id, { consistency: 'strong' });
-  return json({ etag: saved && saved.etag || null, saved: true });
+  return respond({ etag: saved && saved.etag || null, saved: true });
 }

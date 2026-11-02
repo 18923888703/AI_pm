@@ -18,6 +18,15 @@ const { createHash } = require('node:crypto');
     }
   };
   const endpoint = 'https://example.netlify.app/.netlify/functions/sync-memory?id=' + id;
+  const pagesOrigin = 'https://18923888703.github.io';
+  const preflight = await handleSync(new Request(endpoint, { method: 'OPTIONS', headers: {
+    Origin: pagesOrigin, 'Access-Control-Request-Method': 'PUT',
+    'Access-Control-Request-Headers': 'content-type,x-aipm-sync-auth'
+  } }), store, config);
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), pagesOrigin);
+  assert.match(preflight.headers.get('Access-Control-Allow-Headers'), /X-AIPM-Sync-Auth/);
+  assert.equal((await handleSync(new Request(endpoint, { headers: { Origin: 'https://unrelated.example' } }), store, config)).status, 403);
   const put = (body, auth = token) => new Request(endpoint, { method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-AIPM-Sync-Auth': auth }, body: JSON.stringify(body) });
   const payload = { v: 1, iv: '1234567890abcdef', data: 'A'.repeat(64) };
@@ -34,6 +43,8 @@ const { createHash } = require('node:crypto');
   assert.deepEqual(read.payload, payload);
   assert.equal(read.etag, '"revision-1"');
   assert.equal(fetched.headers.get('Cache-Control'), 'no-store');
+  const browserFetched = await handleSync(new Request(endpoint, { headers: { Origin: pagesOrigin } }), store, config);
+  assert.equal(browserFetched.headers.get('Access-Control-Allow-Origin'), pagesOrigin);
   assert.equal((await handleSync(put({ payload, etag: '"stale"' }), store, config)).status, 409,
     '旧设备不能覆盖另一设备的新版本');
   assert.equal((await handleSync(put({ payload, etag: read.etag }), store, config)).status, 200);

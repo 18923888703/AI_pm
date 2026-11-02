@@ -775,6 +775,11 @@ body.simple-mode .simple-only{display:block}
 .optional-practice-formats>b{width:100%;font-size:13px}
 .optional-practice>.adaptive-review-card{margin:16px 0 0;background:#fff}
 .optional-practice-actions{margin-top:14px}
+.optional-focus-page>.practice-head{margin-bottom:18px}
+.optional-focus-page>.practice-head h1{margin:8px 0 0}
+.optional-focus-page>.optional-practice{margin:0;padding:0;border:0;background:transparent}
+.optional-focus-page>.optional-practice>.adaptive-review-card{margin:0}
+.optional-focus-page>.optional-practice-actions{margin-top:16px}
 @media(max-width:720px){
   .practice-head,.practice-submitted > div,.practice-analysis-head,.practice-save-row{flex-direction:column;align-items:flex-start}
   .daily-decomp-card{grid-template-columns:1fr;padding:18px 18px 23px}

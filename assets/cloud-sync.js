@@ -1,7 +1,9 @@
 /* 手机/电脑共用的端到端加密记忆同步。同步码只保存在本机浏览器，不上传明文。 */
 (function () {
   const CODE_KEY = 'aipm.cloud.code.v1';
-  const ENDPOINT = '/.netlify/functions/sync-memory';
+  const ENDPOINT = location.hostname === '18923888703.github.io'
+    ? 'https://ai-pm-academy-cn.netlify.app/.netlify/functions/sync-memory'
+    : '/.netlify/functions/sync-memory';
   const enc = new TextEncoder(), dec = new TextDecoder();
   let account = null, timer = null, inFlight = null, dirty = false;
 

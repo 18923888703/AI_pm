@@ -9,8 +9,12 @@ export default async function syncMemory(request) {
     });
   } catch (error) {
     console.error('Encrypted memory sync failed:', error && error.message || error);
-    return new Response(JSON.stringify({ error: 'sync-unavailable' }), { status: 503, headers: {
+    const origin = request.headers.get('Origin') || '';
+    const allowedOrigin = origin === new URL(request.url).origin || origin === 'https://18923888703.github.io' ? origin : '';
+    const headers = {
       'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'
-    } });
+    };
+    if (allowedOrigin) { headers['Access-Control-Allow-Origin'] = allowedOrigin; headers.Vary = 'Origin'; }
+    return new Response(JSON.stringify({ error: 'sync-unavailable' }), { status: 503, headers });
   }
 }
