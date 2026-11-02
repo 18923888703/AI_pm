@@ -189,6 +189,28 @@
     return out;
   }
 
+  function mergeDailyDecomposition(a, b) {
+    if (!a && !b) return null;
+    a = a || {}; b = b || {};
+    const sessions = {};
+    const allDays = new Set(Object.keys(a.sessions || {}).concat(Object.keys(b.sessions || {})));
+    allDays.forEach(function (day) {
+      const left = (a.sessions || {})[day], right = (b.sessions || {})[day];
+      if (!left || !right) { sessions[day] = JSON.parse(JSON.stringify(left || right)); return; }
+      const latest = (left.updatedAt || 0) >= (right.updatedAt || 0) ? left : right;
+      const other = latest === left ? right : left;
+      const merged = JSON.parse(JSON.stringify(latest));
+      merged.attempts = unionBy([].concat(left.attempts || [], right.attempts || []), function (x) {
+        return (x.at || 0) + '|' + (x.answer || '');
+      }).sort(function (x, y) { return (x.at || 0) - (y.at || 0); }).slice(-10);
+      merged.completedAt = Math.max(left.completedAt || 0, right.completedAt || 0);
+      if (!merged.analysis && other.analysis && other.submissionId === merged.submissionId) merged.analysis = other.analysis;
+      sessions[day] = merged;
+    });
+    const started = [a.startedAt || 0, b.startedAt || 0].filter(Boolean);
+    return { version: 1, startedAt: started.length ? Math.min.apply(Math, started) : 0, sessions: sessions };
+  }
+
   /* ---------- 合并策略 ----------
      · 整体：取 updatedAt 更新的一方
      · 事件流：按 t+type+termId+source 去重取并集（不丢另一台设备的学习记录）
@@ -373,6 +395,9 @@
         : Object.assign({}, learnA.patterns || {}, learnB.patterns || {}) };
 
     out.prefs = newest.prefs || base.prefs;
+    out.lab = Object.assign({}, base.lab || {});
+    const dailyDecomposition = mergeDailyDecomposition((a.lab || {}).dailyDecomposition, (b.lab || {}).dailyDecomposition);
+    if (dailyDecomposition) out.lab.dailyDecomposition = dailyDecomposition;
     const profileA = a.learnerProfile || {}, profileB = b.learnerProfile || {};
     out.learnerProfile = (profileA.updatedAt || 0) >= (profileB.updatedAt || 0) ? profileA : profileB;
     out.plan = mergePlan(a.plan, b.plan);
