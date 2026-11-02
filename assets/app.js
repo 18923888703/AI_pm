@@ -17,6 +17,7 @@
   let dailyDecompositionSaveTimer = null;
   const dailyDecompositionInFlight = new Map();
   let optionalPracticeSkill = '';
+  let optionalPracticeFocus = null;
 
   const T = function (id) { return window.TERMS.find(function (t) { return t.id === id; }); };
   const STAGE_ICONS = ['🌱', '🔧', '🔄', '🚀', '⚡', '🎯'];
@@ -1018,14 +1019,19 @@
   function viewDailyDecomposition() {
     const plan = window.DailyDecomposition.state();
     const learner = window.DailyDecomposition.profile();
+    const optionalRun = plan.started ? window.DailyDecomposition.optionalRun() : null;
+    const modelReady = practiceModelReady();
+    if (plan.started && (optionalPracticeFocus === true || (optionalPracticeFocus === null && !!optionalRun))) {
+      return '<div class="page daily-decomp-page optional-focus-page"><div class="practice-head"><div><span class="tag blue">自主变式加练</span>' +
+        '<h1>专注这一题</h1></div><button class="btn sm ghost" data-daily-optional-exit="1">返回训练计划</button></div>' +
+        dailyOptionalPracticeHTML(optionalRun, optionalPracticeSkill || learner.weakestKey, modelReady) + '</div>';
+    }
     const review = plan.started ? window.DailyDecomposition.dueReview() : null;
     const todayReview = plan.started ? window.DailyDecomposition.todayReview() : null;
-    const optionalRun = plan.started ? window.DailyDecomposition.optionalRun() : null;
     const dayNo = plan.completedToday ? plan.todayDay : plan.day;
     const task = dayNo <= plan.total ? window.DailyDecomposition.task(dayNo) : null;
     const rec = dayNo <= plan.total ? window.DailyDecomposition.record(dayNo, false) : null;
     const busy = !!(rec && rec.submissionId && dailyDecompositionInFlight.get('core:' + dayNo) === rec.submissionId);
-    const modelReady = practiceModelReady();
     let html = '<div class="page daily-decomp-page"><div class="practice-head"><div><span class="tag purple">每日训练计划</span>' +
       '<h1>需求拆解训练</h1><p class="lead">共 14 个递进主题，一天一个主线练习。模型逐项分析后，关键项达标才推进主线；未达标会留在当前主题，并按薄弱能力安排变式复习。</p></div>' +
       '<button class="btn sm ghost" data-route="practice">返回实战练习</button></div>' +
@@ -1145,7 +1151,8 @@
   }
 
   function dailyOptionalPracticeHTML(run, selectedSkill, modelReady) {
-    let html = '<section class="optional-practice"><div class="optional-practice-head"><div><span class="tag blue">自己选择 · 随时加练</span><h2>换个思路，再练一题</h2></div></div>' +
+    let html = run ? '<section class="optional-practice optional-practice-active">' :
+      '<section class="optional-practice"><div class="optional-practice-head"><div><span class="tag blue">自己选择 · 随时加练</span><h2>换个思路，再练一题</h2></div></div>' +
       '<p>选一个能力和题型，系统会换场景出题。长需求也可以分四格作答；每次都会单独评分并给出修改思路。加练不会占用当天的主线题。</p>';
     if (run) {
       const format = window.DailyDecomposition.optionalFormats(run.skill).find(function (item) { return item.name === run.task.format; });
@@ -1368,10 +1375,12 @@
       const labels = { met: ['已达到', 'green'], partial: ['部分达到', 'orange'],
         missing: ['未达到', 'red'], uncertain: ['待核实', 'orange'] };
       const met = a.criteria.filter(function (row) { return row.status === 'met'; }).length;
+      const score = dailyRubricScore(a);
       return '<section class="practice-analysis" aria-label="在线模型逐项评估结果"><div class="practice-analysis-head"><div>' +
         '<span class="tag ' + result[1] + '">在线模型建议判定 · ' + result[0] + '</span>' +
-        '<h2>按任务要求逐项看你的方案</h2></div><span class="tiny">已达到 ' + met + '/' + a.criteria.length + ' 项</span></div>' +
-        '<p class="practice-analysis-summary">' + esc(a.summary) + '</p>' +
+        '<h2>按任务要求逐项看你的方案</h2></div><div class="daily-analysis-score"><b>' + score + '<small>/100</small></b>' +
+        '<span>本次量表得分<br><small>已达到 ' + met + '/' + a.criteria.length + ' 项</small></span></div></div>' +
+        '<p class="practice-analysis-summary">' + esc(a.summary) + '</p><p class="tiny daily-score-method">四项等权：达到计 1，部分达到计 0.5，未达到或待核实计 0。</p>' +
         '<div class="practice-criteria">' + a.criteria.map(function (row) {
           const label = labels[row.status] || labels.uncertain;
           return '<article class="practice-criterion"><div class="practice-criterion-head"><b>' + esc(row.criterion) + '</b>' +
@@ -1380,7 +1389,7 @@
             '<p><strong>为什么这样判断：</strong>' + esc(row.why) + '</p>' +
             (row.status !== 'met' ? '<p class="practice-revision"><strong>下一版怎么改：</strong>' + esc(row.revision) + '</p>' : '') +
             '</article>';
-        }).join('') + '</div><div class="practice-next-step"><b>最优先修改</b><p>' + esc(a.nextStep) + '</p></div>' +
+        }).join('') + '</div><div class="practice-next-step"><b>下一版先改这一点</b><p>' + esc(a.nextStep) + '</p></div>' +
         (a.revisedAnswer ? '<details class="practice-rewrite"><summary>对照 AI 修改稿（提交后可看）</summary>' +
           '<p class="tiny">这是基于你原答案改写的示例，不会自动覆盖你的方案；请核对其中未证实的事实和数字。</p>' +
           '<div class="practice-rewrite-text">' + esc(a.revisedAnswer) + '</div>' +
@@ -2150,7 +2159,7 @@
 
     const cloud = window.CloudSync;
     html += '<h2>跨设备记录</h2><section class="card cloud-sync-card"><div class="cloud-sync-head"><div><b>配对码同步暂不可用</b>' +
-      '<p class="tiny">静态版不运行原 Netlify 同步后端。题目记录、错因与复测计划仍保存在本机；请用下方 JSON 导出与导入迁移。</p></div>' +
+      '<p class="tiny">静态版尚未接通原 Netlify 同步后端。题目记录、错因与复测计划仍保存在本机；请用下方 JSON 导出与导入迁移。</p></div>' +
       '<span id="cloudStatus" class="tag ' + (cloud.status === 'synced' ? 'green' : cloud.status === 'error' ? 'red' : 'orange') + '">' +
       (cloud.status === 'synced' ? '已同步' : cloud.status === 'syncing' ? '同步中' : cloud.status === 'error' ? '同步失败' : '未连接') + '</span></div>';
     if (cloud.connected()) {
@@ -2321,7 +2330,7 @@
       '<div class="callout"><span class="emo">🔒</span><div class="ct"><b>关于隐私</b><br>' +
       '· 学习记录、练习答案、面试分数、对话历史和 API Key 保存在本机浏览器，可自行导出或清空。<br>' +
       '· 启用文件同步时，数据只写进你自己选的那个文件 —— 放哪个网盘由你决定。<br>' +
-      '· 本静态版本不提供 Netlify 配对码同步；跨设备迁移请使用 JSON 导出与导入，模型 API Key 需分别配置。<br>' +
+      '· 本静态版本暂未接通 Netlify 配对码同步；跨设备迁移请使用 JSON 导出与导入，模型 API Key 需分别配置。<br>' +
       '· 启用在线模型后，问题、当前概念、相关对话、学习画像摘要，以及你提交的实战练习答案会发送给你配置的模型厂商，用于回答、归纳、重讲和具体点评。<br>' +
       '· 可以导出、回滚或清空本机记忆；本站不会创建配对码云端记录。</div></div>';
 
@@ -2514,7 +2523,7 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-daily-optional-skill],[data-daily-optional-start],[data-daily-optional-next],[data-daily-optional-reset],[data-assess-start],[data-assess-answer],' +
+      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-daily-optional-skill],[data-daily-optional-start],[data-daily-optional-next],[data-daily-optional-reset],[data-daily-optional-exit],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
 
@@ -2575,16 +2584,22 @@
     }
     if (el.dataset.dailyOptionalSkill) {
       optionalPracticeSkill = el.dataset.dailyOptionalSkill;
+      optionalPracticeFocus = true;
       render(); return;
     }
     if (el.dataset.dailyOptionalStart || el.dataset.dailyOptionalNext) {
       const choice = (el.dataset.dailyOptionalStart || el.dataset.dailyOptionalNext).split(':');
       const run = window.DailyDecomposition.startOptional(choice[0], Number(choice[1]));
       if (!run) { toast('暂时无法生成这道变式题'); return; }
-      optionalPracticeSkill = choice[0]; render(); return;
+      optionalPracticeSkill = choice[0]; optionalPracticeFocus = true; render(); return;
     }
     if (el.dataset.dailyOptionalReset !== undefined) {
       window.DailyDecomposition.clearOptional();
+      optionalPracticeFocus = true;
+      render(); return;
+    }
+    if (el.dataset.dailyOptionalExit !== undefined) {
+      optionalPracticeFocus = false;
       render(); return;
     }
     if (el.dataset.dailyReviewSubmit) {
