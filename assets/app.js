@@ -1145,14 +1145,14 @@
   }
 
   function dailyOptionalPracticeHTML(run, selectedSkill, modelReady) {
-    let html = '<section class="optional-practice"><div class="optional-practice-head"><div><span class="tag blue">自己选择 · 不限次数</span><h2>换个思路，再练一题</h2></div></div>' +
+    let html = '<section class="optional-practice"><div class="optional-practice-head"><div><span class="tag blue">自己选择 · 随时加练</span><h2>换个思路，再练一题</h2></div></div>' +
       '<p>选一个能力和题型，系统会换场景出题。长需求也可以分四格作答；每次都会单独评分并给出修改思路。加练不会占用当天的主线题。</p>';
     if (run) {
       const format = window.DailyDecomposition.optionalFormats(run.skill).find(function (item) { return item.name === run.task.format; });
       const formatIndex = format ? format.index : 0;
       html += dailyReviewSection({ task: run.task, record: run, id: run.id,
         queue: { lastCriterion: run.task.focus } }, modelReady, true) +
-        '<div class="optional-practice-actions"><button class="btn" data-daily-optional-next="' + escAttr(run.skill + ':' + formatIndex) + '">换一道同类新题 →</button>' +
+        '<div class="optional-practice-actions"><button class="btn" data-daily-optional-next="' + escAttr(run.skill + ':' + formatIndex) + '">再来一道同类变式题 →</button>' +
         '<button class="btn ghost" data-daily-optional-reset="1">改选能力或题型</button></div>';
     } else {
       const skill = window.DailyDecomposition.skills.find(function (item) { return item.key === selectedSkill; }) ? selectedSkill : 'framing';

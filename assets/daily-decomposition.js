@@ -138,6 +138,12 @@
       ], rubric: ['验收对象和步骤可复现','结果指标对应用户价值','护栏覆盖关键风险','门槛和回归决策可执行'],
       reference: ['写明输入、操作、预期字段和状态，让不同测试人能复现。','主指标关注是否解决用户任务，不能只把生成量或点击量当价值。','同时监控错误事实、人工返工、时延和单次成本等护栏。','用固定样本对照版本；高风险错误达到阻断门槛时不发布或回滚。'] }
   };
+  const REVIEW_CONSTRAINTS = {
+    framing: ['现有材料只来自一位内部同事，不能代表所有用户。', '需求方把自己的猜测写成了“用户反馈”，但没有原始记录。', '目标人群同时包含新手和熟练用户，使用时刻不同。', '团队已经选定功能方案，但尚未验证用户是否遇到对应问题。'],
+    scope: ['资源只够一个迭代，必须先保留一个完整闭环。', '上游数据有时缺失，主流程必须能停下并恢复。', '需要同时考虑移动端首次使用和桌面端继续任务。', '已有人工流程仍要保留，自动化只能逐步替换。'],
+    risk: ['相关操作可能改写正式业务数据，不能把草稿当作已执行。', '一次请求可能重复到达，需要区分重试与重复执行。', '用户身份与业务权限可能不一致，必须重新核验。', '外部系统有超时和部分成功状态，需要明确回退。'],
+    validation: ['试点样本较少，不能用单次好结果推断整体效果。', '高频问题改善了，但高风险问题可能退化。', '新旧版本的输入样本必须保持一致才能比较。', '团队希望上线前明确停止条件与人工复核责任。']
+  };
 
   function skillFor(label) {
     const text = String(label || '');
@@ -149,16 +155,20 @@
   }
   function buildReviewTask(skill, level, runCount, chosenFormat) {
     const domain = SKILLS[skill] || SKILLS.scope;
+    const constraints = REVIEW_CONSTRAINTS[skill] || REVIEW_CONSTRAINTS.scope;
     const index = Math.max(0, Number(runCount || 1) - 1) % domain.scenarios.length;
+    const constraintIndex = Math.floor(Math.max(0, Number(runCount || 1) - 1) / domain.scenarios.length) % constraints.length;
+    const timeIndex = Math.floor(Math.max(0, Number(runCount || 1) - 1) / (domain.scenarios.length * constraints.length)) % 3;
     const formIndex = Number.isInteger(chosenFormat) && chosenFormat >= 0 && chosenFormat < domain.forms.length
       ? chosenFormat : (index + Math.max(0, Number(level || 2) - 1)) % domain.forms.length;
     const form = domain.forms[formIndex];
     const difficulty = Number(level || 2);
     const tier = difficulty === 1 ? '基础补强' : difficulty >= 3 ? '高阶迁移' : '场景应用';
-    return { id: 'adaptive-review-' + skill + '-' + index + '-' + formIndex, title: domain.label + ' · ' + form.name,
+    return { id: 'adaptive-review-' + skill + '-' + index + '-' + constraintIndex + '-' + timeIndex + '-' + formIndex, title: domain.label + ' · ' + form.name,
       focus: domain.label, format: form.name, level: difficulty, levelLabel: tier,
       meaning: '这是根据你最近评估中的薄弱项安排的间隔复习。它换了场景和作答形式，检查你是否能把同一判断迁移到新问题。',
-      scenario: domain.scenarios[index], task: '按「' + form.name + '」完成这次复测。' +
+      scenario: domain.scenarios[index] + ' 补充条件：' + constraints[constraintIndex] + ' 这一轮请在 ' + [3, 5, 7][timeIndex] + ' 天内提出可验证的处理方案。',
+      task: '按「' + form.name + '」完成这次复测。' +
         (difficulty === 1 ? '先把对象、事实和条件写具体，再给出结论。' : difficulty >= 3 ? '除给出方案外，还要说明取舍、反例和升级条件。' : '明确依据、操作条件和可验证结果。'),
       fields: form.fields, rubric: domain.rubric, reference: domain.reference,
       checkpoints: domain.reference, related: [] };
