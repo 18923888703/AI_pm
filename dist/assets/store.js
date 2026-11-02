@@ -207,8 +207,34 @@
       if (!merged.analysis && other.analysis && other.submissionId === merged.submissionId) merged.analysis = other.analysis;
       sessions[day] = merged;
     });
+    const reviewRuns = {};
+    const allRuns = new Set(Object.keys(a.reviewRuns || {}).concat(Object.keys(b.reviewRuns || {})));
+    allRuns.forEach(function (id) {
+      const left = (a.reviewRuns || {})[id], right = (b.reviewRuns || {})[id];
+      if (!left || !right) { reviewRuns[id] = JSON.parse(JSON.stringify(left || right)); return; }
+      const latest = (left.updatedAt || 0) >= (right.updatedAt || 0) ? left : right;
+      const other = latest === left ? right : left;
+      const merged = JSON.parse(JSON.stringify(latest));
+      merged.attempts = unionBy([].concat(left.attempts || [], right.attempts || []), function (x) {
+        return (x.at || 0) + '|' + (x.answer || '');
+      }).sort(function (x, y) { return (x.at || 0) - (y.at || 0); }).slice(-10);
+      merged.completedAt = latest.pending ? 0 : Math.max(left.completedAt || 0, right.completedAt || 0);
+      if (!merged.analysis && other.analysis && other.submissionId === merged.submissionId) merged.analysis = other.analysis;
+      reviewRuns[id] = merged;
+    });
+    const reviewQueue = {};
+    const allSkills = new Set(Object.keys(a.reviewQueue || {}).concat(Object.keys(b.reviewQueue || {})));
+    allSkills.forEach(function (skill) {
+      const left = (a.reviewQueue || {})[skill], right = (b.reviewQueue || {})[skill];
+      if (!left || !right) { reviewQueue[skill] = JSON.parse(JSON.stringify(left || right)); return; }
+      const latest = (left.updatedAt || 0) >= (right.updatedAt || 0) ? left : right;
+      reviewQueue[skill] = Object.assign({}, JSON.parse(JSON.stringify(latest)), {
+        failures: Math.max(left.failures || 0, right.failures || 0)
+      });
+    });
     const started = [a.startedAt || 0, b.startedAt || 0].filter(Boolean);
-    return { version: 1, startedAt: started.length ? Math.min.apply(Math, started) : 0, sessions: sessions };
+    return { version: 2, startedAt: started.length ? Math.min.apply(Math, started) : 0, sessions: sessions,
+      reviewQueue: reviewQueue, reviewRuns: reviewRuns, reviewSeeded: !!(a.reviewSeeded || b.reviewSeeded) };
   }
 
   /* ---------- 合并策略 ----------

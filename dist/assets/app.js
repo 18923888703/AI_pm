@@ -976,9 +976,10 @@
   function viewPractice() {
     const pg = window.Lab.practiceProgress();
     const daily = window.DailyDecomposition.state();
-    const dailyTask = daily.completedToday ? window.DailyDecomposition.task(daily.lastCompletedDay) :
+    const learner = window.DailyDecomposition.profile();
+    const dailyTask = daily.completedToday ? window.DailyDecomposition.task(daily.todayDay) :
       daily.day <= daily.total ? window.DailyDecomposition.task(daily.day) : null;
-    const dailyStatus = !daily.started ? '待开始' : daily.complete ? '14 天完成' : daily.completedToday ? '今日已完成' :
+    const dailyStatus = !daily.started ? '待开始' : daily.complete ? '14 天完成' : daily.completedToday ? (daily.todayAdvanced ? '今日已达标' : '当前主题待补强') :
       daily.active && daily.active.submissionId && !daily.active.analysis ? '等待评估' :
         daily.active && daily.active.analysis && daily.active.analysis.mode !== 'model' ? '需要重试评估' : '今日待练';
     const tracks = [];
@@ -986,10 +987,12 @@
     let html = '<div class="page"><h1>实战练习</h1>' +
       '<p class="lead">先看概念和不同情境的案例，再按四个问题拆解自己的题；独立写完后才看在线分析、改进稿与参考拆解。</p>' +
       '<section class="daily-decomp-card"><div class="daily-decomp-card-copy"><span class="tag blue">14 天循序训练</span>' +
-      '<h2>每日需求拆解练习</h2><p>每天 10–15 分钟，从识别用户问题练到写出可交付需求。完成在线评估后记录进度，薄弱项可当日继续修改。</p>' +
+      '<h2>每日需求拆解练习</h2><p>每天训练一个拆解主题；模型按你的答案调整复习题型、难度和主线推进。未达标的重点会更早复测。</p>' +
       '<div class="daily-decomp-stats"><span><b>' + daily.completed + '/' + daily.total + '</b> 天完成</span><span><b>' + daily.streak + '</b> 天连续</span>' +
-      '<span>' + esc(dailyStatus) + (dailyTask ? ' · ' + esc(dailyTask.focus) : '') + '</span></div></div>' +
-      '<button class="btn primary" data-route="daily-decomposition">' + (!daily.started ? '查看训练计划 →' : daily.completedToday ? '查看今日结果 →' : daily.complete ? '查看训练记录 →' : daily.active ? '继续今日训练 →' : '开始今日训练 →') + '</button>' +
+      '<span>' + esc(dailyStatus) + (dailyTask ? ' · ' + esc(dailyTask.focus) : '') + '</span>' +
+      (daily.started ? '<span>个性化节奏：' + esc(learner.pace) + ' · 难度 ' + learner.level + '/3</span>' +
+        (daily.dueReviewCount ? '<span class="daily-review-due-count">待复习 ' + daily.dueReviewCount + ' 项</span>' : '') : '') + '</div></div>' +
+      '<button class="btn primary" data-route="daily-decomposition">' + (!daily.started ? '查看训练计划 →' : daily.completedToday ? '查看今日结果 →' : daily.complete ? '查看训练进度 →' : daily.active ? '继续今日训练 →' : '开始今日训练 →') + '</button>' +
       '<div class="daily-decomp-progress"><i style="width:' + Math.round(daily.completed / daily.total * 100) + '%"></i></div></section>' +
       '<div class="practice-overview"><div><b>' + pg.done + ' / ' + pg.total + '</b><span>已完成</span></div>' +
       '<div class="practice-overview-bar"><i style="width:' + pg.pct + '%"></i></div>' +
@@ -1013,28 +1016,41 @@
 
   function viewDailyDecomposition() {
     const plan = window.DailyDecomposition.state();
-    const dayNo = plan.completedToday ? plan.lastCompletedDay : plan.day;
+    const learner = window.DailyDecomposition.profile();
+    const review = plan.started ? window.DailyDecomposition.dueReview() : null;
+    const todayReview = plan.started ? window.DailyDecomposition.todayReview() : null;
+    const dayNo = plan.completedToday ? plan.todayDay : plan.day;
     const task = dayNo <= plan.total ? window.DailyDecomposition.task(dayNo) : null;
     const rec = dayNo <= plan.total ? window.DailyDecomposition.record(dayNo, false) : null;
-    const busy = !!(rec && rec.submissionId && dailyDecompositionInFlight.get(dayNo) === rec.submissionId);
+    const busy = !!(rec && rec.submissionId && dailyDecompositionInFlight.get('core:' + dayNo) === rec.submissionId);
     const modelReady = practiceModelReady();
     let html = '<div class="page daily-decomp-page"><div class="practice-head"><div><span class="tag purple">每日训练计划</span>' +
-      '<h1>需求拆解训练</h1><p class="lead">共 14 个递进主题，一天一题。按自己的节奏完成；每次提交后由在线模型逐项分析，先收到反馈就算完成当天训练。</p></div>' +
+      '<h1>需求拆解训练</h1><p class="lead">共 14 个递进主题，一天一个主线练习。模型逐项分析后，关键项达标才推进主线；未达标会留在当前主题，并按薄弱能力安排变式复习。</p></div>' +
       '<button class="btn sm ghost" data-route="practice">返回实战练习</button></div>' +
       '<div class="daily-decomp-progress-head"><b>' + plan.completed + ' / ' + plan.total + ' 天完成</b><span>连续训练 ' + plan.streak + ' 天</span></div>' +
-      '<div class="daily-decomp-progress"><i style="width:' + Math.round(plan.completed / plan.total * 100) + '%"></i></div>';
+      '<div class="daily-decomp-progress"><i style="width:' + Math.round(plan.completed / plan.total * 100) + '%"></i></div>' +
+      (plan.started ? '<section class="adaptive-profile-card"><div><span class="tag ' + (learner.level === 1 ? 'orange' : learner.level === 3 ? 'green' : 'blue') + '">当前节奏 · ' + esc(learner.pace) + '</span>' +
+        '<b>难度 ' + learner.level + ' / 3</b></div><p>' + (learner.weakest ? '近期优先补强：' + esc(learner.weakest) + '。' : '正在建立你的能力基线；完成几次评估后会按表现调整难度。') +
+        '薄弱项会在 1 天、3 天、7 天后用不同题型和新场景复测。</p></section>' : '');
+
+    if (review) html += dailyReviewSection(review, modelReady);
+    else if (todayReview) html += dailyCompletedReviewSection(todayReview, modelReady);
 
     if (!plan.started) {
-      html += '<section class="daily-decomp-intro"><h2>这套训练怎么进行</h2><p>每天练一个拆解动作：从用户和问题出发，逐步补齐范围、流程、AI 边界、异常、验收和指标。每题先独立拆解，提交后再看逐项反馈和修改稿。</p>' +
+      html += '<section class="daily-decomp-intro"><h2>这套训练怎么进行</h2><p>每天练一个拆解动作：从用户和问题出发，逐步补齐范围、流程、AI 边界、异常、验收和指标。每题先独立拆解，提交后再看逐项反馈和修改稿；关键项没达标时，主线会停在当前主题。</p>' +
         '<div class="daily-decomp-example"><b>先看一个小例子</b><p><strong>原话：</strong>“帮我自动写会议纪要。”</p><p><strong>拆解：</strong>谁在会后整理信息？要完成的是回顾结论还是分派行动项？哪些字段必须有原文依据？没有负责人时标记待确认，不猜人名。</p></div>' +
         '<ul><li>四个拆解问题会引导你先写思路，不要求一次写完美。</li><li>每次只解锁当前一题；漏掉的训练会保留，不会丢失。</li><li>点评需要启用 DeepSeek 或其他在线模型；草稿在当前浏览器自动保存。</li></ul>' +
         '<button class="btn primary" data-daily-start="1">开始第 1 天 · 约 10 分钟</button></section>';
     } else if (plan.complete && !task) {
-      html += '<section class="daily-decomp-finish"><h2>14 个主题已完成</h2><p>你已经按顺序训练过用户问题、范围、流程、AI 边界、异常、验收和回归验证。下面可以回看每一天的反馈。</p></section>';
+      html += '<section class="daily-decomp-finish"><h2>14 个主题已达标</h2><p>主线训练已完成。系统仍会根据最近表现安排薄弱能力的间隔复测；页面仅保留整体进度和待复习数量。</p></section>';
+    } else if (review && task && !plan.completedToday) {
+      html += '<section class="daily-decomp-review-gate"><b>先完成上方的薄弱项复测</b><p>这是根据上次作答安排的短复习。完成评估后，今天的主线练习会继续；如果模型请求失败，可以重试，不会丢失答案。</p></section>';
     } else if (plan.completedToday && task && rec) {
-      const verdictText = busy ? '修改稿正在评估' : !rec.analysis ? '评估尚未完成' : rec.analysis.verdict === 'pass' ? '本题达到量表要求' : '已收到评估，建议对照反馈修改';
-      html += '<section class="daily-decomp-today-done"><span class="tag green">今日训练已完成</span><h2>第 ' + dayNo + ' 天 · ' + esc(task.title) + '</h2>' +
-        '<p>' + esc(verdictText) + '。' + (plan.complete ? '14 个主题均已训练完成。' : '明天继续第 ' + (dayNo + 1) + ' 天。') + '你也可以现在按反馈重写这一题，巩固拆解过程。</p>' +
+      const verdictText = busy ? '修改稿正在评估' : !rec.analysis ? '评估尚未完成' : rec.analysis.verdict === 'pass' ? '本题达到量表要求' :
+        rec.analysis.verdict === 'partial' ? (plan.todayAdvanced ? '已达到当前主题推进门槛，仍有薄弱项待复习' : '方向部分正确，但量表得分未达到当前主题推进门槛') : '评估发现关键项尚未达标';
+      html += '<section class="daily-decomp-today-done"><span class="tag ' + (plan.todayAdvanced ? 'green' : 'orange') + '">' +
+        (plan.todayAdvanced ? '今日主题已达标' : '当前主题需要补强') + '</span><h2>第 ' + dayNo + ' 天 · ' + esc(task.title) + '</h2>' +
+        '<p>' + esc(verdictText) + '。' + (plan.complete ? '14 个主题均已完成。' : plan.todayAdvanced ? '明天继续第 ' + (dayNo + 1) + ' 天。' : '主线会保留在当前主题，下一次用不同题型复测后再推进。') + '你也可以按反馈重写这一题。</p>' +
         (busy ? '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="true">正在分析你修改后的方案…</div>' :
           rec.analysis ? dailyDecompositionAnalysisHTML(rec.analysis, dayNo) : rec.submissionId ? '<div class="practice-analysis-pending">这次评估尚未完成，原答案已保留。 ' +
             (modelReady ? '<button class="btn sm" data-daily-retry="' + dayNo + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') + '</div>' : '') +
@@ -1043,7 +1059,9 @@
       const fields = rec && Array.isArray(rec.fields) ? rec.fields : ['', '', '', ''];
       const analysis = rec && rec.analysis;
       html += '<section class="daily-decomp-task"><div class="daily-decomp-task-head"><span class="tag orange">第 ' + dayNo + ' 天 / ' + plan.total + '</span><span class="tiny">约 10–15 分钟</span></div>' +
-        '<h2>' + esc(task.title) + '</h2><div class="daily-decomp-focus"><b>今天练什么 · ' + esc(task.focus) + '</b><p>' + esc(task.meaning) + '</p></div>' +
+      '<h2>' + esc(task.title) + '</h2><div class="daily-decomp-focus"><b>今天练什么 · ' + esc(task.focus) + '</b><p>' + esc(task.meaning) + '</p></div>' +
+        '<div class="adaptive-level-hint"><b>按你当前水平 · ' + esc(learner.pace) + '</b><p>' + esc(learner.level === 1 ? '先把四个提示逐条写清；遇到未知就标出来，不用急着写完整 PRD。' :
+          learner.level === 3 ? '你近期表现稳定，额外补一个反例、方案取舍和升级条件。' : '每个判断都写出依据、执行条件和可观察结果。') + '</p></div>' +
         '<div class="case-block"><b>练习场景</b><p>' + esc(task.scenario) + '</p></div><p class="daily-decomp-task-prompt">' + esc(task.task) + '</p>' +
         '<div class="daily-decomp-steps">' + task.fields.map(function (field, index) {
           return '<div class="practice-breakdown-step"><div class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(field[0]) + '</b></div>' +
@@ -1060,18 +1078,11 @@
         (modelReady ? '<button class="btn sm" data-daily-retry="' + dayNo + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') + '</div>';
     }
 
-    html += '<details class="daily-decomp-history"><summary>查看 14 天训练安排与完成记录</summary><div class="daily-decomp-day-list">' +
-      window.DailyDecomposition.history().map(function (item) {
-        const done = !!(item.record && item.record.completedAt);
-        const active = item.task.day === dayNo && !plan.completedToday && !plan.complete;
-        const row = '<span class="daily-decomp-day-num">' + item.task.day + '</span><div><b>' + esc(item.task.title) + '</b><small>' +
-          esc(item.task.focus) + (done ? ' · 已完成' : active ? ' · 当前' : ' · 待解锁') + '</small></div>' + (done ? '<span class="tag green">有反馈</span>' : '');
-        if (done) return '<details class="daily-decomp-history-item"><summary class="daily-decomp-day-row done">' + row + '</summary>' +
-          '<div class="daily-decomp-history-answer"><b>你的作答</b><p>' + esc(item.record.submittedAnswer || item.record.answer || '') + '</p></div>' +
-          dailyDecompositionAnalysisHTML(item.record.analysis, item.task.day) + '</details>';
-        return '<div class="daily-decomp-day-row' + (active ? ' current' : '') + '">' + row + '</div>';
-      }).join('') + '</div></details></div>';
-    return html;
+    const reviewHistory = window.DailyDecomposition.reviewHistory();
+    html += '<div class="adaptive-summary-row"><span>主线达标 <b>' + plan.completed + '/' + plan.total + '</b></span>' +
+      '<span>累计间隔复测 <b>' + reviewHistory.length + '</b> 次</span><span>待复习 <b>' + plan.scheduledReviewCount + '</b> 项</span>' +
+      '<span>当前节奏 <b>' + esc(learner.pace) + '</b></span></div>';
+    return html + '</div>';
   }
 
   function dailyRevisionEditor(rec, dayNo, modelReady, busy) {
@@ -1081,17 +1092,80 @@
       '<button class="btn primary" data-daily-resubmit="' + dayNo + '"' + (!modelReady || busy ? ' disabled' : '') + '>重新分析修改稿</button></details>';
   }
 
-  function dailyDecompositionAnalysisHTML(analysis, dayNo) {
+  function dailyReviewSection(review, modelReady) {
+    const task = review.task, rec = review.record, id = review.id;
+    const busy = !!(rec.submissionId && dailyDecompositionInFlight.get('review:' + id) === rec.submissionId);
+    let html = '<section class="adaptive-review-card"><div class="adaptive-review-head"><div><span class="tag orange">到期复习 · 换题型</span>' +
+      '<h2>' + esc(task.title) + '</h2></div><span class="tag blue">' + esc(task.levelLabel) + '</span></div>' +
+      '<p class="adaptive-review-reason">根据你之前「' + esc(review.queue.lastCriterion || task.focus) + '」的评估安排，换一个问题和题型检查是否能迁移。</p>' +
+      '<div class="adaptive-review-meta"><span>主题：' + esc(task.focus) + '</span><span>形式：' + esc(task.format) + '</span><span>复测难度：' + task.level + '/3</span></div>' +
+      '<div class="daily-decomp-focus"><b>复习目标</b><p>' + esc(task.meaning) + '</p></div>' +
+      '<div class="case-block"><b>新场景</b><p>' + esc(task.scenario) + '</p></div><p class="daily-decomp-task-prompt">' + esc(task.task) + '</p>';
+    if (rec.analysis && rec.analysis.mode !== 'model') {
+      html += '<div class="practice-analysis-pending">本地提示不能判断掌握情况。 ' +
+        (modelReady ? '<button class="btn sm" data-daily-review-retry="' + escAttr(id) + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') + '</div>';
+    } else if (rec.submissionId && !rec.analysis && !busy) {
+      html += '<div class="practice-analysis-pending">这次复习评估尚未完成，草稿已保留。 ' +
+        (modelReady ? '<button class="btn sm" data-daily-review-retry="' + escAttr(id) + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') + '</div>';
+    }
+    if (!rec.analysis || rec.analysis.mode !== 'model') {
+      html += '<div class="daily-decomp-steps" data-daily-review-id="' + escAttr(id) + '">' + task.fields.map(function (field, index) {
+        return '<div class="practice-breakdown-step"><div class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(field[0]) + '</b></div>' +
+          '<label for="dailyReviewField' + index + '">' + esc(field[1]) + '</label><textarea id="dailyReviewField' + index + '" data-daily-review-field="' + index + '" rows="2" maxlength="1200">' +
+          esc((rec.fields || [])[index] || '') + '</textarea></div>';
+      }).join('') + '</div><p class="tiny" role="status" id="dailyReviewSaveStatus">复习答案会自动保存。</p>' +
+        (!modelReady ? '<div class="practice-model-setup" role="note">在线评估需要先启用模型。<button class="btn sm" data-route="settings">去设置 →</button></div>' : '') +
+        '<div class="daily-decomp-submit-row"><span class="tiny">约 3–5 分钟 · 针对一项薄弱能力快速复测</span>' +
+        '<button class="btn primary" data-daily-review-submit="' + escAttr(id) + '"' + (!modelReady || busy ? ' disabled' : '') + '>提交复测 →</button></div>';
+    }
+    if (busy) html += '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="true">模型正在分析这道变式复习题…</div>';
+    if (rec.analysis) html += dailyDecompositionAnalysisHTML(rec.analysis, task.title, { label: '间隔复习 · ' + task.format, reviewId: id });
+    return html + '</section>';
+  }
+
+  function dailyCompletedReviewSection(review, modelReady) {
+    const task = review.task, id = review.id, passed = review.analysis && review.analysis.verdict === 'pass';
+    const busy = !!(review.pending && dailyDecompositionInFlight.get('review:' + id) === review.submissionId);
+    const nextAt = review.queue && review.queue.status === 'active' && review.queue.dueAt
+      ? new Date(review.queue.dueAt).toLocaleDateString('zh-CN') : '';
+    return '<section class="adaptive-review-card adaptive-review-complete"><span class="tag green">' + (busy ? '正在评估修改稿' : '今日间隔复习已记录') + '</span><h2>' + esc(task.title) + '</h2>' +
+      '<p>' + (busy ? '模型正在检查你修改后的答案。' : !review.analysis ? '这次评估尚未完成，草稿已保留。' : passed ? '本次达标。' + (nextAt ? '下次复测安排在 ' + nextAt + '。' : '这一能力已通过三次间隔复测。') :
+        '仍有薄弱项，系统会缩短复测间隔' + (nextAt ? '，下一次安排在 ' + nextAt + '。' : '。')) + '</p>' +
+      (busy ? '<div class="practice-analysis-pending" role="status" aria-live="polite" aria-busy="true">正在分析…</div>' :
+        review.analysis ? dailyDecompositionAnalysisHTML(review.analysis, task.title, { label: '间隔复习 · ' + task.format, reviewId: id }) :
+          review.submissionId ? '<div class="practice-analysis-pending">' + (modelReady ? '<button class="btn sm" data-daily-review-retry="' + escAttr(id) + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') + '</div>' : '') +
+      dailyReviewRevisionEditor(review, modelReady) + '</section>';
+  }
+
+  function dailyReviewRevisionEditor(review, modelReady) {
+    if (!review.analysis || review.analysis.mode !== 'model' || review.analysis.verdict === 'pass') return '';
+    return '<details class="daily-decomp-revision"><summary>按反馈修改，再巩固一次</summary><textarea id="dailyReviewRevisionAnswer" rows="8" maxlength="6000">' +
+      esc(review.analysis.revisedAnswer || review.submittedAnswer || '') + '</textarea><button class="btn primary" data-daily-review-resubmit="' + escAttr(review.id) + '"' +
+      (!modelReady ? ' disabled' : '') + '>重新分析复习答案</button></details>';
+  }
+
+  function dailyRubricScore(analysis) {
+    if (!analysis || !Array.isArray(analysis.criteria) || !analysis.criteria.length) return null;
+    const total = analysis.criteria.reduce(function (sum, row) {
+      return sum + (row.status === 'met' ? 1 : row.status === 'partial' ? 0.5 : 0);
+    }, 0);
+    return Math.round(total / analysis.criteria.length * 100);
+  }
+
+  function dailyDecompositionAnalysisHTML(analysis, dayNo, options) {
     if (!analysis) return '';
+    options = options || {};
     if (analysis.mode !== 'model' || !analysis.criteria) {
       return '<section class="practice-analysis"><div class="practice-analysis-head"><div><span class="tag orange">本地结构提示 · 未判断正确性</span><h2>这次尚未得到在线评估</h2></div>' +
-        (practiceModelReady() ? '<button class="btn sm" data-daily-retry="' + dayNo + '">重新请求在线评估</button>' : '<button class="btn sm" data-route="settings">检查模型配置</button>') +
+        (practiceModelReady() ? (options.reviewId ? '<button class="btn sm" data-daily-review-retry="' + escAttr(options.reviewId) + '">重新请求在线评估</button>' : '<button class="btn sm" data-daily-retry="' + dayNo + '">重新请求在线评估</button>') : '<button class="btn sm" data-route="settings">检查模型配置</button>') +
         '</div><p class="practice-analysis-summary">' + esc(analysis.summary || '') + '</p>' + (analysis.notice ? '<p class="practice-analysis-notice">' + esc(analysis.notice) + '</p>' : '') + '</section>';
     }
     const verdict = { pass: ['符合要求', 'green'], partial: ['方向基本正确，需补强', 'orange'], revise: ['还需要修改', 'red'], unverified: ['证据不足，暂不能确认', 'orange'] }[analysis.verdict] || ['已完成评估', 'blue'];
     const status = { met: ['已达到', 'green'], partial: ['部分达到', 'orange'], missing: ['未达到', 'red'], uncertain: ['待核实', 'orange'] };
+    const rubricScore = dailyRubricScore(analysis);
     return '<section class="practice-analysis daily-decomp-analysis"><div class="practice-analysis-head"><div><span class="tag ' + verdict[1] + '">在线模型建议 · ' + verdict[0] + '</span>' +
-      '<h2>按今天的拆解目标逐项看</h2></div><span class="tiny">第 ' + dayNo + ' 天 · 已评估</span></div><p class="practice-analysis-summary">' + esc(analysis.summary) + '</p>' +
+      '<h2>按训练目标逐项看</h2></div><div class="daily-analysis-score"><b>' + rubricScore + '<small>/100</small></b><span>量表得分<br><small>' + esc(options.label || ('第 ' + dayNo + ' 天')) + '</small></span></div></div>' +
+      '<p class="practice-analysis-summary">' + esc(analysis.summary) + '</p><p class="tiny daily-score-method">按四项等权折算：达标 1 分、部分达到 0.5 分、未达到或待核实 0 分。</p>' +
       '<div class="practice-criteria">' + analysis.criteria.map(function (row) {
         const label = status[row.status] || status.uncertain;
         return '<article class="practice-criterion"><div class="practice-criterion-head"><b>' + esc(row.criterion) + '</b><span class="tag ' + label[1] + '">' + label[0] + '</span></div>' +
@@ -1343,34 +1417,39 @@
     }
   }
 
-  async function analyzeDailyDecomposition(dayNo, submissionId, answer) {
-    const task = window.DailyDecomposition.task(dayNo);
-    if (!task || !submissionId || !answer || dailyDecompositionInFlight.get(dayNo) === submissionId) return;
+  async function analyzeDailyDecomposition(dayNo, submissionId, answer, type, reviewId) {
+    type = type || 'core';
+    const key = type === 'review' ? 'review:' + reviewId : 'core:' + dayNo;
+    const reviewRun = type === 'review' ? window.DailyDecomposition.reviewRun(reviewId) : null;
+    const task = reviewRun ? reviewRun.task : window.DailyDecomposition.task(dayNo);
+    if (!task || !submissionId || !answer || dailyDecompositionInFlight.get(key) === submissionId) return;
+    const rubricTask = Object.assign({ id: type === 'review' ? 'daily-review-' + reviewRun.skill : 'daily-decomposition-' + dayNo }, task);
+    const saveResult = function (result) {
+      return type === 'review' ? window.DailyDecomposition.saveReviewAnalysis(reviewId, submissionId, result) :
+        window.DailyDecomposition.saveAnalysis(dayNo, submissionId, result);
+    };
     if (!practiceModelReady()) {
-      window.DailyDecomposition.saveAnalysis(dayNo, submissionId, Object.assign(
-        window.PracticeCoach.localAnalysis(Object.assign({ id: 'daily-decomposition-' + dayNo }, task), answer),
+      saveResult(Object.assign(window.PracticeCoach.localAnalysis(rubricTask, answer),
         { notice: '尚未启用在线模型，因此没有判断这份需求拆解是否正确。' }));
       if (parseHash().route === 'daily-decomposition') render();
       return;
     }
-    dailyDecompositionInFlight.set(dayNo, submissionId);
+    dailyDecompositionInFlight.set(key, submissionId);
     if (parseHash().route === 'daily-decomposition') render();
     const controller = new AbortController();
     const timer = setTimeout(function () { controller.abort(); }, 60000);
     try {
-      const rubricTask = Object.assign({ id: 'daily-decomposition-' + dayNo }, task);
       const raw = await window.LLM.analyzePractice(rubricTask, answer, controller.signal);
       const specific = window.PracticeCoach.normalizeModelAnalysis(raw, rubricTask, answer);
       if (!specific) throw new Error('模型未返回完整、可核对的逐项评估');
-      window.DailyDecomposition.saveAnalysis(dayNo, submissionId, specific);
+      saveResult(specific);
     } catch (error) {
-      const rubricTask = Object.assign({ id: 'daily-decomposition-' + dayNo }, task);
-      window.DailyDecomposition.saveAnalysis(dayNo, submissionId, Object.assign({}, window.PracticeCoach.localAnalysis(rubricTask, answer), {
+      saveResult(Object.assign({}, window.PracticeCoach.localAnalysis(rubricTask, answer), {
         notice: practiceFailureReason(error) + ' 当前仅展示本地结构提示，尚未判定正确性。'
       }));
     } finally {
       clearTimeout(timer);
-      if (dailyDecompositionInFlight.get(dayNo) === submissionId) dailyDecompositionInFlight.delete(dayNo);
+      if (dailyDecompositionInFlight.get(key) === submissionId) dailyDecompositionInFlight.delete(key);
       if (parseHash().route === 'daily-decomposition') render();
     }
   }
@@ -2405,7 +2484,7 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-assess-start],[data-assess-answer],' +
+      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
 
@@ -2462,6 +2541,35 @@
       if (result.error) { toast(result.error); return; }
       render();
       void analyzeDailyDecomposition(day, result.submissionId, result.answer);
+      return;
+    }
+    if (el.dataset.dailyReviewSubmit) {
+      if (!practiceModelReady()) { toast('请先在「我的学习 → 设置与记忆」启用并保存在线模型'); return; }
+      const id = el.dataset.dailyReviewSubmit, fields = Array.from(document.querySelectorAll('[data-daily-review-field]')).map(function (input) { return input.value; });
+      window.DailyDecomposition.saveReviewFields(id, fields);
+      const result = window.DailyDecomposition.submitReview(id, fields);
+      if (result.error) { toast(result.error); return; }
+      render();
+      const run = window.DailyDecomposition.reviewRun(id);
+      void analyzeDailyDecomposition(run.day, result.submissionId, result.answer, 'review', id);
+      return;
+    }
+    if (el.dataset.dailyReviewRetry) {
+      if (!practiceModelReady()) { toast('请先在设置中启用并配置在线模型'); return; }
+      const id = el.dataset.dailyReviewRetry, run = window.DailyDecomposition.reviewRun(id);
+      if (!run || !run.submissionId || !run.submittedAnswer) { toast('请先提交这道复习题'); return; }
+      render();
+      void analyzeDailyDecomposition(run.day, run.submissionId, run.submittedAnswer, 'review', id);
+      return;
+    }
+    if (el.dataset.dailyReviewResubmit) {
+      if (!practiceModelReady()) { toast('请先在设置中启用并配置在线模型'); return; }
+      const id = el.dataset.dailyReviewResubmit, run = window.DailyDecomposition.reviewRun(id), answer = $('#dailyReviewRevisionAnswer');
+      if (!run) return;
+      const result = window.DailyDecomposition.submitReview(id, answer ? answer.value : '');
+      if (result.error) { toast(result.error); return; }
+      render();
+      void analyzeDailyDecomposition(run.day, result.submissionId, result.answer, 'review', id);
       return;
     }
 
@@ -2713,6 +2821,21 @@
       const inp = $('#dictSearch'); if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); } }
   });
   document.addEventListener('input', function (e) {
+    if (e.target.dataset.dailyReviewField !== undefined) {
+      const box = e.target.closest('[data-daily-review-id]');
+      if (!box) return;
+      const id = box.dataset.dailyReviewId;
+      const fields = Array.from(box.querySelectorAll('[data-daily-review-field]')).map(function (input) { return input.value; });
+      clearTimeout(dailyDecompositionSaveTimer);
+      const status = $('#dailyReviewSaveStatus');
+      if (status) status.textContent = '正在保存复习答案…';
+      dailyDecompositionSaveTimer = setTimeout(function () {
+        window.DailyDecomposition.saveReviewFields(id, fields);
+        const saved = $('#dailyReviewSaveStatus');
+        if (saved) saved.textContent = '复习答案已自动保存。';
+      }, 300);
+      return;
+    }
     if (e.target.dataset.dailyField !== undefined) {
       const page = e.target.closest('.daily-decomp-task');
       if (!page) return;

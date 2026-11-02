@@ -96,25 +96,148 @@
 
   DAYS.forEach(function (item, index) { item.day = index + 1; });
 
+  const SKILLS = {
+    framing: { label: '用户问题与证据', scenarios: [
+      '业务说“做个 AI 助手，用户就会更愿意续费”，但没有流失原因或用户反馈。',
+      '运营说“年轻用户都喜欢排行榜”，目前只看到少数用户在群里提过。',
+      '老板要求上线“智能导师”，目标是让所有学员都坚持完成课程。'],
+      forms: [
+        { name: '事实 / 假设分类卡', fields: [['确定事实','题目明确给了哪些信息？'],['待验证假设','哪些因果或人群结论还没有证据？'],['决策缺口','哪三项未知会改变方案？'],['优先追问','先向谁验证什么，为什么？']] },
+        { name: '用户问题改写', fields: [['具体用户','谁在什么时刻遇到问题？'],['当前任务','他现在要完成什么？'],['证据与反例','什么证据支持？什么现象会推翻？'],['问题陈述','写一句不预设功能的问题。']] },
+        { name: '访谈问题排序', fields: [['要验证的判断','最关键的假设是什么？'],['过去行为','用什么问题了解真实经历而非态度？'],['替代做法','用户目前怎样解决、付出什么代价？'],['决策信号','什么回答会让你继续、调整或停止？']] }
+      ], rubric: ['事实与假设区分准确','用户任务和时刻具体','关键未知能改变决策','追问或结论不预设方案'],
+      reference: ['仅把题目明确描述的行为或材料标成事实，愿望和因果推断列为假设。','明确具体用户与发生任务的时刻，避免“所有用户”这类泛化。','优先补充能改变目标、范围或是否使用 AI 的信息。','使用过去真实行为、替代方案或可观察证据来检验，不把表态当需求。'] },
+    scope: { label: '范围与流程', scenarios: [
+      '团队想做一个智能报销助手：自动读票据、核对政策、填表、提交、追踪审批和催财务。',
+      '订单客服希望增加聊天、语音、自动退款、优惠推荐、投诉分析和人工协作。',
+      '学习产品想同时做测评、计划、内容推荐、社群、打卡和导师陪练。'],
+      forms: [
+        { name: 'MVP 取舍表', fields: [['核心用户时刻','这一版只解决哪一个时刻？'],['必须闭环','用户从输入到下一步要走完什么？'],['明确不做','哪些功能先排除，理由是什么？'],['继续门槛','什么观察结果支持扩大范围？']] },
+        { name: '状态流程图（文字）', fields: [['起点与输入','触发条件和必需字段是什么？'],['状态序列','按顺序列出主流程状态。'],['分支条件','什么时候停下、追问或转人工？'],['完成定义','什么状态和证据表示任务完成？']] },
+        { name: '方案取舍题', fields: [['可选方案','给出两个范围不同的方案。'],['用户价值','各自解决哪个问题，证据是什么？'],['代价与边界','成本、风险和不做项分别是什么？'],['选择条件','当前选哪个，满足什么条件再升级？']] }
+      ], rubric: ['首版目标和范围一致','主流程输入输出完整','状态与分支条件明确','取舍依据和完成条件可验证'],
+      reference: ['聚焦一个用户时刻和一个主要结果，不把愿望清单都放进首版。','把输入、处理、结果、下一步连成可完成的闭环。','明确缺字段、失败、等待确认和人工接手时的状态。','说明为何选该范围、暂不做什么，以及什么证据触发扩展。'] },
+    risk: { label: '边界、权限与恢复', scenarios: [
+      'AI 助手读取邮件后，准备自动接受会议邀请并代用户回复参会人。',
+      '智能客服根据订单记录处理退款，接口偶尔超时，客户可能重复点击。',
+      '会议助手会提取负责人和截止日期，并直接在项目系统创建任务。'],
+      forms: [
+        { name: 'AI / 规则 / 人工分工表', fields: [['可交给 AI','哪些理解或归纳任务可由 AI 辅助？'],['确定性规则','哪些权限、资格或数值必须由规则校验？'],['确认门槛','执行前用户要看到和确认什么？'],['失败兜底','信息不足或冲突时如何停下？']] },
+        { name: '故障诊断卡', fields: [['故障状态','怎样区分超时、拒绝、未执行和已执行？'],['用户反馈','页面该如何准确表达当前状态？'],['副作用控制','怎样防止重复操作或越权？'],['恢复办法','保留什么信息，如何重试或交给人工？']] },
+        { name: '风险优先级矩阵', fields: [['高影响场景','哪些错误会影响权益、资金或他人？'],['权限与证据','哪些身份和依据必须先核实？'],['阻断条件','出现什么情况必须停止自动化？'],['审计与接管','如何记录动作并让人纠正或撤回？']] }
+      ], rubric: ['AI 与确定性职责分清','权限和关键证据明确','高影响动作有确认或阻断','失败状态可恢复且不重复执行'],
+      reference: ['只让模型承担不确定文本理解或草拟，不让其自行决定权限和业务资格。','关键事实可追溯，身份、金额、状态等由可信业务系统校验。','发送、退款、创建正式记录等动作前要有明确授权和确认门槛。','使用明确状态和幂等控制；失败保留草稿，不把未知说成成功。'] },
+    validation: { label: '验收、指标与评测', scenarios: [
+      '团队想把“回答更自然”作为客服助手上线标准。',
+      '产品只统计“生成了多少份计划”，准备据此判断学习功能有效。',
+      '提示词改过后，大家各试了一个问题，觉得结果更好了。'],
+      forms: [
+        { name: '验收用例卡', fields: [['输入与操作','测试人拿什么数据、执行什么步骤？'],['可观察结果','用户能看到哪些字段和状态？'],['异常用例','缺信息、冲突或超时要怎样表现？'],['判定门槛','什么必须通过，什么错误阻断发布？']] },
+        { name: '指标与护栏设计', fields: [['用户结果','功能希望改善什么真实任务结果？'],['主指标','怎样测结果而不是只测使用量？'],['风险护栏','质量、成本、时延或人工返工看什么？'],['分群观察','哪些类型要单独拆开，避免均值掩盖？']] },
+        { name: '回归评测方案', fields: [['样本覆盖','常见、边界、高风险样本各有哪些？'],['评分规则','按哪些维度判，谁来复核？'],['版本对照','怎样保持新旧测试条件可比？'],['发布决策','何时灰度、回滚或补充验证？']] }
+      ], rubric: ['验收对象和步骤可复现','结果指标对应用户价值','护栏覆盖关键风险','门槛和回归决策可执行'],
+      reference: ['写明输入、操作、预期字段和状态，让不同测试人能复现。','主指标关注是否解决用户任务，不能只把生成量或点击量当价值。','同时监控错误事实、人工返工、时延和单次成本等护栏。','用固定样本对照版本；高风险错误达到阻断门槛时不发布或回滚。'] }
+  };
+
+  function skillFor(label) {
+    const text = String(label || '');
+    if (/用户|问题|事实|假设|证据|目标|追问|需求|关键未知|决策/.test(text)) return 'framing';
+    if (/范围|MVP|流程|状态|输入|输出|闭环|分支|方案|取舍/.test(text)) return 'scope';
+    if (/边界|异常|风险|权限|确认|隐私|安全|恢复|失败|数据/.test(text)) return 'risk';
+    if (/验收|指标|评测|回归|样本|通过|验证|实验/.test(text)) return 'validation';
+    return 'scope';
+  }
+  function buildReviewTask(skill, level, runCount) {
+    const domain = SKILLS[skill] || SKILLS.scope;
+    const index = Math.max(0, Number(runCount || 1) - 1) % domain.scenarios.length;
+    const formIndex = (index + Math.max(0, Number(level || 2) - 1)) % domain.forms.length;
+    const form = domain.forms[formIndex];
+    const difficulty = Number(level || 2);
+    const tier = difficulty === 1 ? '基础补强' : difficulty >= 3 ? '高阶迁移' : '场景应用';
+    return { id: 'adaptive-review-' + skill + '-' + index + '-' + formIndex, title: domain.label + ' · ' + form.name,
+      focus: domain.label, format: form.name, level: difficulty, levelLabel: tier,
+      meaning: '这是根据你最近评估中的薄弱项安排的间隔复习。它换了场景和作答形式，检查你是否能把同一判断迁移到新问题。',
+      scenario: domain.scenarios[index], task: '按「' + form.name + '」完成这次复测。' +
+        (difficulty === 1 ? '先把对象、事实和条件写具体，再给出结论。' : difficulty >= 3 ? '除给出方案外，还要说明取舍、反例和升级条件。' : '明确依据、操作条件和可验证结果。'),
+      fields: form.fields, rubric: domain.rubric, reference: domain.reference,
+      checkpoints: domain.reference, related: [] };
+  }
+
   function todayKey(date) {
     const d = date || new Date();
     return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
   }
+  function queueWeakCriteria(s, day, r, analysis, at) {
+    if (!analysis || analysis.mode !== 'model' || !Array.isArray(analysis.criteria)) return;
+    const groups = {};
+    analysis.criteria.forEach(function (row) {
+      const skill = skillFor(row.criterion);
+      if (!groups[skill]) groups[skill] = { skill: skill, rows: [], weak: 0, severity: 0 };
+      groups[skill].rows.push(row);
+      if (row.status !== 'met') {
+        groups[skill].weak++;
+        groups[skill].severity += row.status === 'missing' ? 2 : 1;
+      }
+    });
+    const groupsList = Object.keys(groups).map(function (key) { return groups[key]; });
+    if (!groupsList.length) return;
+    const weak = groupsList.filter(function (item) { return item.weak > 0; }).sort(function (a, b) {
+      return b.severity - a.severity || b.weak - a.weak;
+    });
+    const targets = weak.length ? weak.slice(0, 2) : [groupsList[(Number(day) - 1) % groupsList.length]];
+    const now = at || analysis.at || Date.now();
+    targets.forEach(function (chosen) {
+      const row = chosen.rows.find(function (item) { return item.status !== 'met'; }) || chosen.rows[0];
+      const skill = chosen.skill, old = s.reviewQueue[skill] || {}, failed = chosen.weak > 0;
+      const priorSuccesses = old.status === 'active' ? (old.successes || 0) : 0;
+      const dueAt = now + (failed ? 86400000 : 3 * 86400000);
+      s.reviewQueue[skill] = Object.assign({}, old, { skill: skill, label: (SKILLS[skill] || SKILLS.scope).label,
+        status: 'active', dueAt: failed ? (old.status === 'active' ? Math.min(old.dueAt || dueAt, dueAt) : dueAt) :
+          old.status === 'active' && old.dueAt > now ? old.dueAt : dueAt,
+        successes: failed ? 0 : Math.max(1, priorSuccesses), failures: (old.failures || 0) + (failed ? 1 : 0),
+        sourceDay: Number(day), lastCriterion: row.criterion, lastStatus: failed ? row.status : 'met', updatedAt: Date.now() });
+    });
+  }
+  function seedLegacyReviews(s) {
+    if (s.reviewSeeded) return;
+    Object.keys(s.sessions).forEach(function (day) {
+      const r = s.sessions[day];
+      if (r && r.completedAt && r.analysis && r.analysis.mode === 'model') queueWeakCriteria(s, day, r, r.analysis, r.analysis.at || r.completedAt);
+    });
+    s.reviewSeeded = true;
+  }
   function state() {
     const lab = window.Lab.state;
     if (!lab.dailyDecomposition || typeof lab.dailyDecomposition !== 'object') {
-      lab.dailyDecomposition = { version: 1, startedAt: 0, sessions: {} };
+      lab.dailyDecomposition = { version: 2, startedAt: 0, sessions: {}, reviewQueue: {}, reviewRuns: {}, reviewSeeded: false };
     }
     const s = lab.dailyDecomposition;
-    s.version = 1;
+    const previousVersion = Number(s.version || 1);
+    s.version = 2;
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
+    if (!s.reviewQueue || typeof s.reviewQueue !== 'object') s.reviewQueue = {};
+    if (!s.reviewRuns || typeof s.reviewRuns !== 'object') s.reviewRuns = {};
+    if (previousVersion < 2) Object.keys(s.sessions).forEach(function (key) {
+      const item = s.sessions[key];
+      if (item && item.completedAt && item.analysis && item.analysis.mode === 'model') item.coreAdvancedAt = item.completedAt;
+    });
+    const needsSeed = !s.reviewSeeded;
+    seedLegacyReviews(s);
+    if (needsSeed) window.Mem.save();
     return s;
   }
   function save() { window.Mem.state.lab = window.Lab.state; window.Mem.save(); }
   function completedDays(s) {
-    return DAYS.filter(function (task) { return s.sessions[task.day] && s.sessions[task.day].completedAt; }).length;
+    return DAYS.filter(function (task) { return s.sessions[task.day] && s.sessions[task.day].coreAdvancedAt; }).length;
   }
   function nextDay(s) { return Math.min(DAYS.length + 1, completedDays(s) + 1); }
+  function rubricScore(analysis) {
+    if (!analysis || !Array.isArray(analysis.criteria) || !analysis.criteria.length) return 0;
+    const value = analysis.criteria.reduce(function (sum, row) {
+      return sum + (row.status === 'met' ? 1 : row.status === 'partial' ? 0.5 : 0);
+    }, 0);
+    return Math.round(value / analysis.criteria.length * 100);
+  }
   function record(day, create) {
     const s = state();
     if (!s.sessions[day] && create) {
@@ -127,22 +250,67 @@
   function streak(s) {
     const keys = new Set(Object.keys(s.sessions).map(function (key) {
       const r = s.sessions[key]; return r && r.completedAt ? todayKey(new Date(r.completedAt)) : '';
-    }).filter(Boolean));
+    }).concat(Object.keys(s.reviewRuns).map(function (key) {
+      const r = s.reviewRuns[key]; return r && r.completedAt ? todayKey(new Date(r.completedAt)) : '';
+    })).filter(Boolean));
     let day = new Date();
     if (!keys.has(todayKey(day))) day.setDate(day.getDate() - 1);
     let n = 0;
     while (keys.has(todayKey(day))) { n++; day.setDate(day.getDate() - 1); }
     return n;
   }
+  function learnerProfile(s) {
+    const records = Object.keys(s.sessions).map(function (key) { return s.sessions[key]; })
+      .concat(Object.keys(s.reviewRuns).map(function (key) { return s.reviewRuns[key]; }));
+    const assessments = records.reduce(function (all, item) {
+      if (!item) return all;
+      (item.attempts || []).forEach(function (attempt) { if (attempt.analysis && attempt.analysis.mode === 'model') all.push({ analysis: attempt.analysis }); });
+      if (item.analysis && item.analysis.mode === 'model') all.push(item);
+      return all;
+    }, [])
+      .filter(function (item) { return item && item.analysis && Array.isArray(item.analysis.criteria); })
+      .sort(function (a, b) { return (a.analysis.at || a.completedAt || 0) - (b.analysis.at || b.completedAt || 0); });
+    const score = function (item) {
+      const rows = item.analysis.criteria;
+      return rows.length ? rows.reduce(function (sum, row) { return sum + (row.status === 'met' ? 1 : row.status === 'partial' ? 0.5 : 0); }, 0) / rows.length : 0;
+    };
+    const recent = assessments.slice(-5), rates = recent.map(score);
+    const lastTwo = rates.slice(-2), lastThree = rates.slice(-3);
+    const level = lastTwo.length === 2 && lastTwo.every(function (x) { return x < 0.5; }) ? 1 :
+      lastThree.length === 3 && lastThree.every(function (x) { return x >= 0.85; }) ? 3 : 2;
+    const weakness = {};
+    recent.forEach(function (item) {
+      item.analysis.criteria.forEach(function (row) {
+        if (row.status === 'met') return;
+        const skill = skillFor(row.criterion);
+        weakness[skill] = (weakness[skill] || 0) + (row.status === 'missing' ? 2 : 1);
+      });
+    });
+    const weakest = Object.keys(weakness).sort(function (a, b) { return weakness[b] - weakness[a]; })[0] || '';
+    return { level: level, pace: level === 1 ? '补基础' : level === 3 ? '加速迁移' : '稳步推进',
+      weakest: weakest ? (SKILLS[weakest] || SKILLS.scope).label : '',
+      assessmentCount: assessments.length, recentRates: rates.slice(-3).map(function (x) { return Math.round(x * 100); }),
+      weakCounts: weakness };
+  }
   function viewState() {
     const s = state();
     const count = completedDays(s), day = nextDay(s), last = count ? record(count, false) : null;
     const today = todayKey();
-    const completedToday = !!(last && last.completedAt && todayKey(new Date(last.completedAt)) === today);
     const active = day <= DAYS.length ? record(day, false) : null;
+    const activeAssessedToday = !!(active && active.completedAt && todayKey(new Date(active.completedAt)) === today);
+    const lastAdvancedToday = !!(last && last.completedAt && todayKey(new Date(last.completedAt)) === today);
+    const completedToday = activeAssessedToday || lastAdvancedToday;
+    const todayDay = activeAssessedToday ? day : lastAdvancedToday ? count : 0;
+    const todayAdvanced = !!(todayDay && s.sessions[todayDay] && s.sessions[todayDay].coreAdvancedAt);
+    const profile = learnerProfile(s);
+    const dueReviews = Object.keys(s.reviewQueue).map(function (key) { return s.reviewQueue[key]; })
+      .filter(function (item) { return item.status === 'active' && item.dueAt <= Date.now(); }).sort(function (a, b) { return a.dueAt - b.dueAt; });
     return { started: !!s.startedAt, startedAt: s.startedAt, total: DAYS.length, completed: count, day: day,
-      streak: streak(s), completedToday: completedToday, active: active, last: last, lastCompletedDay: count,
-      lockedUntilTomorrow: completedToday && day <= DAYS.length, complete: count >= DAYS.length };
+      streak: streak(s), completedToday: completedToday, todayDay: todayDay, todayAdvanced: todayAdvanced,
+      active: active, last: last, lastCompletedDay: count,
+      lockedUntilTomorrow: completedToday && day <= DAYS.length, complete: count >= DAYS.length,
+      level: profile.level, pace: profile.pace, weakest: profile.weakest, dueReviewCount: dueReviews.length,
+      scheduledReviewCount: Object.keys(s.reviewQueue).filter(function (key) { return s.reviewQueue[key].status === 'active'; }).length };
   }
   function task(day) { return DAYS[Number(day) - 1] || null; }
   function start() {
@@ -160,7 +328,7 @@
   }
   function submit(day, answerOrFields) {
     const s = state(), n = nextDay(s), item = task(day), current = viewState();
-    const sameDayRevision = current.completedToday && Number(day) === current.lastCompletedDay;
+    const sameDayRevision = current.completedToday && Number(day) === current.todayDay;
     if (!s.startedAt || !item || (!sameDayRevision && Number(day) !== n) || (current.lockedUntilTomorrow && !sameDayRevision))
       return { error: '今天的训练状态已变化，请刷新训练页后再试。' };
     const r = record(day, true);
@@ -182,13 +350,99 @@
     if (!r || r.submissionId !== submissionId) return false;
     r.analysis = Object.assign({}, analysis, { submissionId: submissionId, at: Date.now() });
     r.updatedAt = Date.now();
-    if (analysis && analysis.mode === 'model') r.completedAt = r.completedAt || Date.now();
+    if (analysis && analysis.mode === 'model') {
+      r.completedAt = Date.now();
+      if (rubricScore(analysis) >= 75) r.coreAdvancedAt = r.coreAdvancedAt || Date.now();
+      queueWeakCriteria(state(), day, r, r.analysis, r.analysis.at);
+    }
     save(); return true;
+  }
+  function dueReview() {
+    const s = state();
+    const reviewedToday = todayReview();
+    if (reviewedToday && reviewedToday.analysis && reviewedToday.analysis.mode === 'model') return null;
+    const queue = Object.keys(s.reviewQueue).map(function (key) { return s.reviewQueue[key]; })
+      .filter(function (item) { return item.status === 'active' && item.dueAt <= Date.now(); })
+      .sort(function (a, b) { return (a.dueAt - b.dueAt) || ((b.failures || 0) - (a.failures || 0)); })[0];
+    if (!queue) return null;
+    let run = queue.currentRunId ? s.reviewRuns[queue.currentRunId] : null;
+    if (!run || run.completedAt) {
+      const runCount = (queue.runCount || 0) + 1, profile = learnerProfile(s);
+      const challenge = buildReviewTask(queue.skill, profile.level, runCount);
+      const id = 'review-' + queue.skill + '-' + runCount;
+      run = { id: id, type: 'review', skill: queue.skill, day: queue.sourceDay || nextDay(s), runCount: runCount,
+        variantId: challenge.id, task: challenge, fields: ['', '', '', ''], answer: '', submittedAnswer: '',
+        submissionId: '', analysis: null, attempts: [], completedAt: 0, updatedAt: Date.now() };
+      s.reviewRuns[id] = run; queue.currentRunId = id; queue.runCount = runCount; save();
+    }
+    return { queue: queue, record: run, task: run.task, id: run.id, level: learnerProfile(s).level };
+  }
+  function reviewRun(id) { return state().reviewRuns[id] || null; }
+  function saveReviewFields(id, fields) {
+    const run = reviewRun(id); if (!run) return null;
+    run.fields = (Array.isArray(fields) ? fields : []).slice(0, 4).map(function (x) { return String(x || '').slice(0, 1200); });
+    while (run.fields.length < 4) run.fields.push('');
+    run.updatedAt = Date.now(); save(); return run;
+  }
+  function submitReview(id, answerOrFields) {
+    const s = state(), run = s.reviewRuns[id];
+    if (!run || !s.reviewQueue[run.skill] || s.reviewQueue[run.skill].currentRunId !== id)
+      return { error: '这条间隔复习已更新，请刷新后继续。' };
+    const item = run.task;
+    let answer;
+    if (Array.isArray(answerOrFields)) {
+      run.fields = answerOrFields.slice(0, 4).map(function (x) { return String(x || '').trim().slice(0, 1200); });
+      while (run.fields.length < 4) run.fields.push('');
+      answer = item.fields.map(function (field, i) { return field[0] + '：' + run.fields[i]; }).filter(function (_, i) { return !!run.fields[i]; }).join('\n');
+    } else answer = String(answerOrFields || '').trim().slice(0, 6000);
+    if (answer.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length < 40) return { error: '请先写出至少 40 个有效字符，再提交评估。' };
+    if (run.submissionId && run.submittedAnswer) run.attempts = (run.attempts || []).concat([{ answer: run.submittedAnswer, analysis: run.analysis, at: run.updatedAt }]).slice(-10);
+    run.answer = answer; run.submittedAnswer = answer;
+    run.submissionId = id + '-submission-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    run.analysis = null; run.pending = true; run.completedAt = 0; run.lastAttemptAt = Date.now(); run.updatedAt = Date.now(); save();
+    return { submissionId: run.submissionId, answer: answer };
+  }
+  function saveReviewAnalysis(id, submissionId, analysis) {
+    const s = state(), run = s.reviewRuns[id], queue = run && s.reviewQueue[run.skill];
+    if (!run || !queue || run.submissionId !== submissionId) return false;
+    run.analysis = Object.assign({}, analysis, { submissionId: submissionId, at: Date.now() });
+    run.pending = false; run.updatedAt = Date.now();
+    if (analysis && analysis.mode === 'model') {
+      run.completedAt = Date.now();
+      const passed = analysis.verdict === 'pass';
+      if (passed) {
+        queue.successes = (queue.successes || 0) + 1;
+        queue.lastStatus = 'met'; queue.lastReviewAt = run.completedAt;
+        if (queue.successes >= 3) { queue.status = 'resolved'; queue.dueAt = 0; }
+        else queue.dueAt = run.completedAt + (queue.successes === 1 ? 3 : 7) * 86400000;
+      } else {
+        queue.successes = 0; queue.failures = (queue.failures || 0) + 1;
+        queue.lastStatus = 'needs-work'; queue.lastReviewAt = run.completedAt;
+        queue.dueAt = run.completedAt + 86400000;
+      }
+      queue.updatedAt = Date.now();
+    }
+    save(); return true;
+  }
+  function todayReview() {
+    const s = state(), today = todayKey();
+    const run = Object.keys(s.reviewRuns).map(function (key) { return s.reviewRuns[key]; })
+      .filter(function (run) { return run && ((run.lastAttemptAt && todayKey(new Date(run.lastAttemptAt)) === today) ||
+        (run.completedAt && todayKey(new Date(run.completedAt)) === today)); })
+      .sort(function (a, b) { return (b.lastAttemptAt || b.completedAt || 0) - (a.lastAttemptAt || a.completedAt || 0); })[0] || null;
+    return run ? Object.assign({}, run, { queue: s.reviewQueue[run.skill] || null }) : null;
+  }
+  function reviewHistory() {
+    const s = state();
+    return Object.keys(s.reviewRuns).map(function (key) { return s.reviewRuns[key]; })
+      .filter(function (run) { return run && run.completedAt; }).sort(function (a, b) { return b.completedAt - a.completedAt; });
   }
   function history() {
     const s = state();
     return DAYS.map(function (item) { return { task: item, record: s.sessions[item.day] || null }; });
   }
   window.DailyDecomposition = { days: DAYS.slice(), task: task, state: viewState, start: start, record: record,
-    saveFields: saveFields, submit: submit, saveAnalysis: saveAnalysis, history: history, todayKey: todayKey };
+    saveFields: saveFields, submit: submit, saveAnalysis: saveAnalysis, history: history, todayKey: todayKey,
+    dueReview: dueReview, reviewRun: reviewRun, saveReviewFields: saveReviewFields, submitReview: submitReview,
+    saveReviewAnalysis: saveReviewAnalysis, todayReview: todayReview, reviewHistory: reviewHistory, profile: function () { return learnerProfile(state()); } };
 })();
