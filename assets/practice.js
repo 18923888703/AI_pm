@@ -367,7 +367,8 @@
   function practiceRec(id) {
     load();
     if (!S.practices[id]) S.practices[id] = { answer: '', decision: null, correct: null, rating: null,
-      phase: 'learn', submittedAnswer: '', submissionId: '', analysis: null, choiceOrder: null, updatedAt: 0 };
+      phase: 'learn', breakdown: ['', '', '', ''], submittedAnswer: '', submissionId: '', analysis: null,
+      choiceOrder: null, updatedAt: 0 };
     return S.practices[id];
   }
   function practicePhase(id) {
@@ -574,9 +575,30 @@
     practicePhase: practicePhase,
     practiceDone: practiceDone,
     practiceProgress: practiceProgress,
-    startPractice(id) { const r = practiceRec(id); r.phase = 'write'; r.updatedAt = Date.now(); save(); return r; },
+    startPractice(id) { const r = practiceRec(id); r.phase = 'breakdown'; r.updatedAt = Date.now(); save(); return r; },
+    savePracticeBreakdown(id, notes) {
+      const r = practiceRec(id);
+      r.breakdown = (Array.isArray(notes) ? notes : []).slice(0, 4).map(function (note) { return String(note || '').slice(0, 500); });
+      r.updatedAt = Date.now(); save(); return r;
+    },
+    continuePractice(id, notes) {
+      const r = this.savePracticeBreakdown(id, notes);
+      if (!String(r.answer || '').trim()) {
+        const p = exercise(id);
+        r.answer = (p ? p.rubric : []).map(function (label, i) {
+          const note = String(r.breakdown[i] || '').trim();
+          return note ? label + '：' + note : '';
+        }).filter(Boolean).join('\n');
+      }
+      r.phase = 'write'; r.updatedAt = Date.now(); save(); return r;
+    },
     savePractice(id, answer) { const r = practiceRec(id); r.answer = String(answer || ''); r.updatedAt = Date.now(); save(); return r; },
-    revisePractice(id) { const r = practiceRec(id); r.phase = 'write'; r.updatedAt = Date.now(); save(); return r; },
+    revisePractice(id, draft) {
+      const r = practiceRec(id); r.phase = 'write';
+      if (typeof draft === 'string') r.answer = draft.slice(0, 6000);
+      r.updatedAt = Date.now(); save(); return r;
+    },
+    revisitBreakdown(id) { const r = practiceRec(id); r.phase = 'breakdown'; r.updatedAt = Date.now(); save(); return r; },
     submitPractice(id, answer) {
       const p = exercise(id);
       if (!p) return { error: '找不到这道练习。' };

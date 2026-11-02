@@ -13,6 +13,7 @@
   let abortCtl = null;
   let activeRoute = null;
   const practiceAnalysisInFlight = new Map();
+  let practiceBreakdownSaveTimer = null;
 
   const T = function (id) { return window.TERMS.find(function (t) { return t.id === id; }); };
   const STAGE_ICONS = ['🌱', '🔧', '🔄', '🚀', '⚡', '🎯'];
@@ -965,6 +966,7 @@
     const r = window.Lab.practiceRec(id);
     if (window.Lab.practiceDone(id)) return { label: '已完成', cls: 'green' };
     if (window.Lab.practicePhase(id) === 'learn') return { label: '先学案例', cls: '' };
+    if (window.Lab.practicePhase(id) === 'breakdown') return { label: '拆解中', cls: 'orange' };
     if ((r.answer || '').trim() || r.decision != null || r.rating != null) return { label: '进行中', cls: 'orange' };
     return { label: '待作答', cls: 'orange' };
   }
@@ -974,7 +976,7 @@
     const tracks = [];
     window.PRACTICES.forEach(function (p) { if (tracks.indexOf(p.track) < 0) tracks.push(p.track); });
     let html = '<div class="page"><h1>实战练习</h1>' +
-      '<p class="lead">先看两个相邻案例，理解方法后独立写方案；提交后再看针对你原文的分析、检查点和参考拆解。</p>' +
+      '<p class="lead">先看概念和不同情境的案例，再按四个问题拆解自己的题；独立写完后才看在线分析、改进稿与参考拆解。</p>' +
       '<div class="practice-overview"><div><b>' + pg.done + ' / ' + pg.total + '</b><span>已完成</span></div>' +
       '<div class="practice-overview-bar"><i style="width:' + pg.pct + '%"></i></div>' +
       '<button class="btn sm" data-route="interview">去做面试测评 →</button></div>';
@@ -1005,30 +1007,58 @@
     if (!p) return '<div class="page"><div class="empty">找不到这个练习<br><br><button class="btn" data-route="practice">返回练习列表</button></div></div>';
     const r = window.Lab.practiceRec(id);
     const phase = window.Lab.practicePhase(id);
+    const guide = window.PracticeCoach.guide(p);
+    const phases = ['learn', 'breakdown', 'write', 'review'];
+    const phaseIndex = phases.indexOf(phase);
     let html = '<div class="page practice-page"><div class="practice-head">' +
       '<div><h1>' + esc(p.title) + '</h1><p class="lead">' + esc(p.source) + ' · 约 ' + p.min + ' 分钟</p></div>' +
       '<button class="btn sm ghost" data-route="practice">返回练习列表</button></div>' +
-      '<nav class="practice-steps" aria-label="练习步骤">' +
-      '<span class="' + (phase === 'learn' ? 'active' : 'done') + '">1 · 学案例</span>' +
-      '<span class="' + (phase === 'write' ? 'active' : phase === 'review' ? 'done' : '') + '">2 · 自己写</span>' +
-      '<span class="' + (phase === 'review' ? 'active' : '') + '">3 · 看分析</span></nav>';
+      '<nav class="practice-steps" aria-label="练习步骤">' + ['先理解', '自己拆解', '独立写', '看分析'].map(function (label, index) {
+        return '<span class="' + (index === phaseIndex ? 'active' : index < phaseIndex ? 'done' : '') + '"' +
+          (index === phaseIndex ? ' aria-current="step"' : '') + '>' + (index + 1) + ' · ' + label + '</span>';
+      }).join('') + '</nav>';
 
     const examples = window.PracticeCoach.examples(id);
     if (phase === 'learn') {
-      html += '<section class="practice-learn"><h2>先看两个案例</h2><p class="muted small">案例讲判断方法，和你要完成的任务是不同场景。</p>' +
+      const concepts = p.related.map(T).filter(Boolean).slice(0, 3);
+      html += '<section class="practice-learn"><div class="practice-concept-intro"><span class="tag blue">这题在训练什么</span>' +
+        '<p>' + esc(guide.meaning) + '</p><p class="tiny">先抓住下面的知识点；不需要背定义，试着说出它在本题里解决什么问题。</p>' +
+        '<div class="practice-concept-list">' + concepts.map(function (term) {
+          return '<div><b>' + esc(term.name) + '</b><p>' + esc(term.one) + '</p>' +
+            '<button type="button" class="btn sm ghost" data-goto="term:' + escAttr(term.id) + '">展开理解 →</button></div>';
+        }).join('') + '</div></div>' +
+        '<h2>再看两个案例</h2><p class="muted small">案例讲判断方法，和你要完成的任务是不同场景；你的题目答案不会提前展示。</p>' +
         examples.map(function (x, i) { return '<article class="practice-example"><div class="practice-example-index">案例 0' + (i + 1) + '</div>' +
           '<h3>' + esc(x.title) + '</h3><p class="practice-example-scene">' + esc(x.scene) + '</p>' +
           '<div class="practice-example-worked"><b>怎么想、怎么做</b><p>' + esc(x.worked) + '</p></div>' +
           '<p class="practice-example-takeaway">记住：' + esc(x.lesson) + '</p></article>'; }).join('') +
-        '<button type="button" class="btn primary practice-main-action" data-practice-begin="' + escAttr(id) + '">看完案例，开始自己写 →</button></section>';
+        '<button type="button" class="btn primary practice-main-action" data-practice-begin="' + escAttr(id) + '">看完案例，先拆解自己的题 →</button></section>';
+      return html + '</div>';
+    }
+
+    if (phase === 'breakdown') {
+      const notes = Array.isArray(r.breakdown) ? r.breakdown : [];
+      html += '<section class="practice-breakdown" data-practice-breakdown-id="' + escAttr(id) + '">' +
+        '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
+        '<h2>把大题拆成四个小判断</h2><p class="muted small">每格先写自己的想法，哪怕不完整也可以。提示只告诉你从哪里想，不会给出参考方案。</p>' +
+        guide.steps.map(function (step, index) {
+          return '<div class="practice-breakdown-step"><div class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(step.title) + '</b></div>' +
+            '<label for="practiceBreakdown' + index + '">' + esc(step.prompt) + '</label>' +
+            '<textarea id="practiceBreakdown' + index + '" data-practice-breakdown-index="' + index + '" aria-describedby="practiceBreakdownHint' + index + '" rows="3" maxlength="500" placeholder="用自己的话写一两句，暂时不用完美。">' + esc(notes[index] || '') + '</textarea>' +
+            '<p class="tiny" id="practiceBreakdownHint' + index + '">检查方向：' + esc(step.hint) + '</p></div>';
+        }).join('') +
+        '<div class="practice-breakdown-actions"><span class="tiny" id="practiceBreakdownSaveStatus" role="status" aria-live="polite">拆解笔记会自动保存在当前浏览器。</span>' +
+        '<button type="button" class="btn sm ghost" data-practice-direct="' + escAttr(id) + '">先跳过，直接写</button>' +
+        '<button type="button" class="btn primary" data-practice-continue="' + escAttr(id) + '">带着拆解进入写作 →</button></div></section>';
       return html + '</div>';
     }
 
     if (phase === 'write') {
       const modelReady = practiceModelReady();
-      html += '<details class="practice-example-review"><summary>回看刚才的两个案例</summary>' + examples.map(function (x) {
-        return '<p><b>' + esc(x.title) + '</b> · ' + esc(x.lesson) + '</p>';
-      }).join('') + '</details>' +
+      html += '<details class="practice-example-review"><summary>回看拆解问题和案例</summary>' +
+        guide.steps.map(function (step, i) { return '<p><b>' + esc(step.title) + '</b> · ' + esc(step.prompt) +
+          (r.breakdown && r.breakdown[i] ? '<br>你的思路：' + esc(r.breakdown[i]) : '') + '</p>'; }).join('') +
+        examples.map(function (x) { return '<p><b>' + esc(x.title) + '</b> · ' + esc(x.lesson) + '</p>'; }).join('') + '</details>' +
         '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
         '<div class="practice-task"><h2>你的任务</h2><p>' + esc(p.task) + '</p></div>' +
       '<label class="practice-label" for="practiceAnswer">写下你的方案</label>' +
@@ -1045,7 +1075,9 @@
 
     const answer = r.submittedAnswer || r.answer || '';
     html += '<div class="case-block"><b>练习场景</b><p>' + esc(p.scenario) + '</p></div>' +
-      '<div class="practice-submitted"><div><h2>你提交的方案</h2><button type="button" class="btn sm" data-practice-revise="' + escAttr(id) + '">修改后重新提交</button></div>' +
+      '<div class="practice-submitted"><div><h2>你提交的方案</h2><div class="practice-review-actions">' +
+      '<button type="button" class="btn sm ghost" data-practice-rebreak="' + escAttr(id) + '">从拆解重新练</button>' +
+      '<button type="button" class="btn sm" data-practice-revise="' + escAttr(id) + '">修改后重新提交</button></div></div>' +
       '<p>' + esc(answer) + '</p></div>';
     const analysis = r.analysis && r.analysis.submissionId === r.submissionId ? r.analysis :
       !r.phase && answer.length >= 20 ? window.PracticeCoach.localAnalysis(p, answer) : null;
@@ -1064,6 +1096,15 @@
 
     if (!analysis || (r.assessmentRequired && (analysis.mode !== 'model' || !analysis.verdict)))
       return html + '<p class="tiny practice-assessment-gate">参考拆解与后续自评将在在线模型完成逐项判断后显示；本地关键词提示不代表答案正确。</p></div>';
+    if (analysis.mode === 'model' && Array.isArray(analysis.criteria)) {
+      const weak = analysis.criteria.map(function (row, index) { return { row: row, step: guide.steps[index], term: T(p.related[index]) }; })
+        .filter(function (item) { return item.row.status !== 'met'; });
+      if (weak.length) html += '<section class="practice-focus-review"><h2>只补练这 ' + weak.length + ' 个薄弱点</h2>' +
+        '<p class="muted small">先回答问题，再改完整方案；不用把整题从头背一遍。</p>' +
+        weak.map(function (item) { return '<div><b>' + esc(item.row.criterion) + '</b><p>' + esc(item.step.prompt) + '</p>' +
+          (item.term ? '<span class="tiny">关联知识：' + esc(item.term.name) + ' · ' + esc(item.term.one) + '</span>' : '') + '</div>'; }).join('') +
+        '<button type="button" class="btn sm" data-practice-rebreak="' + escAttr(id) + '">按薄弱项重新拆解 →</button></section>';
+    }
     html += '<h2>交付前检查</h2><div class="check-list">' + p.checkpoints.map(function (x) {
       return '<div><span>□</span>' + esc(x) + '</div>';
     }).join('') + '</div>' +
@@ -1131,6 +1172,10 @@
             (row.status !== 'met' ? '<p class="practice-revision"><strong>下一版怎么改：</strong>' + esc(row.revision) + '</p>' : '') +
             '</article>';
         }).join('') + '</div><div class="practice-next-step"><b>最优先修改</b><p>' + esc(a.nextStep) + '</p></div>' +
+        (a.revisedAnswer ? '<details class="practice-rewrite"><summary>对照 AI 修改稿（提交后可看）</summary>' +
+          '<p class="tiny">这是基于你原答案改写的示例，不会自动覆盖你的方案；请核对其中未证实的事实和数字。</p>' +
+          '<div class="practice-rewrite-text">' + esc(a.revisedAnswer) + '</div>' +
+          '<button type="button" class="btn sm" data-practice-use-rewrite="' + escAttr(id) + '">带入编辑器，我再改一版 →</button></details>' : '') +
         '<p class="tiny practice-privacy">这是基于题目材料和你提交的文字做出的量表判断；未经外部核验的数据或经历仍需你自行提供证据。</p></section>';
     }
     let html = '<section class="practice-analysis"><div class="practice-analysis-head"><div><span class="tag ' +
@@ -2220,7 +2265,7 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-begin],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
+      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
 
@@ -2286,6 +2331,26 @@
     if (el.dataset.practiceBegin) {
       window.Lab.startPractice(el.dataset.practiceBegin);
       render();
+      return;
+    }
+    if (el.dataset.practiceContinue || el.dataset.practiceDirect) {
+      const id = el.dataset.practiceContinue || el.dataset.practiceDirect;
+      const notes = Array.from(document.querySelectorAll('[data-practice-breakdown-index]')).map(function (input) { return input.value; });
+      window.Lab.continuePractice(id, notes);
+      render();
+      return;
+    }
+    if (el.dataset.practiceRebreak) {
+      window.Lab.revisitBreakdown(el.dataset.practiceRebreak);
+      render();
+      return;
+    }
+    if (el.dataset.practiceUseRewrite) {
+      const id = el.dataset.practiceUseRewrite;
+      const rec = window.Lab.practiceRec(id);
+      if (!rec.analysis || rec.analysis.submissionId !== rec.submissionId || !rec.analysis.revisedAnswer) return;
+      window.Lab.revisePractice(id, rec.analysis.revisedAnswer);
+      render(); toast('AI 修改稿已带入编辑器，请核对并改成你的方案');
       return;
     }
     if (el.dataset.practiceSave) {
@@ -2474,6 +2539,22 @@
       const inp = $('#dictSearch'); if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); } }
   });
   document.addEventListener('input', function (e) {
+    if (e.target.dataset.practiceBreakdownIndex !== undefined) {
+      const box = e.target.closest('.practice-breakdown');
+      if (box) {
+        const id = box.dataset.practiceBreakdownId;
+        const notes = Array.from(box.querySelectorAll('[data-practice-breakdown-index]')).map(function (input) { return input.value; });
+        clearTimeout(practiceBreakdownSaveTimer);
+        const status = $('#practiceBreakdownSaveStatus');
+        if (status) status.textContent = '正在保存拆解笔记…';
+        practiceBreakdownSaveTimer = setTimeout(function () {
+          window.Lab.savePracticeBreakdown(id, notes);
+          const saved = $('#practiceBreakdownSaveStatus');
+          if (saved) saved.textContent = '拆解笔记已自动保存。';
+        }, 300);
+      }
+      return;
+    }
     if (e.target.id === 'dictSearch') {
       searchQuery = e.target.value;
       const pos = content.scrollTop;

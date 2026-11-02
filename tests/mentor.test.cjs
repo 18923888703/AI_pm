@@ -133,13 +133,15 @@ assert.ok(mentor.recommend(6)[0].why.includes('卡住'));
       summary: '方案已有基本结构，但验收对象不够明确。',
       criteria: [{ criterion: '验收', status: 'partial', quote: '再定义缺参提示与验收步骤',
         why: '提到了验收步骤，但没有写出具体输入变化及预期结果。', revision: '补一条输入变化后的预期结果，并说明失败时如何处理。' }],
-      nextStep: '补一条实际测试用例。'
+      nextStep: '补一条实际测试用例。',
+      revisedAnswer: '目标用户是第一次需要创建学习计划的人；先收集目标、时间和现有基础，缺少必填字段时提示补齐，再生成可执行的今日计划，并用输入变化验证结果。'
     }) } }] }) };
   };
   context.window.LLM.setCfg({ enabled: true, apiKey: 'fake-test-key', baseUrl: 'https://provider-mock.test/v1' });
   const review = await context.window.LLM.analyzePractice({ title: '练习', scenario: '场景', task: '写任务卡',
     checkpoints: ['输入输出'], rubric: ['验收'], reference: ['明确条件'] }, practiceAnswer);
   assert.equal(review.criteria[0].status, 'partial');
+  assert.ok(review.revisedAnswer && practicePayload.response_format.json_schema.schema.required.includes('revisedAnswer'));
   assert.ok(practicePayload.messages[1].content.includes(practiceAnswer), '在线模型应收到已提交的原文');
   assert.equal(practicePayload.stream, false);
 
