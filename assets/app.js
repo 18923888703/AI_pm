@@ -1243,11 +1243,12 @@
           return '<div><b>' + esc(term.name) + '</b><p>' + esc(term.one) + '</p>' +
             '<button type="button" class="btn sm ghost" data-goto="term:' + escAttr(term.id) + '">展开理解 →</button></div>';
         }).join('') + '</div></div>' +
-        '<h2>再看两个案例</h2><p class="muted small">案例讲判断方法，和你要完成的任务是不同场景；你的题目答案不会提前展示。</p>' +
-        examples.map(function (x, i) { return '<article class="practice-example"><div class="practice-example-index">案例 0' + (i + 1) + '</div>' +
+        '<h2>先看一个做法</h2><p class="muted small">看它如何从场景走到判断，再用同样方法处理你的题目。案例与题目不同，不会提前显示答案。</p>' +
+        examples.slice(0, 1).map(function (x, i) { return '<article class="practice-example"><div class="practice-example-index">案例 0' + (i + 1) + '</div>' +
           '<h3>' + esc(x.title) + '</h3><p class="practice-example-scene">' + esc(x.scene) + '</p>' +
           '<div class="practice-example-worked"><b>怎么想、怎么做</b><p>' + esc(x.worked) + '</p></div>' +
           '<p class="practice-example-takeaway">记住：' + esc(x.lesson) + '</p></article>'; }).join('') +
+        (examples[1] ? '<details class="practice-extra-example"><summary>再看一个反例（可选）</summary><article class="practice-example"><h3>' + esc(examples[1].title) + '</h3><p class="practice-example-scene">' + esc(examples[1].scene) + '</p><div class="practice-example-worked"><b>为什么要这样改</b><p>' + esc(examples[1].worked) + '</p></div><p class="practice-example-takeaway">记住：' + esc(examples[1].lesson) + '</p></article></details>' : '') +
         '<button type="button" class="btn primary practice-main-action" data-practice-begin="' + escAttr(id) + '">看完案例，先拆解自己的题 →</button></section>';
       return html + '</div>';
     }
@@ -1256,12 +1257,13 @@
       const notes = Array.isArray(r.breakdown) ? r.breakdown : [];
       html += '<section class="practice-breakdown" data-practice-breakdown-id="' + escAttr(id) + '">' +
         '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
-        '<h2>把大题拆成四个小判断</h2><p class="muted small">每格先写自己的想法，哪怕不完整也可以。提示只告诉你从哪里想，不会给出参考方案。</p>' +
+        '<h2>一次只想一个问题</h2><p class="muted small">每步写一两句。完成后会把你的四步笔记整理成可编辑初稿；提示不会给出本题答案。</p>' +
         guide.steps.map(function (step, index) {
-          return '<div class="practice-breakdown-step"><div class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(step.title) + '</b></div>' +
+          return '<details class="practice-breakdown-step"' + (index === 0 ? ' open' : '') + '><summary class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(step.title) + '</b></summary>' +
             '<label for="practiceBreakdown' + index + '">' + esc(step.prompt) + '</label>' +
             '<textarea id="practiceBreakdown' + index + '" data-practice-breakdown-index="' + index + '" aria-describedby="practiceBreakdownHint' + index + '" rows="3" maxlength="500" placeholder="用自己的话写一两句，暂时不用完美。">' + esc(notes[index] || '') + '</textarea>' +
-            '<p class="tiny" id="practiceBreakdownHint' + index + '">检查方向：' + esc(step.hint) + '</p></div>';
+            '<p class="tiny" id="practiceBreakdownHint' + index + '">检查方向：' + esc(step.hint) + '</p>' +
+            '<button type="button" class="btn sm practice-step-next" data-practice-step-next="' + index + '">' + (index + 1 === guide.steps.length ? '完成拆解，开始写 →' : '继续下一小步 →') + '</button></details>';
         }).join('') +
         '<div class="practice-breakdown-actions"><span class="tiny" id="practiceBreakdownSaveStatus" role="status" aria-live="polite">拆解笔记会自动保存在当前浏览器。</span>' +
         '<button type="button" class="btn sm ghost" data-practice-direct="' + escAttr(id) + '">先跳过，直接写</button>' +
@@ -2523,7 +2525,7 @@
      ============================================================ */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-goto],[data-route],[data-fb],[data-ai-help-kind],[data-opt],[data-stage],[data-regen],' +
-      '[data-practice-begin],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-daily-optional-skill],[data-daily-optional-start],[data-daily-optional-next],[data-daily-optional-reset],[data-daily-optional-exit],[data-assess-start],[data-assess-answer],' +
+      '[data-practice-begin],[data-practice-step-next],[data-practice-continue],[data-practice-direct],[data-practice-rebreak],[data-practice-use-rewrite],[data-practice-save],[data-practice-submit],[data-practice-revise],[data-practice-analyze],[data-practice-choice],[data-practice-rate],[data-daily-start],[data-daily-submit],[data-daily-retry],[data-daily-resubmit],[data-daily-review-submit],[data-daily-review-retry],[data-daily-review-resubmit],[data-daily-optional-skill],[data-daily-optional-start],[data-daily-optional-next],[data-daily-optional-reset],[data-daily-optional-exit],[data-assess-start],[data-assess-answer],' +
       '[data-assess-next],[data-assess-open-submit],[data-assess-open-score],[data-learn-start],[data-learn-answer],[data-learn-next],[data-review-start],[data-review-answer],[data-review-next],[data-spaced-start],[data-spaced-answer],[data-spaced-next],[data-plan-day],[data-kb-answer],[data-kb-pan],[data-kb-center],[data-supplement],[data-memory-mark],[data-wrong-practice]');
     if (!el) return;
 
@@ -2674,6 +2676,23 @@
     if (el.dataset.practiceBegin) {
       window.Lab.startPractice(el.dataset.practiceBegin);
       render();
+      return;
+    }
+    if (el.dataset.practiceStepNext !== undefined) {
+      const box = el.closest('.practice-breakdown');
+      if (!box) return;
+      const notes = Array.from(box.querySelectorAll('[data-practice-breakdown-index]')).map(function (input) { return input.value; });
+      window.Lab.savePracticeBreakdown(box.dataset.practiceBreakdownId, notes);
+      const next = Number(el.dataset.practiceStepNext) + 1;
+      const steps = Array.from(box.querySelectorAll('.practice-breakdown-step'));
+      if (next < steps.length) {
+        steps.forEach(function (step, index) { step.open = index === next; });
+        steps[next].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        steps[next].querySelector('textarea')?.focus({ preventScroll: true });
+      } else {
+        window.Lab.continuePractice(box.dataset.practiceBreakdownId, notes);
+        render();
+      }
       return;
     }
     if (el.dataset.practiceContinue || el.dataset.practiceDirect) {
