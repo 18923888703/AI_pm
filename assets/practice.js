@@ -147,6 +147,7 @@
   PRACTICES.push.apply(PRACTICES, window.AGENT_HALLUCINATION_PRACTICES || []);
   PRACTICES.push.apply(PRACTICES, window.MEMORY_WORKFLOW_PRACTICES || []);
   PRACTICES.push.apply(PRACTICES, window.MODEL_GROWTH_PRACTICES || []);
+  PRACTICES.push.apply(PRACTICES, window.ENTERPRISE_EFFICIENCY_PRACTICES || []);
 
   const DIMS = {
     project_experience: { name: '项目与产品经验', desc: '项目价值、个人贡献与复盘', terms: ['problemframing', 'outcomemetric', 'flywheel'], practices: ['assumption-evidence', 'enterprise-handoff'] },
