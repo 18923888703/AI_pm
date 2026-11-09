@@ -469,9 +469,15 @@
 
     /* 2) 热身复习：复习队列里优先级最高的 */
     const nReview = att.key === 'short' ? 2 : 3;
-    reviewQueueRaw(99).filter(function (x) { return !x.term.optional; }).forEach(function (x) {
+    // 从较弱的候选窗口随机抽热身题，避免每天固定落在同一批知识点；弱项仍限定在优先候选范围。
+    const reviewCandidates = reviewQueueRaw(99).filter(function (x) { return !x.term.optional && !taken[x.term.id]; });
+    const reviewPool = reviewCandidates.slice(0, Math.min(reviewCandidates.length, Math.max(nReview * 3, nReview)));
+    for (let i = reviewPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = reviewPool[i]; reviewPool[i] = reviewPool[j]; reviewPool[j] = temp;
+    }
+    reviewPool.forEach(function (x) {
       if (seq.filter(function (i) { return i.type !== 'checkpoint'; }).length >= nReview + carried) return;
-      if (taken[x.term.id]) return;
       add({
         type: 'review', termId: x.term.id, min: 2,
         why: x.rec.confused > 0
@@ -515,7 +521,8 @@
     }
 
     /* 4) 收尾测验：对着今天最后一个要搞清楚的概念出 */
-    const anchor = seq.filter(function (i) { return i.type === 'new' || i.type === 'review'; }).pop();
+    const quizCandidates = seq.filter(function (i) { return i.type === 'new' || i.type === 'review'; });
+    const anchor = quizCandidates.length ? quizCandidates[Math.floor(Math.random() * quizCandidates.length)] : null;
     if (anchor && anchor.termId) {
       const t = window.TERMS.find(function (x) { return x.id === anchor.termId; });
       if (t && t.quiz && t.quiz.length) {
