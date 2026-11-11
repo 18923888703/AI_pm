@@ -370,7 +370,11 @@
     load();
     if (!S.practices[id]) S.practices[id] = { answer: '', decision: null, correct: null, rating: null,
       phase: 'learn', breakdown: ['', '', '', ''], submittedAnswer: '', submissionId: '', analysis: null,
-      choiceOrder: null, updatedAt: 0 };
+      choiceOrder: null, focusCriteria: [], updatedAt: 0 };
+    if (!Array.isArray(S.practices[id].focusCriteria)) S.practices[id].focusCriteria = [];
+    const rubricLength = (exercise(id) && exercise(id).rubric || []).length || 4;
+    if (!Array.isArray(S.practices[id].breakdown)) S.practices[id].breakdown = [];
+    while (S.practices[id].breakdown.length < rubricLength) S.practices[id].breakdown.push('');
     return S.practices[id];
   }
   function practicePhase(id) {
@@ -580,7 +584,7 @@
     startPractice(id) { const r = practiceRec(id); r.phase = 'breakdown'; r.updatedAt = Date.now(); save(); return r; },
     savePracticeBreakdown(id, notes) {
       const r = practiceRec(id);
-      r.breakdown = (Array.isArray(notes) ? notes : []).slice(0, 4).map(function (note) { return String(note || '').slice(0, 500); });
+      r.breakdown = (Array.isArray(notes) ? notes : []).slice(0, 8).map(function (note) { return String(note || '').slice(0, 500); });
       r.updatedAt = Date.now(); save(); return r;
     },
     continuePractice(id, notes) {
@@ -600,7 +604,12 @@
       if (typeof draft === 'string') r.answer = draft.slice(0, 6000);
       r.updatedAt = Date.now(); save(); return r;
     },
-    revisitBreakdown(id) { const r = practiceRec(id); r.phase = 'breakdown'; r.updatedAt = Date.now(); save(); return r; },
+    revisitBreakdown(id) {
+      const r = practiceRec(id);
+      r.focusCriteria = r.analysis && Array.isArray(r.analysis.criteria)
+        ? r.analysis.criteria.filter(function (row) { return row.status !== 'met'; }).map(function (row) { return row.criterion; }) : [];
+      r.phase = 'learn'; r.updatedAt = Date.now(); save(); return r;
+    },
     submitPractice(id, answer) {
       const p = exercise(id);
       if (!p) return { error: '找不到这道练习。' };
