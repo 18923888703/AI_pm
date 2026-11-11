@@ -132,6 +132,52 @@
     return all[termId];
   }
 
+  function selectDailyTerms(planIds, requiredIds) {
+    const planned = Array.from(new Set((planIds || []).filter(function (id) { return BANK[id]; })));
+    const selected = Array.from(new Set((requiredIds || []).filter(function (id) { return BANK[id]; })));
+    const target = Math.max(selected.length, Math.min(6, Math.max(4, planned.length)));
+    const now = Date.now(), recentWindow = 5 * 86400000;
+    const dueIds = new Set(window.SpacedReview ? window.SpacedReview.due(now).map(function (item) { return item.termId; }) : []);
+    let candidates = window.TERMS.filter(function (term) {
+      return !term.optional && BANK[term.id] && selected.indexOf(term.id) < 0;
+    });
+    function score(term) {
+      const memory = window.Mem.state.terms[term.id] || {};
+      const history = record(term.id);
+      return (dueIds.has(term.id) ? 12 : 0) + Math.max(0, 4 - Number(memory.mastery || 0)) * 2 +
+        Math.min(5, Number(memory.wrong || 0) + Number(memory.confused || 0)) -
+        (history.dailyLastAt && now - history.dailyLastAt < recentWindow ? 100 : 0) + Math.random() * 3;
+    }
+    candidates.sort(function (a, b) { return score(b) - score(a); });
+    let fresh = candidates.filter(function (term) {
+      const last = record(term.id).dailyLastAt || 0;
+      return !last || now - last >= recentWindow;
+    });
+    if (fresh.length < target - selected.length) fresh = candidates;
+    const categories = new Set(selected.map(function (id) {
+      const term = window.TERMS.find(function (item) { return item.id === id; }); return term && term.cat;
+    }));
+    while (selected.length < target && fresh.length) {
+      const diverse = fresh.filter(function (term) { return !categories.has(term.cat); });
+      const pool = diverse.length ? diverse : fresh;
+      const choice = pool[Math.floor(Math.random() * Math.min(pool.length, Math.max(4, target * 2)))];
+      if (!choice) break;
+      selected.push(choice.id); categories.add(choice.cat);
+      fresh = fresh.filter(function (term) { return term.id !== choice.id; });
+    }
+    shuffled(planned).forEach(function (id) { if (selected.length < target && selected.indexOf(id) < 0) selected.push(id); });
+    return shuffled(selected);
+  }
+
+  function dailyDifficultyTypes(termId) {
+    const memory = window.Mem.state.terms[termId] || {};
+    const mastery = Number(memory.mastery || 0);
+    if (mastery < 1.5 || Number(memory.wrong || 0) > Number(memory.right || 0))
+      return ['definition', 'scenario', 'mechanism'];
+    if (mastery >= 3) return ['boundary', 'tradeoff', 'pitfall'];
+    return ['scenario', 'mechanism', 'tradeoff', 'boundary'];
+  }
+
   function pick(termId) {
     if (active[termId]) return active[termId];
     const rec = record(termId);
@@ -139,6 +185,9 @@
     const recent = new Set((rec.recentIds || []).slice(-2));
     let candidates = bank.filter(function (q) { return !recent.has(q.id); });
     if (!candidates.length) candidates = bank.slice();
+    const preferredTypes = dailyDifficultyTypes(termId);
+    const preferred = candidates.filter(function (q) { return preferredTypes.indexOf(q.variantType) >= 0; });
+    if (preferred.length) candidates = preferred;
     candidates.sort(function (a, b) {
       const aa = rec.answered[a.id] || { attempts: 0, lastAt: 0 };
       const bb = rec.answered[b.id] || { attempts: 0, lastAt: 0 };
@@ -169,6 +218,7 @@
     qr.attempts++; if (ok) qr.correct++; else qr.wrong++; qr.lastAt = Date.now();
     rec.answered[q.id] = qr;
     if (ok) rec.correct++; else rec.wrong++;
+    if (source === 'daily') rec.dailyLastAt = Date.now();
     rec.recentIds = (rec.recentIds || []).concat(q.id).slice(-6);
     delete active[termId];
     if (window.SpacedReview) window.SpacedReview.record(termId, q.id, q.variantType, ok, source || 'term');
@@ -192,12 +242,12 @@
     return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
   }
 
-  function startDaily(termIds) {
+  function startDaily(termIds, requiredTermIds) {
     const mem = window.Mem.state;
     const today = dayKey();
     const existing = mem.dailyLearning;
     if (existing && existing.date === today && !existing.completedAt) return existing;
-    const unique = Array.from(new Set((termIds || []).filter(function (id) { return BANK[id]; })));
+    const unique = selectDailyTerms(termIds, requiredTermIds);
     mem.dailyLearning = {
       date: today, startedAt: Date.now(), completedAt: 0, index: 0,
       questions: unique.map(function (termId) {

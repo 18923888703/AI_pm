@@ -596,8 +596,10 @@
   function viewLearn() {
     let session = window.LearningQuiz.daily();
     if (!session) {
-      const ids = window.Mem.plan().items.filter(function (it) { return !it.done && it.termId; }).map(function (it) { return it.termId; });
-      session = window.LearningQuiz.startDaily(ids);
+      const todayPlanItems = window.Mem.plan().items.filter(function (it) { return !it.done && it.termId; });
+      const ids = todayPlanItems.map(function (it) { return it.termId; });
+      const requiredIds = todayPlanItems.filter(function (it) { return it.type === 'new'; }).map(function (it) { return it.termId; });
+      session = window.LearningQuiz.startDaily(ids, requiredIds);
     }
     if (!session || !session.questions.length) {
       return '<div class="page assessment-page"><div class="empty">今天没有待完成的知识点。<br><br><button class="btn" data-route="home">返回今日学习</button></div></div>';
