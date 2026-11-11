@@ -509,6 +509,11 @@
         });
       } else {
         const fresh = cur.ids.filter(function (id) { return !graduated(id) && !taken[id]; });
+        // 同一课内随机安排知识点顺序，避免每天固定从同一个概念开始；课程完成条件仍以掌握为准。
+        for (let i = fresh.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const swap = fresh[i]; fresh[i] = fresh[j]; fresh[j] = swap;
+        }
         fresh.slice(0, pace).forEach(function (id) {
           const t = window.TERMS.find(function (x) { return x.id === id; });
           add({
