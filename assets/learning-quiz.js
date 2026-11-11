@@ -134,12 +134,21 @@
 
   function selectDailyTerms(planIds, requiredIds) {
     const planned = Array.from(new Set((planIds || []).filter(function (id) { return BANK[id]; })));
-    const selected = Array.from(new Set((requiredIds || []).filter(function (id) { return BANK[id]; })));
-    const target = Math.max(selected.length, Math.min(6, Math.max(4, planned.length)));
+    const todayNew = Array.from(new Set((requiredIds || []).filter(function (id) { return BANK[id]; })));
+    const selected = [];
+    const target = 5;
     const now = Date.now(), recentWindow = 5 * 86400000;
     const dueIds = new Set(window.SpacedReview ? window.SpacedReview.due(now).map(function (item) { return item.termId; }) : []);
+    const recentlyAsked = function (id) {
+      const last = record(id).dailyLastAt || 0;
+      return !!last && now - last < recentWindow;
+    };
+    // Keep at most two of today's new lesson points, and rotate which two are checked.
+    let newPool = shuffled(todayNew.filter(function (id) { return !recentlyAsked(id); }));
+    if (newPool.length < Math.min(2, todayNew.length)) newPool = shuffled(todayNew);
+    newPool.slice(0, Math.min(2, todayNew.length)).forEach(function (id) { selected.push(id); });
     let candidates = window.TERMS.filter(function (term) {
-      return !term.optional && BANK[term.id] && selected.indexOf(term.id) < 0;
+      return !term.optional && BANK[term.id] && planned.indexOf(term.id) < 0 && selected.indexOf(term.id) < 0 && !recentlyAsked(term.id);
     });
     function score(term) {
       const memory = window.Mem.state.terms[term.id] || {};
@@ -149,11 +158,12 @@
         (history.dailyLastAt && now - history.dailyLastAt < recentWindow ? 100 : 0) + Math.random() * 3;
     }
     candidates.sort(function (a, b) { return score(b) - score(a); });
-    let fresh = candidates.filter(function (term) {
-      const last = record(term.id).dailyLastAt || 0;
-      return !last || now - last >= recentWindow;
-    });
-    if (fresh.length < target - selected.length) fresh = candidates;
+    let fresh = candidates;
+    if (fresh.length < target - selected.length) {
+      fresh = window.TERMS.filter(function (term) {
+        return !term.optional && BANK[term.id] && selected.indexOf(term.id) < 0;
+      }).sort(function (a, b) { return score(b) - score(a); });
+    }
     const categories = new Set(selected.map(function (id) {
       const term = window.TERMS.find(function (item) { return item.id === id; }); return term && term.cat;
     }));
@@ -165,6 +175,7 @@
       selected.push(choice.id); categories.add(choice.cat);
       fresh = fresh.filter(function (term) { return term.id !== choice.id; });
     }
+    // Fallback for unusually small/filtered banks; preserve the 4–5 question range.
     shuffled(planned).forEach(function (id) { if (selected.length < target && selected.indexOf(id) < 0) selected.push(id); });
     return shuffled(selected);
   }
@@ -249,7 +260,8 @@
     if (existing && existing.date === today && !existing.completedAt) return existing;
     const unique = selectDailyTerms(termIds, requiredTermIds);
     mem.dailyLearning = {
-      date: today, selectionVersion: 2, startedAt: Date.now(), completedAt: 0, index: 0,
+      date: today, selectionVersion: 3, planTermIds: (termIds || []).slice(), requiredTermIds: (requiredTermIds || []).slice(),
+      startedAt: Date.now(), completedAt: 0, index: 0,
       questions: unique.map(function (termId) {
         const q = pick(termId);
         return { termId: termId, questionId: q.id, review: q.review, optionIds: q.options.map(function (o) { return o.id; }) };
@@ -262,17 +274,30 @@
   function daily() {
     const s = window.Mem.state.dailyLearning;
     if (!s || s.date !== dayKey()) return null;
-    // 旧版未作答的固定顺序会话只迁移一次；已答记录对应的题目顺序不动。
-    if (!s.completedAt && !s.feedback && s.selectionVersion !== 2) {
-      const answered = (s.questions || []).slice(0, s.responses ? s.responses.length : 0);
-      const pending = shuffled((s.questions || []).slice(answered.length)).map(function (question) {
-        const ref = Object.assign({}, question);
-        ref.optionIds = shuffled((ref.optionIds || []).slice());
-        return ref;
-      });
-      s.questions = answered.concat(pending);
-      s.index = answered.length;
-      s.selectionVersion = 2;
+    // 尚未作答的旧会话改用跨知识点随机抽题；已有作答保留原序和历史。
+    if (!s.completedAt && !s.feedback && s.selectionVersion !== 3) {
+      if (!(s.responses || []).length) {
+        const plan = window.Mem.plan();
+        const items = plan.items.filter(function (item) { return !item.done && item.termId; });
+        const planIds = items.map(function (item) { return item.termId; });
+        const requiredIds = items.filter(function (item) { return item.type === 'new'; }).map(function (item) { return item.termId; });
+        const ids = selectDailyTerms(planIds, requiredIds);
+        s.questions = ids.map(function (termId) {
+          const q = pick(termId);
+          return { termId: termId, questionId: q.id, review: q.review, optionIds: q.options.map(function (o) { return o.id; }) };
+        });
+        s.index = 0;
+      } else {
+        const answered = (s.questions || []).slice(0, s.responses.length);
+        const pending = shuffled((s.questions || []).slice(s.responses.length)).map(function (question) {
+          const ref = Object.assign({}, question);
+          ref.optionIds = shuffled((ref.optionIds || []).slice());
+          return ref;
+        });
+        s.questions = answered.concat(pending);
+        s.index = answered.length;
+      }
+      s.selectionVersion = 3;
       window.Mem.save();
     }
     if (!s.completedAt && s.feedback && s.responses.length === s.questions.length) {
