@@ -1218,6 +1218,16 @@
     return !!(cfg.enabled && cfg.apiKey && cfg.baseUrl && cfg.model);
   }
 
+  function practiceBreakdownNotes(box) {
+    const practice = box && window.Lab.exercise(box.dataset.practiceBreakdownId);
+    const notes = new Array(practice && practice.rubric ? practice.rubric.length : 4).fill('');
+    Array.from(box.querySelectorAll('[data-practice-breakdown-index]')).forEach(function (input) {
+      const index = Number(input.dataset.practiceBreakdownIndex);
+      if (Number.isInteger(index) && index >= 0 && index < notes.length) notes[index] = input.value;
+    });
+    return notes;
+  }
+
   function viewPracticeDetail(id) {
     const p = window.Lab.exercise(id);
     if (!p) return '<div class="page"><div class="empty">找不到这个练习<br><br><button class="btn" data-route="practice">返回练习列表</button></div></div>';
@@ -1237,33 +1247,59 @@
     const examples = window.PracticeCoach.examples(id);
     if (phase === 'learn') {
       const concepts = p.related.map(T).filter(Boolean).slice(0, 3);
+      const focusRows = r.focusCriteria.map(function (criterion) {
+        const index = p.rubric.indexOf(criterion);
+        const row = r.analysis && Array.isArray(r.analysis.criteria)
+          ? r.analysis.criteria.find(function (item) { return item.criterion === criterion; }) : null;
+        return index >= 0 ? { criterion: criterion, step: guide.steps[index], row: row } : null;
+      }).filter(Boolean);
+      const focusLesson = focusRows.length ? '<section class="practice-focus-lesson"><h2>先把薄弱点讲清楚</h2>' +
+        '<p class="muted small">这是你上次没掌握的部分。先看原因和示范，再用新场景自己拆，不用背原答案。</p>' +
+        focusRows.map(function (item, focusIndex) {
+          return '<article class="practice-focus-lesson-item"><h3>' + esc(item.criterion) + '</h3>' +
+            (item.row && item.row.quote ? '<blockquote>上次你写的是：“' + esc(item.row.quote) + '”</blockquote>' : '') +
+            '<p><b>为什么会卡在这里：</b>' + esc(item.row ? item.row.why : '这一步需要把判断依据写具体，不能只写结论。') + '</p>' +
+            '<p><b>先学这个拆法：</b>' + esc(item.step.prompt) + '</p>' +
+            '<p><b>检查方向：</b>' + esc(item.step.hint) + '</p>' +
+            (item.row && item.row.revision ? '<details><summary>看一个修改示范</summary><p>' + esc(item.row.revision) + '</p></details>' : '') +
+            '</article>';
+        }).join('') +
+        '<div class="practice-focus-method"><b>写的时候按这四步想</b><ol><li>圈出题目里的对象、场景和要交付的结果。</li><li>找出这条薄弱点要求你判断或补充的条件。</li><li>写清谁根据什么信息采取什么动作。</li><li>补上信息不足、出错时怎么办，以及怎样验收。</li></ol></div></section>' : '';
       html += '<section class="practice-learn"><div class="practice-concept-intro"><span class="tag blue">这题在训练什么</span>' +
         '<p>' + esc(guide.meaning) + '</p><p class="tiny">先抓住下面的知识点；不需要背定义，试着说出它在本题里解决什么问题。</p>' +
         '<div class="practice-concept-list">' + concepts.map(function (term) {
           return '<div><b>' + esc(term.name) + '</b><p>' + esc(term.one) + '</p>' +
             '<button type="button" class="btn sm ghost" data-goto="term:' + escAttr(term.id) + '">展开理解 →</button></div>';
-        }).join('') + '</div></div>' +
+        }).join('') + '</div></div>' + focusLesson +
         '<h2>先看一个做法</h2><p class="muted small">看它如何从场景走到判断，再用同样方法处理你的题目。案例与题目不同，不会提前显示答案。</p>' +
         examples.slice(0, 1).map(function (x, i) { return '<article class="practice-example"><div class="practice-example-index">案例 0' + (i + 1) + '</div>' +
           '<h3>' + esc(x.title) + '</h3><p class="practice-example-scene">' + esc(x.scene) + '</p>' +
           '<div class="practice-example-worked"><b>怎么想、怎么做</b><p>' + esc(x.worked) + '</p></div>' +
           '<p class="practice-example-takeaway">记住：' + esc(x.lesson) + '</p></article>'; }).join('') +
         (examples[1] ? '<details class="practice-extra-example"><summary>再看一个反例（可选）</summary><article class="practice-example"><h3>' + esc(examples[1].title) + '</h3><p class="practice-example-scene">' + esc(examples[1].scene) + '</p><div class="practice-example-worked"><b>为什么要这样改</b><p>' + esc(examples[1].worked) + '</p></div><p class="practice-example-takeaway">记住：' + esc(examples[1].lesson) + '</p></article></details>' : '') +
-        '<button type="button" class="btn primary practice-main-action" data-practice-begin="' + escAttr(id) + '">看完案例，先拆解自己的题 →</button></section>';
+        '<button type="button" class="btn primary practice-main-action" data-practice-begin="' + escAttr(id) + '">' +
+          (focusRows.length ? '按刚学的拆法，开始补练 →' : '看完案例，先拆解自己的题 →') + '</button></section>';
       return html + '</div>';
     }
 
     if (phase === 'breakdown') {
       const notes = Array.isArray(r.breakdown) ? r.breakdown : [];
+      const stepIndices = guide.steps.map(function (_, index) { return index; }).filter(function (index) {
+        return !r.focusCriteria.length || r.focusCriteria.indexOf(p.rubric[index]) >= 0;
+      });
+      const activeStep = stepIndices.findIndex(function (index) { return !String(notes[index] || '').trim(); });
       html += '<section class="practice-breakdown" data-practice-breakdown-id="' + escAttr(id) + '">' +
         '<div class="case-block"><b>现在轮到你 · 场景</b><p>' + esc(p.scenario) + '</p></div>' +
-        '<h2>一次只想一个问题</h2><p class="muted small">每步写一两句。完成后会把你的四步笔记整理成可编辑初稿；提示不会给出本题答案。</p>' +
-        guide.steps.map(function (step, index) {
-          return '<details class="practice-breakdown-step"' + (index === 0 ? ' open' : '') + '><summary class="practice-breakdown-title"><span>' + (index + 1) + '</span><b>' + esc(step.title) + '</b></summary>' +
+        '<h2>' + (r.focusCriteria.length ? '只拆上次卡住的部分' : '一次只想一个问题') + '</h2><p class="muted small">每步写一两句。' +
+        (r.focusCriteria.length ? '先针对薄弱项练习，写完会把你的笔记整理成可编辑初稿。' : '完成后会把你的笔记整理成可编辑初稿。') +
+        '提示会指出检查方向，不会替你写本题答案。</p>' +
+        stepIndices.map(function (index, displayIndex) {
+          const step = guide.steps[index];
+          return '<details class="practice-breakdown-step"' + (displayIndex === activeStep ? ' open' : '') + '><summary class="practice-breakdown-title"><span>' + (displayIndex + 1) + '</span><b>' + esc(step.title) + '</b></summary>' +
             '<label for="practiceBreakdown' + index + '">' + esc(step.prompt) + '</label>' +
             '<textarea id="practiceBreakdown' + index + '" data-practice-breakdown-index="' + index + '" aria-describedby="practiceBreakdownHint' + index + '" rows="3" maxlength="500" placeholder="用自己的话写一两句，暂时不用完美。">' + esc(notes[index] || '') + '</textarea>' +
             '<p class="tiny" id="practiceBreakdownHint' + index + '">检查方向：' + esc(step.hint) + '</p>' +
-            '<button type="button" class="btn sm practice-step-next" data-practice-step-next="' + index + '">' + (index + 1 === guide.steps.length ? '完成拆解，开始写 →' : '继续下一小步 →') + '</button></details>';
+            '<button type="button" class="btn sm practice-step-next" data-practice-step-next="' + displayIndex + '">' + (displayIndex + 1 === stepIndices.length ? '完成拆解，开始写 →' : '继续下一小步 →') + '</button></details>';
         }).join('') +
         '<div class="practice-breakdown-actions"><span class="tiny" id="practiceBreakdownSaveStatus" role="status" aria-live="polite">拆解笔记会自动保存在当前浏览器。</span>' +
         '<button type="button" class="btn sm ghost" data-practice-direct="' + escAttr(id) + '">先跳过，直接写</button>' +
@@ -2681,7 +2717,7 @@
     if (el.dataset.practiceStepNext !== undefined) {
       const box = el.closest('.practice-breakdown');
       if (!box) return;
-      const notes = Array.from(box.querySelectorAll('[data-practice-breakdown-index]')).map(function (input) { return input.value; });
+      const notes = practiceBreakdownNotes(box);
       window.Lab.savePracticeBreakdown(box.dataset.practiceBreakdownId, notes);
       const next = Number(el.dataset.practiceStepNext) + 1;
       const steps = Array.from(box.querySelectorAll('.practice-breakdown-step'));
@@ -2697,7 +2733,7 @@
     }
     if (el.dataset.practiceContinue || el.dataset.practiceDirect) {
       const id = el.dataset.practiceContinue || el.dataset.practiceDirect;
-      const notes = Array.from(document.querySelectorAll('[data-practice-breakdown-index]')).map(function (input) { return input.value; });
+      const notes = practiceBreakdownNotes(document.querySelector('.practice-breakdown'));
       window.Lab.continuePractice(id, notes);
       render();
       return;
@@ -2935,7 +2971,7 @@
       const box = e.target.closest('.practice-breakdown');
       if (box) {
         const id = box.dataset.practiceBreakdownId;
-        const notes = Array.from(box.querySelectorAll('[data-practice-breakdown-index]')).map(function (input) { return input.value; });
+        const notes = practiceBreakdownNotes(box);
         clearTimeout(practiceBreakdownSaveTimer);
         const status = $('#practiceBreakdownSaveStatus');
         if (status) status.textContent = '正在保存拆解笔记…';

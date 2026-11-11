@@ -608,6 +608,19 @@ body.simple-mode .simple-only{display:block}
 .practice-extra-example summary:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 .practice-extra-example .practice-example{margin-top:12px}
 .practice-main-action{margin-top:12px}
+.practice-focus-lesson{max-width:820px;margin:18px 0 24px;padding:18px 20px;border:1px solid rgba(35,131,226,.24);border-radius:10px;background:rgba(35,131,226,.035)}
+.practice-focus-lesson>h2{margin:0 0 5px}
+.practice-focus-lesson-item{padding:13px 0;border-top:1px solid var(--border)}
+.practice-focus-lesson-item h3{margin:0 0 8px;font-size:15px}
+.practice-focus-lesson-item p{margin:7px 0;line-height:1.65}
+.practice-focus-lesson-item blockquote{margin:8px 0;padding:0 0 0 12px;border-left:2px solid var(--blue);line-height:1.65}
+.practice-focus-lesson-item details{margin-top:8px}
+.practice-focus-lesson-item summary{cursor:pointer;color:var(--blue);font-weight:600}
+.practice-focus-method{margin-top:12px;padding:13px 15px;border-radius:8px;background:#fff}
+.practice-focus-method ol{margin:7px 0 0;padding-left:21px;line-height:1.75}
+.practice-breakdown-step.focused{border-color:rgba(35,131,226,.32)}
+.practice-breakdown-step.focused .practice-breakdown-title b{color:var(--blue)}
+.practice-focus-origin{margin:6px 0 9px;color:var(--text-2);font-size:12px;line-height:1.6}
 .practice-example-review{padding:10px 13px;margin:0 0 19px;border:1px solid var(--border);border-radius:8px;font-size:13px}
 .practice-example-review summary{cursor:pointer;font-weight:600;color:var(--blue)}
 .practice-example-review p{margin:9px 0 0;color:var(--text-2)}
