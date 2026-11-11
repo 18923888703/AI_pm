@@ -249,7 +249,7 @@
     if (existing && existing.date === today && !existing.completedAt) return existing;
     const unique = selectDailyTerms(termIds, requiredTermIds);
     mem.dailyLearning = {
-      date: today, startedAt: Date.now(), completedAt: 0, index: 0,
+      date: today, selectionVersion: 2, startedAt: Date.now(), completedAt: 0, index: 0,
       questions: unique.map(function (termId) {
         const q = pick(termId);
         return { termId: termId, questionId: q.id, review: q.review, optionIds: q.options.map(function (o) { return o.id; }) };
@@ -262,6 +262,19 @@
   function daily() {
     const s = window.Mem.state.dailyLearning;
     if (!s || s.date !== dayKey()) return null;
+    // 旧版未作答的固定顺序会话只迁移一次；已答记录对应的题目顺序不动。
+    if (!s.completedAt && !s.feedback && s.selectionVersion !== 2) {
+      const answered = (s.questions || []).slice(0, s.responses ? s.responses.length : 0);
+      const pending = shuffled((s.questions || []).slice(answered.length)).map(function (question) {
+        const ref = Object.assign({}, question);
+        ref.optionIds = shuffled((ref.optionIds || []).slice());
+        return ref;
+      });
+      s.questions = answered.concat(pending);
+      s.index = answered.length;
+      s.selectionVersion = 2;
+      window.Mem.save();
+    }
     if (!s.completedAt && s.feedback && s.responses.length === s.questions.length) {
       finishSession(s);
       window.Mem.save();
